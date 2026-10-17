@@ -37,6 +37,10 @@ sealed partial class PetForm
     internal Dictionary<string,bool> VerifyDockPeeking(string output)
     {
         var checks=new Dictionary<string,bool>();var area=Screen.FromControl(this).WorkingArea;var far=new Point(area.Right-2,area.Top+5);
+        for(int i=0;i<5;i++)RevealDock(true);
+        checks["repeated_click_reveal_keeps_visible_footer_without_reshowing"]=foot.Visible&&foot.Opacity==1;
+        foot.Hide();RevealDock(true);RevealDock(true);
+        checks["click_reveal_restores_hidden_footer_and_is_repeatable"]=foot.Visible;
         Location=new Point(area.Left,area.Top+Math.Max(20,(area.Height-Height)/2));dockMotion.Reset(0);
         for(int t=0;t<=2400;t+=32)AdvanceDock(t,far);
         checks["tucked_pet_hides_all_footer_buttons"]=dockMotion.Progress>=.999f&&!foot.Visible;

@@ -477,7 +477,7 @@ sealed partial class PetForm : Form
             }
         };
         Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();};
-        Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; hit.Show(this); PositionFoot(); foot.Show(this); };
+        Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; if(!hit.Visible)hit.Show(this); PositionFoot(); if(!foot.Visible)foot.Show(this); };
         LocationChanged += (_, _) => OnDockLocationChanged();
         ClientSizeChanged += (_, _) => { SyncDockHit(); PositionFoot(); };
         animation.Interval = 140;
@@ -510,7 +510,7 @@ sealed partial class PetForm : Form
         if (hide == hiddenForFullscreen) return;
         hiddenForFullscreen = hide;
         if (hide) { hoverCard?.Hide();feedback?.Hide();if(reminders?.Visible==true)reminders.Hide();launcher.Hide(); foot.CollapseSearch(); hit.Hide(); foot.Hide(); Hide(); }
-        else { Show(); hit.Show(this); PositionFoot(); if(dockMotion.Progress<.001f)foot.Show(this);if(reminders!=null&&!reminders.IsDisposed&&reminders.PendingCount>0&&!QuietHours.Load().Contains(DateTime.Now))reminders.Present([]); }
+        else { Show(); if(!hit.Visible)hit.Show(this); PositionFoot(); if(dockMotion.Progress<.001f&&!foot.Visible)foot.Show(this);if(reminders!=null&&!reminders.IsDisposed&&reminders.PendingCount>0&&!QuietHours.Load().Contains(DateTime.Now))reminders.Present([]); }
     }
     void Animate()
     {

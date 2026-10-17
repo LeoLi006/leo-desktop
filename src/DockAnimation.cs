@@ -73,7 +73,7 @@ sealed partial class PetForm
         if(!immediate)return;
         var shift=dockShift;dockShift=Point.Empty;movingDock=true;try{Location=new Point(Left-shift.X,Top-shift.Y);}finally{movingDock=false;}
         dockMotion.Reset(clock.ElapsedMilliseconds);SyncDockHit();Invalidate();
-        if(!hiddenForFullscreen&&IsHandleCreated&&!previewMode){PositionFoot();foot.Opacity=1;foot.Show(this);}
+        if(!hiddenForFullscreen&&IsHandleCreated){PositionFoot();foot.Opacity=1;if(!foot.Visible)foot.Show(this);}
     }
     void OnDockLocationChanged()
     {
