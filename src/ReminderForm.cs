@@ -1,0 +1,15 @@
+﻿namespace LeoLauncher;
+sealed class ReminderForm:BarcaWindow
+{
+    readonly TodoStore store;readonly Action<DailyTask> open;readonly HashSet<string> ids=new();
+    readonly FlowLayoutPanel list=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(16,8,12,8)};
+    public int PendingCount=>ids.Count;
+    protected override bool ShowWithoutActivation=>true;
+    public ReminderForm(TodoStore tasks,Action<DailyTask> openTask){store=tasks;open=openTask;Text="Leo · 到时间了";ClientSize=new Size(490,360);TopMost=true;ShowInTaskbar=false;var chrome=BarcaUi.Chrome(this,"到时间了","先做一件，或给自己多一点时间。");chrome.Height=82;Controls.Add(list);Controls.Add(chrome);MaximizeBox=false;MinimumSize=MaximumSize=Size;store.Changed+=Changed;}
+    bool queued;
+    void Changed(){if(IsDisposed||!IsHandleCreated||queued)return;queued=true;try{BeginInvoke((Action)(()=>{queued=false;if(!IsDisposed){Render();if(ids.Count==0)Close();}}));}catch(InvalidOperationException){queued=false;}}
+    protected override void Dispose(bool disposing){if(disposing)store.Changed-=Changed;base.Dispose(disposing);}
+    public void Present(IEnumerable<DailyTask> tasks){foreach(var task in tasks)ids.Add(task.Id);Render();if(ids.Count==0)return;var area=Screen.FromPoint(Cursor.Position).WorkingArea;Location=new Point(area.Right-Width-18,area.Bottom-Height-18);Show();}
+    void Act(string id,Action action){try{action();ids.Remove(id);Render();if(ids.Count==0)Close();}catch(Exception e){MessageBox.Show(this,e.Message,"Leo · 提醒未保存");}}
+    void Render(){foreach(Control c in list.Controls.Cast<Control>().ToArray())c.Dispose();foreach(var id in ids.ToArray()){var task=store.Items.FirstOrDefault(t=>t.Id==id);if(task==null||task.Completed!=null||task.Reminder==null||task.Reminder>DateTimeOffset.Now){ids.Remove(id);continue;}var card=new RoundedSurface{Width=435,Height=123,BackColor=BarcaUi.Surface,Margin=new Padding(0,0,0,10)};card.Controls.Add(new Label{Text=task.Title,Bounds=new Rectangle(13,10,406,28),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(11,true),AutoEllipsis=true});card.Controls.Add(new Label{Text=task.Reminder?.ToLocalTime().ToString("MM.dd HH:mm")??"清单提醒",Bounds=new Rectangle(14,41,390,21),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});var ten=new BarcaButton{Text="10分钟后",AccessibleName="10分钟后提醒",Bounds=new Rectangle(12,77,100,31)};var hour=new BarcaButton{Text="1小时后",AccessibleName="1小时后提醒",Bounds=new Rectangle(119,77,100,31)};var done=new BarcaButton{Text="完成",AccessibleName="完成提醒事项",Bounds=new Rectangle(226,77,81,31),ForeColor=BarcaUi.Gold};var show=new BarcaButton{Text="查看",Bounds=new Rectangle(314,77,105,31)};ten.Click+=(_,_)=>Act(id,()=>store.Snooze(id,10,DateTimeOffset.Now));hour.Click+=(_,_)=>Act(id,()=>store.Snooze(id,60,DateTimeOffset.Now));done.Click+=(_,_)=>Act(id,()=>{var latest=store.Items.FirstOrDefault(t=>t.Id==id);if(latest?.Completed==null)store.Toggle(id);});show.Click+=(_,_)=>open(task);card.Controls.AddRange([ten,hour,done,show]);list.Controls.Add(card);}}
+}

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>LeoLauncher</AssemblyName><ApplicationIcon>leo.ico</ApplicationIcon>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>0.38.0</Version><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="leo.ico" CopyToOutputDirectory="PreserveNewest" /><PackageReference Include="System.Speech" Version="9.0.0" />
+    <Reference Include="NAudio.WinMM"><HintPath>../.deps/naudio.winmm/lib/netstandard2.0/NAudio.WinMM.dll</HintPath></Reference>
+    <Reference Include="NAudio.Core"><HintPath>../.deps/naudio.core/lib/netstandard2.0/NAudio.Core.dll</HintPath></Reference>
+    <Reference Include="sherpa-onnx"><HintPath>../.deps/sherpa/lib/net8.0/sherpa-onnx.dll</HintPath></Reference>
+    <Content Include="../.deps/native/runtimes/win-x64/native/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="../assets/**/*" Link="assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+<Content Include="../licenses/**/*" Link="licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+</Project>
+

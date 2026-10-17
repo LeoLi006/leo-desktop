@@ -1,0 +1,77 @@
+﻿using System.Diagnostics;
+using System.Net.Http;
+using System.Text.Json;
+namespace LeoLauncher;
+sealed partial class ChatForm
+{
+    readonly Panel bodyHost=new(){Dock=DockStyle.Fill,Padding=new Padding(16,8,16,0)};
+    readonly FlowLayoutPanel results=new(){Dock=DockStyle.Fill,AutoScroll=true,WrapContents=false,FlowDirection=FlowDirection.TopDown,Padding=new Padding(8)};
+    readonly Panel options=new(){Dock=DockStyle.Bottom,Height=99,BackColor=BarcaUi.Surface,Visible=false};
+    readonly Panel topPanel=new();
+    readonly Button settingsButton=new BarcaButton{Text="设置",Size=new Size(66,32)};
+    readonly Action<QuickIntent>? todoAction;
+    readonly Action? openClipboard;
+    readonly TodoStore? planStore;
+    string lastAnswer="";
+    void ShowView(Control view){foreach(Control c in bodyHost.Controls)c.Visible=c==view;view.BringToFront();}
+    void ClearResults(){foreach(Control c in results.Controls.Cast<Control>().ToArray())c.Dispose();ShowView(results);}
+    int ResultWidth=>Math.Max(250,results.ClientSize.Width-30);
+    void ResultText(string text,bool heading=false){results.Controls.Add(new Label{Text=text,Width=ResultWidth,Height=heading?39:Math.Clamp(TextRenderer.MeasureText(text,Font,new Size(ResultWidth-12,2000),TextFormatFlags.WordBreak).Height+16,35,400),Padding=new Padding(4,heading?8:4,4,3),ForeColor=heading?BarcaUi.Text:BarcaUi.Muted,Font=heading?BarcaUi.Font(13,true):Font});}
+    void Choice(string text,Action action){var button=new BarcaButton{Text=text,Width=ResultWidth,Height=41,Margin=new Padding(0,2,0,6)};button.Click+=(_,_)=>{try{action();}catch(Exception e){state.Text=e.Message;}};results.Controls.Add(button);}
+    void ShowHome(){ClearResults();ResultText("有什么交给我？",true);ResultText("打开应用、安排清单、查比赛，直接说就好。");Choice("看看今晚的比赛",()=>{input.Text="今晚看球";_=SendAsync();});if(turns.Count>0)Choice("继续刚才的话题",()=>ShowView(transcript));lastAnswer="";}
+    void ShowTeamChoices(){ClearResults();ResultText("想看看哪支球队？",true);foreach(string name in FootballForm.FixedFollowing)Choice(name,()=>{input.Text=name+"近况";_=SendAsync();});}
+    void LocalDone(string text){lastAnswer=text;state.Text="本地完成 · 无 AI 请求";}
+    async Task HandleQuickAsync(QuickIntent intent,string prompt)
+    {
+        var request=new CancellationTokenSource(TimeSpan.FromSeconds(90));pending=request;send.Enabled=false;stop.Enabled=true;UpdateVoice();
+        try{
+            switch(intent.Kind){
+                case QuickKind.LeoCommand:if(appTools==null)throw new InvalidOperationException("功能尚未就绪");ClearResults();var result=await appTools.ExecuteLeoAsync(intent.Value,intent.Argument,request.Token);ResultText(result);LocalDone(result);break;
+                case QuickKind.Todos:case QuickKind.AddTodo:case QuickKind.CompleteTodo:if(todoAction==null)throw new InvalidOperationException("请从 Leo 脚下清单图标打开每日清单");todoAction(intent);LocalDone("已在独立清单中处理");break;
+                case QuickKind.Clipboard:if(openClipboard==null)throw new InvalidOperationException("请从 Leo 入口打开剪贴板");openClipboard();ClearResults();ResultText("剪贴板已打开",true);LocalDone("已打开剪贴板");break;
+                case QuickKind.Web:if(!preview)Process.Start(FootTools.EdgeStart(intent.Value));ClearResults();ResultText("已在浏览器搜索",true);ResultText(intent.Value);LocalDone("已打开网页搜索");break;
+                case QuickKind.OpenApp:case QuickKind.SearchApp:
+                    ClearResults();ResultText("应用",true);
+                    if(intent.Value is "应用" or "软件"||string.IsNullOrWhiteSpace(intent.Value)){ResultText("输入或说：打开微信、打开浏览器。");break;}
+                    if(appTools==null)throw new InvalidOperationException("本机应用索引尚未就绪");var apps=appTools.FindLocal(intent.Value);var exact=apps.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(intent.Value)).ToArray();
+                    if(intent.Kind==QuickKind.OpenApp&&(apps.Length==1||exact.Length==1)){var app=exact.Length==1?exact[0]:apps[0];appTools.OpenLocal(app);ResultText("已打开 "+app.Name);LocalDone("已打开"+app.Name);}
+                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,()=>{appTools.OpenLocal(app);LocalDone("已打开"+app.Name);});}break;
+                case QuickKind.Football:await ShowFootball(intent,request.Token);break;
+            }
+        }catch(OperationCanceledException){state.Text="已停止";}catch(Exception e){state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
+        finally{pending=null;request.Dispose();if(!IsDisposed){send.Enabled=true;UpdateVoice();input.Focus();}}
+    }
+    async Task<(TeamData Data,Club Club,bool Stale)> TeamFacts(string name,CancellationToken token)
+    {
+        var club=Club.For(name);var data=TeamData.Load(club);bool stale=false;
+        if(!preview&&(data.MatchesUpdated<DateTimeOffset.UtcNow.AddMinutes(-10)||data.TableUpdated<DateTimeOffset.UtcNow.AddMinutes(-10))){var result=await TeamData.Fetch(club,data,token);data=result.Data;stale=result.MatchesFailed||result.TableFailed;}
+        return(data,club,stale);
+    }
+    async Task ShowFootball(QuickIntent intent,CancellationToken token)
+    {
+        ClearResults();state.Text="正在查询赛程…";
+        if(intent.Value.Contains("球队近况")&&intent.Team.Length==0){ShowTeamChoices();return;}
+        if(intent.Team.Length>0){
+            var fact=await TeamFacts(intent.Team,token);if(IsDisposed)return;
+            bool ranking=System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"积分|排名|第几");
+            ResultText(fact.Club.Name+(ranking?" · "+fact.Club.LeagueName+"积分榜":" · 近期比赛"),true);
+            if(ranking){var selected=fact.Data.Rows.FirstOrDefault(r=>r.Id==fact.Club.Id);var group=fact.Data.Rows.Where(r=>selected==null||r.Group==selected.Group).ToArray();results.Controls.Add(new StandingsLine(null,false){Width=ResultWidth});foreach(var row in group.Where((r,i)=>i<5||r.Id==fact.Club.Id))results.Controls.Add(new StandingsLine(row,row.Id==fact.Club.Id){Width=ResultWidth});lastAnswer=selected==null?"暂无排名数据":fact.Club.Name+"目前排名第"+selected.Rank+"，积分"+selected.Points+"。";}
+            else{bool recent=System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"近况|最近|上一场|昨天|前天|赛果|比分");IEnumerable<FootballMatch> matches=recent?fact.Data.Matches.Where(m=>m.State=="post").OrderByDescending(m=>m.Kickoff):fact.Data.Matches.Where(m=>m.State!="post"&&m.Kickoff>DateTimeOffset.UtcNow.AddHours(-3)).OrderBy(m=>m.Kickoff);if(System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"昨天|前天|明天|今天")){int offset=intent.Value.Contains("昨天")?-1:intent.Value.Contains("前天")?-2:intent.DayOffset;var date=DateTime.Today.AddDays(offset);matches=fact.Data.Matches.Where(m=>m.Kickoff.LocalDateTime.Date==date).OrderBy(m=>m.Kickoff);}ShowMatches(matches.Take(System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"下一场|上一场")?1:3));lastAnswer="已显示"+fact.Club.Name+"近期比赛。";}
+            var time=ranking?fact.Data.TableUpdated:fact.Data.MatchesUpdated;ResultText("ESPN · "+(time==default?"暂无缓存":time.ToLocalTime().ToString("MM-dd HH:mm")+" 更新")+(fact.Stale?" · 更新失败，含旧数据":""));
+        }else{
+            var cache=FootballFeed.LoadCache();bool stale=false;if(!preview&&(cache.SchemaVersion<2||cache.Updated<DateTimeOffset.UtcNow.AddMinutes(-10)))try{cache=await FootballFeed.FetchAsync(cache,token);}catch(HttpRequestException){stale=true;}
+            if(IsDisposed)return;bool overnight=intent.Value.Contains("今晚");var start=DateTimeOffset.Now.Date.AddDays(intent.DayOffset).AddHours(overnight?16:0);var end=start.AddHours(overnight?16:24);
+            bool timed=intent.Value.Contains("今晚")||intent.Value.Contains("明天")||intent.Value.Contains("今天");
+            var matches=cache.Matches.Where(m=>(FootballFeed.FollowTags(m,FootballForm.FixedFollowing).Length>0||FootballFeed.IsFocus(m))&&(timed?m.Kickoff.LocalDateTime>=start&&m.Kickoff.LocalDateTime<end:m.Kickoff>=DateTimeOffset.UtcNow&&m.Kickoff<=DateTimeOffset.UtcNow.AddHours(48))).OrderBy(m=>m.Kickoff).Take(8).ToArray();
+            ResultText(timed?start.ToString("MM-dd HH:mm")+" — "+end.ToString("MM-dd HH:mm")+" · 看球清单":"近期值得关注的比赛",true);ShowMatches(matches);ResultText("按关注球队与焦点对阵筛选 · ESPN "+cache.Updated.ToLocalTime().ToString("MM-dd HH:mm")+(stale||cache.FailedSources>0?" · 含旧缓存":""));lastAnswer=matches.Length>0?"找到"+matches.Length+"场比赛。":"这个时段暂无已公布的匹配比赛。";
+        }
+        state.Text="赛程查询 · 无 AI 请求";
+    }
+    void ShowMatches(IEnumerable<FootballMatch> matches){var rows=matches.ToArray();if(rows.Length==0)ResultText("暂无已公布的匹配比赛。");foreach(var m in rows){var card=new MatchCard(m,"",planStore){Width=ResultWidth};card.Click+=(_,_)=>{if(!preview&&m.Id.Length>0&&m.Id.All(char.IsAsciiDigit))try{Process.Start(new ProcessStartInfo("https://www.espn.com/soccer/match/_/gameId/"+m.Id){UseShellExecute=true});}catch{state.Text="无法打开比赛来源";}};results.Controls.Add(card);}}
+    async Task<string> AnalysisFacts(QuickIntent intent,CancellationToken token)
+    {
+        if(intent.Team.Length==0){var cache=FootballFeed.LoadCache();if(!preview&&cache.Updated<DateTimeOffset.UtcNow.AddMinutes(-10))cache=await FootballFeed.FetchAsync(cache,token);return "当前时间："+DateTimeOffset.Now.ToString("O")+"。以下是ESPN公开比赛数据，来源https://www.espn.com/soccer/scoreboard 。只依据数据简短分析，不得编造伤停、新闻和比赛过程。\n"+JsonSerializer.Serialize(new{cache.Updated,cache.FailedSources,matches=cache.Matches.Where(m=>FootballFeed.IsRecent(m,DateTimeOffset.UtcNow)&&(FootballFeed.FollowTags(m,FootballForm.FixedFollowing).Length>0||FootballFeed.IsFocus(m))).Take(20)});}
+        string team=intent.Team;var fact=await TeamFacts(team,token);
+        return "当前时间："+DateTimeOffset.Now.ToString("O")+"。以下为 ESPN 结构化查询结果。只依据这些事实分析，明确区分推测；没有查询伤停、首发、新闻和比赛过程，不得编造。若现有数据不足，直接说明。来源比赛页：https://www.espn.com/soccer/match/_/gameId/{Id}；积分榜：https://www.espn.com/soccer/standings/_/league/"+fact.Club.League+"。\n"+JsonSerializer.Serialize(new{team, fact.Data.MatchesUpdated,fact.Data.TableUpdated,stale=fact.Stale,matches=fact.Data.Matches.Take(12),table=fact.Data.Rows.Where(r=>r.Id==fact.Club.Id)});
+    }
+}

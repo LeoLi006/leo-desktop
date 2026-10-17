@@ -1,0 +1,22 @@
+[
+  {
+    "file": "naudio.core.2.2.1.nupkg",
+    "sha256": "794645dbfd30e4880663d52d9d9224d55c301fa54228ff623c95d572c7887347"
+  },
+  {
+    "file": "naudio.winmm.2.2.1.nupkg",
+    "sha256": "48da978d715f219489c050ee8c32c64f80ff73718eba237ebcbc636ba5902be3"
+  },
+  {
+    "file": "org.k2fsa.sherpa.onnx.1.13.8.nupkg",
+    "sha256": "f89f28fc6fbbc894a46c2c73b040780ec6ea7a21400d9d219dce4d2333981d57"
+  },
+  {
+    "file": "org.k2fsa.sherpa.onnx.runtime.win-x64.1.13.8.nupkg",
+    "sha256": "2257c06893d1d90792ea3157606de33a51122d935b6913bed5442d2ffb9e9bd7"
+  },
+  {
+    "file": "system.speech.9.0.0.nupkg",
+    "sha256": "eca077ec3b25d81a35eca5b1f5e53a84fd43dbf0ada21eac3be2538b21dd23a5"
+  }
+]

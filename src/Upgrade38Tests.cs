@@ -1,0 +1,25 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
+namespace LeoLauncher;
+static class Upgrade38Tests
+{
+    public static Dictionary<string,bool> Check(string directory){var c=new Dictionary<string,bool>();using(var pet=new PetForm(new Preferences(),true)){pet.Show();Application.DoEvents();var menu=pet.ContextMenuStrip!;menu.Show(new Point(20,20));Application.DoEvents();c["redundant_launcher_item_removed"]=menu.Items.Cast<ToolStripItem>().All(i=>i.Text?.Contains("应用")!=true);c["only_one_music_entry_at_top_level"]=menu.Items.Cast<ToolStripItem>().Count(i=>i.Text=="音乐")==1&&menu.Items.Cast<ToolStripItem>().All(i=>i.Text?.Contains("赛前")!=true);var group=menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="音乐");group.ShowDropDown();Application.DoEvents();using(var sub=new Bitmap(group.DropDown.Width,group.DropDown.Height)){group.DropDown.DrawToBitmap(sub,group.DropDown.ClientRectangle);sub.Save(Path.Combine(directory,"preview-music-submenu38.png"));}c["music_submenu_opens_on_hover_path"]=group.DropDown.Visible&&group.DropDownItems.Cast<ToolStripItem>().Any(i=>i.Text=="显示 / 隐藏歌词");using(var b=new Bitmap(menu.Width,menu.Height)){menu.DrawToBitmap(b,menu.ClientRectangle);b.Save(Path.Combine(directory,"preview-context38.png"));}group.HideDropDown();menu.Close();}
+        var song=new MusicSong("97773","0039MnYb0qxYhV","晴天","周杰伦");string command=QQNative.PlayCommand(song);using(var memory=new MemoryStream(QQNative.Packet(command)))using(var reader=new BinaryReader(memory)){int total=reader.ReadInt32(),tag=reader.ReadInt32();ushort version=reader.ReadUInt16();int type=reader.ReadInt32(),count=reader.ReadInt32();string payload=Encoding.Unicode.GetString(reader.ReadBytes(count));c["native_packet_matches_verified_client_protocol"]=total==memory.Length&&tag==0x514d4153&&version==100&&type==4&&payload==command;c["silent_flag_follows_play_command"]=payload.EndsWith("' /silent")&&payload.Contains("cmd_count==1&&id_0==97773&&songtype_0==0");}bool rejected=false;try{QQNative.PlayCommand(song with{Id="1' /exit"});}catch(ArgumentException){rejected=true;}c["song_id_cannot_inject_client_commands"]=rejected;using(var image=LeoBrand.Icon.ToBitmap()){c["custom_tray_icon_has_transparency_and_color"]=image.Width==32&&image.GetPixel(0,0).A==0&&image.GetPixel(16,5).A>0;image.Save(Path.Combine(directory,"preview-tray38.png"));}return c;
+    }
+}
+static class QQNativeLive38
+{
+    delegate void Hook(IntPtr hook,uint evt,IntPtr h,int obj,int child,uint thread,uint ms);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr FindWindow(string cls,string title);
+    [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint id);
+    [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")]static extern bool ShowWindow(IntPtr h,int how);
+    [DllImport("user32.dll")]static extern IntPtr SetWinEventHook(uint from,uint to,IntPtr module,Hook callback,uint pid,uint tid,uint flags);
+    [DllImport("user32.dll")]static extern bool UnhookWinEvent(IntPtr h);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetWindowText(IntPtr h,StringBuilder text,int count);
+    static string Title(IntPtr h){var b=new StringBuilder(512);GetWindowText(h,b,512);return b.ToString();}
+    public static object Run(){var daemon=FindWindow("QQMusic_Daemon_Wnd",null!);GetWindowThreadProcessId(daemon,out uint pid);string title=Title(daemon);var main=FindWindow("TXGuiFoundation",title);if(main==IntPtr.Zero)throw new IOException("未找到QQ主窗口");bool wasVisible=IsWindowVisible(main);ShowWindow(main,0);var events=new List<string>();Hook callback=(_,evt,h,obj,child,_,_)=>{if(h==main&&(evt==3||evt==0x8002&&obj==0&&child==0))events.Add(evt==3?"foreground":"main_shown");};var hook=SetWinEventHook(3,0x8002,IntPtr.Zero,callback,pid,0,0);string after="";string lyricFirst="",lyricSecond="";bool lyricOriginal=QQNative.LyricsVisible((int)pid);try{var library=new MusicLibrary(Path.Combine(Store.Root,"leo-playlists.json"));var choices=library.Items.First(p=>p.Songs.Count>=2).Songs;var song=title.Contains(choices[0].Name,StringComparison.OrdinalIgnoreCase)?choices[1]:choices[0];QQNative.Play(song);var until=DateTime.UtcNow.AddSeconds(6);while(DateTime.UtcNow<until){Application.DoEvents();Thread.Sleep(10);}after=Title(daemon);lyricFirst=Pump(QQNative.ToggleLyrics());lyricSecond=Pump(QQNative.ToggleLyrics());return new{ok=events.Count==0&&!IsWindowVisible(main)&&after!=title&&QQNative.LyricsVisible((int)pid)==lyricOriginal,silent_play_changed_title=after!=title,main_window_stayed_hidden=!IsWindowVisible(main),main_window_events=events,lyrics_first=lyricFirst,lyrics_second=lyricSecond,lyrics_state_restored=QQNative.LyricsVisible((int)pid)==lyricOriginal,model_requests=0};}finally{UnhookWinEvent(hook);GC.KeepAlive(callback);if(wasVisible)ShowWindow(main,4);}}
+    static string Pump(Task<string> task){var until=DateTime.UtcNow.AddSeconds(4);while(!task.IsCompleted&&DateTime.UtcNow<until){Application.DoEvents();Thread.Sleep(10);}return task.GetAwaiter().GetResult();}
+}
