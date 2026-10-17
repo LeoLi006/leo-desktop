@@ -10,6 +10,7 @@ sealed partial class ChatForm
 }
 static class QuickTests
 {
+    static IEnumerable<Control> Descendants(Control root){yield return root;foreach(Control c in root.Controls)foreach(var child in Descendants(c))yield return child;}
     public static Dictionary<string,bool> Check(string directory)
     {
         using var footballFixture=new FootballTestCache();var checks=new Dictionary<string,bool>();
@@ -22,6 +23,10 @@ static class QuickTests
         string bad=Path.Combine(directory,"todo-corrupt-fixture.json");File.WriteAllText(bad,"broken fixture");try{new TodoStore(bad).Add("不能覆盖",day);checks["corrupt_file_preserved"]=false;}catch(IOException){checks["corrupt_file_preserved"]=File.ReadAllText(bad)=="broken fixture";}
         checks["local_intent_routes"]=QuickRouter.Route("打开微信").Kind==QuickKind.OpenApp&&QuickRouter.Route("巴萨下一场什么时候").Kind==QuickKind.Football&&QuickRouter.Route("曼城排第几").Kind==QuickKind.Football&&QuickRouter.Route("今晚有什么值得看").Kind==QuickKind.Football&&QuickRouter.Route("明天添加待办，买牛奶").DayOffset==1;
         checks["analysis_and_casual_chat_need_model"]=QuickRouter.Route("分析巴萨为什么输了").Kind==QuickKind.FootballAnalysis&&QuickRouter.Route("今天有点烦，聊聊").Kind==QuickKind.Ai;
+        checks["club_mentions_do_not_hijack_conversation"]=new[]{"我喜欢巴萨和曼城","你觉得巴萨和曼城谁更强","巴萨球衣真好看","我今天看了曼城比赛很开心","巴萨下一场什么时候，然后帮我安排任务"}.All(t=>QuickRouter.Route(t).Kind==QuickKind.Ai);
+        checks["today_plan_shortcut_routes_locally"]=QuickRouter.Route("看看今天的清单").Kind==QuickKind.Todos;
+        var startup=QQNative.StartupRequest(@"C:\QQMusic\QQMusic.exe",new MusicSong("97773","0039MnYb0qxYhV","晴天","周杰伦"));
+        checks["cold_music_start_carries_song_and_silent_flag"]=startup.Arguments==QQNative.PlayCommand(new MusicSong("97773","0039MnYb0qxYhV","晴天","周杰伦"))&&startup.WindowStyle==System.Diagnostics.ProcessWindowStyle.Hidden;
         int calls=0,opened=0;var apps=new[]{new AppEntry("微信","fixture-wx"),new AppEntry("浏览器甲","fixture-a"),new AppEntry("浏览器乙","fixture-b")};
         using var daily=new TodoForm(true);
         using var window=new ChatForm(true,ChatTests.Settings(),()=>{calls++;return ChatTests.FixtureApi();},new AppTools(()=>apps,_=>opened++),onTodo:intent=>{daily.Show();daily.Apply(intent);});window.Show();Application.DoEvents();
@@ -34,6 +39,8 @@ static class QuickTests
         Send("巴萨下一场什么时候");checks["football_fact_uses_match_cards"]=window.PreviewMatchCards>0;
         checks["local_commands_make_zero_model_requests"]=calls==0;
         Send("你好，陪我聊两句");checks["casual_chat_invokes_model_after_local_routes"]=calls==1&&window.PreviewReplyComplete;
+        Send("我喜欢巴萨和曼城");checks["club_conversation_streams_reply"]=calls==2&&window.PreviewReplyComplete;
+        window.PreviewHome();var todayButton=window.Controls.Cast<Control>().SelectMany(Descendants).OfType<Button>().Single(b=>b.Text=="看看今天的清单");todayButton.PerformClick();Application.DoEvents();checks["today_shortcut_opens_plan_without_model"]=daily.Visible&&calls==2;
         var links=new WatchLinkStore(Path.Combine(directory,"watch-fixture.json"));links.Save(Enumerable.Range(1,4).Select(i=>new WatchLink("入口"+i,"https://example.com/"+i)));checks["four_watch_links_persist"]=new WatchLinkStore(Path.Combine(directory,"watch-fixture.json")).Items[3].Url=="https://example.com/4";try{FootTools.EdgeUrlStart("javascript:alert(1)");checks["invalid_link_rejected"]=false;}catch(ArgumentException){checks["invalid_link_rejected"]=true;}
         File.Delete(path);File.Delete(bad);return checks;
     }

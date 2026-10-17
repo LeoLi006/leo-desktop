@@ -18,7 +18,7 @@ sealed partial class ChatForm
     int ResultWidth=>Math.Max(250,results.ClientSize.Width-30);
     void ResultText(string text,bool heading=false){results.Controls.Add(new Label{Text=text,Width=ResultWidth,Height=heading?39:Math.Clamp(TextRenderer.MeasureText(text,Font,new Size(ResultWidth-12,2000),TextFormatFlags.WordBreak).Height+16,35,400),Padding=new Padding(4,heading?8:4,4,3),ForeColor=heading?BarcaUi.Text:BarcaUi.Muted,Font=heading?BarcaUi.Font(13,true):Font});}
     void Choice(string text,Action action){var button=new BarcaButton{Text=text,Width=ResultWidth,Height=41,Margin=new Padding(0,2,0,6)};button.Click+=(_,_)=>{try{action();}catch(Exception e){state.Text=e.Message;}};results.Controls.Add(button);}
-    void ShowHome(){ClearResults();ResultText("有什么交给我？",true);ResultText("打开应用、安排清单、查比赛，直接说就好。");Choice("看看今晚的比赛",()=>{input.Text="今晚看球";_=SendAsync();});if(turns.Count>0)Choice("继续刚才的话题",()=>ShowView(transcript));lastAnswer="";}
+    void ShowHome(){ClearResults();ResultText("有什么交给我？",true);ResultText("打开应用、安排清单、查比赛，直接说就好。");Choice("看看今晚的比赛",()=>{input.Text="今晚看球";_=SendAsync();});Choice("看看今天的清单",()=>{input.Text="看看今天的清单";_=SendAsync();});if(turns.Count>0)Choice("继续刚才的话题",()=>ShowView(transcript));lastAnswer="";}
     void ShowTeamChoices(){ClearResults();ResultText("想看看哪支球队？",true);foreach(string name in FootballForm.FixedFollowing)Choice(name,()=>{input.Text=name+"近况";_=SendAsync();});}
     void LocalDone(string text){lastAnswer=text;state.Text="本地完成 · 无 AI 请求";}
     async Task HandleQuickAsync(QuickIntent intent,string prompt)
