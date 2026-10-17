@@ -112,10 +112,10 @@ sealed class ConversationView:Panel
         int y=12,available=Math.Max(300,ClientSize.Width-32);
         for(int i=0;i<data.Count;i++){
             var item=data[i];
-            if(i==rows.Count){var row=new RoundedSurface{BackColor=BarcaUi.Surface};var label=new Label{Font=labelFont,ForeColor=BarcaUi.Gold,Bounds=new Rectangle(17,11,500,20)};var rich=new RichTextBox{ReadOnly=true,BorderStyle=BorderStyle.None,DetectUrls=false,Font=bodyFont,ForeColor=BarcaUi.Text,ScrollBars=RichTextBoxScrollBars.None};row.Controls.Add(label);row.Controls.Add(rich);Controls.Add(row);rows.Add(row);texts.Add(rich);signatures.Add("");}
+            if(i==rows.Count){var row=new SpeechSurface{BackColor=BarcaUi.Surface};var label=new Label{Font=labelFont,ForeColor=BarcaUi.Gold,Bounds=new Rectangle(17,11,500,20)};var rich=new RichTextBox{ReadOnly=true,BorderStyle=BorderStyle.None,DetectUrls=false,Font=bodyFont,ForeColor=BarcaUi.Text,ScrollBars=RichTextBoxScrollBars.None};row.Controls.Add(label);row.Controls.Add(rich);Controls.Add(row);rows.Add(row);texts.Add(rich);signatures.Add("");}
             var panel=rows[i];var text=texts[i];int width=item.User?Math.Max(260,(int)(available*.82)):available;
-            panel.BackColor=item.User?Color.FromArgb(27,48,79):BarcaUi.Surface;text.BackColor=panel.BackColor;
-            ((Label)panel.Controls[0]).Text=item.Name;((Label)panel.Controls[0]).Width=width-34;
+            ((SpeechSurface)panel).IsUser=item.User;panel.BackColor=item.User?Color.FromArgb(27,48,79):Color.FromArgb(32,27,48);text.BackColor=panel.BackColor;
+            ((Label)panel.Controls[0]).Text=item.User?"你":"LEO  ·  随时在你身边";((Label)panel.Controls[0]).Width=width-34;
             text.SetBounds(17,38,width-34,50);
             if(signatures[i]!=item.Text){text.Text=item.Text;signatures[i]=item.Text;}
             int height=Math.Clamp(TextRenderer.MeasureText(item.Text,bodyFont,new Size(width-39,int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl).Height+12,35,1400);

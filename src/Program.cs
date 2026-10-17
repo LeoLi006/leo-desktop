@@ -168,6 +168,7 @@ static class Program
         if(args.Length==1&&args[0]=="--enable-startup"){LeoStartup.SetEnabled(true);return;}
         Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         Application.EnableVisualStyles();
+        BarcaScrollTheme.Start();
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--ask-data-test")
         {
@@ -362,8 +363,10 @@ static class Program
             Environment.ExitCode = checks.Values.All(x => x) ? 0 : 1;
             return;
         }
+        if(args.Contains("--startup")) { Environment.CurrentDirectory=AppContext.BaseDirectory; LeoStartup.Log("登录启动已执行"); }
         bool isPreview = args.Length == 2 && args[0].StartsWith("--preview");
         using var mutex = new Mutex(true, isPreview ? "Local\\LeoLauncherPreview" + Environment.ProcessId : "Local\\LeoLauncherOriginalGoat", out bool created);
+        if (!created && args.Contains("--startup")) return;
         if (!created) { MessageBox.Show("Leo 已在运行。请先右键旧版小羊并退出，再启动新版。", "Leo"); return; }
         try
         {
@@ -381,9 +384,10 @@ static class Program
                 pet.SaveInteractionReport(Path.ChangeExtension(args[1], ".interaction.json"));
                 return;
             }
+            if(args.Contains("--startup"))pet.Shown+=(_,_)=>LeoStartup.Log("登录启动成功，Leo 已显示");
             Application.Run(pet);
         }
-        catch (Exception e) { MessageBox.Show("Leo 无法启动：" + e.Message, "Leo"); }
+        catch (Exception e) { if(args.Contains("--startup"))LeoStartup.Log("启动失败："+e.GetType().Name+" · "+e.Message);else MessageBox.Show("Leo 无法启动：" + e.Message, "Leo"); }
     }
 }
 

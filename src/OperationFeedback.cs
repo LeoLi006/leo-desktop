@@ -20,7 +20,7 @@ sealed class LeoToast : Form
     public LeoToast(Func<Rectangle> pet)
     {
         anchor = pet; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true; StartPosition = FormStartPosition.Manual; ClientSize = new Size(320, 103); BackColor = BarcaUi.Surface;
-        Appearance.Round(this, 13); Controls.Add(message); Controls.Add(retry);
+        DoubleBuffered=true; Appearance.Round(this, 13); Controls.Add(message); Controls.Add(retry);
         var close = new BarcaButton { Text = "×", Bounds = new Rectangle(237, 6, 22, 22) }; close.Click += (_, _) => Hide(); Controls.Add(close);
         retry.Click += async (_, _) => { var action = current?.Retry; if (action == null) return; retry.Enabled = false; try { await action(); } catch (Exception e) { Present(new(e.Message, true, action)); } finally { if (!IsDisposed) retry.Enabled = true; } };
         timer.Tick += (_, _) => { if (!Bounds.Contains(Cursor.Position)) { timer.Stop(); Hide(); } };
@@ -30,11 +30,18 @@ sealed class LeoToast : Form
         current = notice; message.Text = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
         message.ForeColor = notice.Error ? Color.LightSalmon : BarcaUi.Text;
         ClientSize=new Size(270,notice.Error&&notice.Retry!=null?84:52);Appearance.Round(this,12);
-        message.SetBounds(11,8,220,notice.Error&&notice.Retry!=null?37:35);retry.SetBounds(194,51,64,25);
+        message.SetBounds(15,14,216,notice.Error&&notice.Retry!=null?32:31);retry.SetBounds(194,51,64,25);
         retry.Text=notice.ActionLabel;retry.Visible = notice.Retry != null; retry.Enabled = true;
         var pet = anchor(); Location = PopupPlacement.Place(pet, Size, Screen.FromRectangle(pet).WorkingArea);
         timer.Stop(); timer.Interval = notice.Error ? 5000 : 1900; timer.Start();
         Show();
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using var path=Appearance.Path(new Rectangle(1,1,Width-3,Height-3),12);
+        using var border=new Pen(Color.FromArgb(82,67,82));e.Graphics.DrawPath(border,path);
+        using var stripe=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(12,3,Width-24,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,12,3,Width-24,4);
     }
     public bool PreviewHasRetry => retry.Visible;
     public void Follow() { if(Visible){var pet=anchor();Location=PopupPlacement.Place(pet,Size,Screen.FromRectangle(pet).WorkingArea);} }

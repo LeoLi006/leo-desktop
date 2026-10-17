@@ -5,15 +5,31 @@ namespace LeoLauncher;
 static class LeoStartup
 {
     const string Run = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    const string Approval = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved";
     public static string Command(string executable) => "\"" + Path.GetFullPath(executable) + "\"";
-    const string Approval = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
-    public static bool Enabled { get { using var key = Registry.CurrentUser.OpenSubKey(Run); using var approval = Registry.CurrentUser.OpenSubKey(Approval); return string.Equals(key?.GetValue("Leo") as string, Command(Application.ExecutablePath), StringComparison.OrdinalIgnoreCase) && !(approval?.GetValue("Leo") is byte[] bytes && bytes.Length > 0 && bytes[0] is 3 or 7); } }
+    public static void Log(string message) { try { File.AppendAllText(Path.Combine(AppContext.BaseDirectory,"startup-last.log"),DateTimeOffset.Now.ToString("O")+" · "+message+Environment.NewLine); }catch { } }
+    static string Shortcut => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "Leo.lnk");
+    static bool Blocked(string group,string name) { using var key=Registry.CurrentUser.OpenSubKey(Approval+@"\"+group);return key?.GetValue(name) is byte[] data&&data.Length>0&&data[0] is 3 or 7; }
+    static (string Target,string Directory,string Arguments) ReadShortcut()
+    {
+        object? shell=null,link=null;
+        try { shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!);dynamic shortcut=link=((dynamic)shell!).CreateShortcut(Shortcut);return ((string)shortcut.TargetPath,(string)shortcut.WorkingDirectory,(string)shortcut.Arguments); }
+        finally { if(link!=null)System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);if(shell!=null)System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell); }
+    }
+    public static bool Enabled { get {
+        try { if(File.Exists(Shortcut)){var link=ReadShortcut();return string.Equals(link.Target,Application.ExecutablePath,StringComparison.OrdinalIgnoreCase)&&string.Equals(link.Directory,AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar),StringComparison.OrdinalIgnoreCase)&&link.Arguments=="--startup"&&!Blocked("StartupFolder","Leo.lnk");}
+        using var key=Registry.CurrentUser.OpenSubKey(Run);return string.Equals(key?.GetValue("Leo") as string,Command(Application.ExecutablePath),StringComparison.OrdinalIgnoreCase)&&!Blocked("Run","Leo"); }catch{return false;}
+    } }
     public static void SetEnabled(bool enabled)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(Run);
-        if (enabled) { key.SetValue("Leo", Command(Application.ExecutablePath), RegistryValueKind.String); using var approval = Registry.CurrentUser.OpenSubKey(Approval, true); approval?.DeleteValue("Leo", false); }
-        else key.DeleteValue("Leo", false);
-        if (Enabled != enabled) throw new IOException("开机启动设置未保存成功");
+        if(enabled){
+            Directory.CreateDirectory(Path.GetDirectoryName(Shortcut)!);object? shell=null,link=null;
+            try { shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!);dynamic shortcut=link=((dynamic)shell!).CreateShortcut(Shortcut);shortcut.TargetPath=Application.ExecutablePath;shortcut.WorkingDirectory=AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);shortcut.Arguments="--startup";shortcut.IconLocation=Application.ExecutablePath+",0";shortcut.Description="Leo 桌面助手";shortcut.Save(); }
+            finally { if(link!=null)System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);if(shell!=null)System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell); }
+            using var approval=Registry.CurrentUser.OpenSubKey(Approval+@"\StartupFolder",true);approval?.DeleteValue("Leo.lnk",false);
+        }else if(File.Exists(Shortcut))File.Delete(Shortcut);
+        using var key=Registry.CurrentUser.CreateSubKey(Run);key.DeleteValue("Leo",false);
+        if(Enabled!=enabled)throw new IOException("开机启动设置未保存成功，请检查 Windows 启动应用权限");
     }
 }
 
