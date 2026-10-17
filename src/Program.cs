@@ -22,6 +22,11 @@ sealed class Preferences
     public bool ClipboardHistory { get; set; } = true;
     public Dictionary<string, string[]> Aliases { get; set; } = new();
     public bool HideInFullscreen { get; set; } = true;
+    public bool EdgeDocking { get; set; } = true;
+    public bool TerminalModule { get; set; } = true;
+    public bool ClashModule { get; set; } = true;
+    public bool MusicModule { get; set; } = true;
+    public bool EdgeModule { get; set; } = true;
 }
 
 static class Store
@@ -169,6 +174,7 @@ static class Program
         Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         Application.EnableVisualStyles();
         BarcaScrollTheme.Start();
+        Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--ask-data-test")
         {
@@ -432,6 +438,7 @@ sealed partial class PetForm : Form
         Location = p.X < 0 ? new Point(screen.Right - Width - 36, screen.Bottom - Height - 36) : Clamp(new Point(p.X, p.Y));
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);
         foot = new FootTools(p.PetSize, preview);
+        foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;
         foot.TodosRequested+=()=>ShowTodos();
         foot.VoiceRequested+=ShowVoice;
@@ -461,7 +468,7 @@ sealed partial class PetForm : Form
             if (e.Button != MouseButtons.Left) return;
             hit.Capture = false;
             if (movedWhileLocked) return;
-            if (dragging) { prefs.X = Left; prefs.Y = Top; Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; }
+            if (dragging) { if(prefs.EdgeDocking)Location=Clamp(EdgeDock.Snap(Bounds,Screen.FromControl(this).WorkingArea,foot.ReservedSpace)); prefs.X = Left; prefs.Y = Top; Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; }
             else {
                 row = 3; rowUntil = clock.ElapsedMilliseconds + 800; frame = 0;
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
@@ -476,7 +483,7 @@ sealed partial class PetForm : Form
         animation.Start();
         fullscreenTimer.Tick += (_, _) => PollFullscreen();
         if (!preview) fullscreenTimer.Start();
-        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle="Leo · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
+        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle="Leo · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
     }
     protected override bool ShowWithoutActivation => true;
     void ShowChat()
@@ -492,7 +499,7 @@ sealed partial class PetForm : Form
     {
         if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;
         bool hide = prefs.HideInFullscreen && FullscreenMonitor.IsFullscreenOn(Screen.FromControl(this));
-        SetFullscreenHidden(hide);
+        SetFullscreenHidden(hide);UpdateDockTools();
     }
     void SetFullscreenHidden(bool hide)
     {
@@ -610,7 +617,7 @@ sealed partial class PetForm : Form
     void OpenSettings()
     {
         launcher.Hide();
-        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications);
+        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications,ShortcutStatus);
         if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
         if(!settingsWindow.Visible)WindowPositions.Prepare(settingsWindow,"settings",Bounds,previewMode);
         settingsWindow.Show();settingsWindow.Activate();

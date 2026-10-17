@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -13,6 +13,11 @@ sealed record ClipItem(string Kind, string Content, string Label, DateTimeOffset
 sealed class ClipHistory
 {
     readonly string? file;
+    readonly Stack<List<ClipItem>> undo=new();
+    public bool CanUndo=>undo.Count>0;
+    void Remember(IEnumerable<ClipItem> touched){var data=touched.ToList();if(data.Count>0){undo.Push(data);if(undo.Count>20){var keep=undo.Take(20).Reverse().ToArray();undo.Clear();foreach(var frame in keep)undo.Push(frame);}}}
+    public void Undo(){if(undo.Count==0)return;var restore=undo.Peek();var keys=restore.Select(x=>x.Key).ToHashSet();Items=restore.Concat(Items.Where(x=>!keys.Contains(x.Key))).ToList();Trim();Save();if(Error==null)undo.Pop();}
+
     public List<ClipItem> Items { get; private set; } = new();
     public string? Error { get; private set; }
     public ClipHistory(string? path)
@@ -41,10 +46,10 @@ sealed class ClipHistory
         int index = Items.FindIndex(x => x.Key == item.Key);
         if (index < 0) return false;
         if (value && !Items[index].Pinned && (Items.Count(x => x.Pinned) >= 50 || Items.Where(x => x.Pinned).Sum(x => (long)x.Content.Length) + item.Content.Length > 12_000_000)) return false;
-        Items[index] = Items[index] with { Pinned = value }; Trim(); Save(); return true;
+        Remember([Items[index]]);Items[index] = Items[index] with { Pinned = value }; Trim(); Save(); return true;
     }
-    public void Delete(ClipItem item) { Items.RemoveAll(x => x.Key == item.Key); Save(); }
-    public void Clear() { Items.RemoveAll(x => !x.Pinned); Save(); }
+    public void Delete(ClipItem item) { Remember(Items.Where(x=>x.Key==item.Key));Items.RemoveAll(x => x.Key == item.Key); Save(); }
+    public void Clear() { Remember(Items.Where(x=>!x.Pinned));Items.RemoveAll(x => !x.Pinned); Save(); }
     public List<ClipItem> Search(string query) => Items.Where(x => x.Label.Contains(query, StringComparison.OrdinalIgnoreCase) || (x.Kind != "image" && x.Content.Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
     void Save()
     {
@@ -144,11 +149,12 @@ static class ClipboardTool
         var enabled = new CheckBox { Text = "记录历史", Checked = service.Enabled, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
         var copy = new Button { Text = "复制", Width = 65, Height = 28 };
         var delete = new Button { Text = "删除", Width = 65, Height = 28 };
+        var undoButton=new Button{Text="撤销",Width=65,Height=28};
         var clear = new Button { Text = "清空历史", Width = 85, Height = 28 };
         var pin = new Button { Text = "收藏", Width = 80, Height = 28 };
         var onlyPins = new CheckBox { Text = "只看收藏", AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
-        foreach (var button in new[] { copy, delete, clear, pin }) { button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderSize = 0; button.BackColor = Appearance.Field; }
-        bar.Controls.AddRange([search, enabled, copy, pin, delete, clear, onlyPins]);
+        foreach (var button in new[] { copy, delete, clear, pin,undoButton }) { button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderSize = 0; button.BackColor = Appearance.Field; }
+        bar.Controls.AddRange([search, enabled, copy, pin, delete, clear,undoButton, onlyPins]);
         var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = Color.FromArgb(32, 39, 55) };
         var list = new ListBox { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(32, 39, 55), ForeColor = Color.White, IntegralHeight = false, ItemHeight = 30 };
         var text = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(40, 47, 65), ForeColor = Color.White, BorderStyle = BorderStyle.None };
@@ -165,6 +171,7 @@ static class ClipboardTool
             if (list.SelectedIndex < 0 && list.Items.Count > 0) list.SelectedIndex = 0;
             list.EndUpdate();
             if (list.Items.Count == 0) { text.Text = "暂无记录"; picture.Visible = false; text.Visible = true; }
+            undoButton.Enabled=service.History.CanUndo;
             state.Text = service.History.Error ?? $"历史 {service.History.Items.Count(x => !x.Pinned)}/50 · 收藏 {service.History.Items.Count(x => x.Pinned)}/50 · 清空历史保留收藏";
         }
         list.SelectedIndexChanged += (_, _) => {
@@ -188,6 +195,7 @@ static class ClipboardTool
         copy.Click += (_, _) => CopySelected(); list.DoubleClick += (_, _) => CopySelected();
         list.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { CopySelected(); e.SuppressKeyPress = true; } };
         delete.Click += (_, _) => { if (list.SelectedItem is ClipItem item) service.History.Delete(item); RefreshItems(); };
+        undoButton.Click+=(_,_)=>{service.History.Undo();RefreshItems();};
         clear.Click += (_, _) => { service.History.Clear(); RefreshItems(); };
         pin.Click += (_, _) => {
             if (list.SelectedItem is not ClipItem item) return;

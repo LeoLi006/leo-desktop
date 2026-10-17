@@ -51,8 +51,10 @@ sealed record ChatReply(string Text, bool Streamed, bool Truncated, ToolCall[]? 
 sealed class ChatApi : IDisposable
 {
     readonly HttpClient http;
-    public ChatApi(HttpMessageHandler? handler = null)
+    readonly ApiUsageLedger? ledger;
+    public ChatApi(HttpMessageHandler? handler = null,ApiUsageLedger? usage=null)
     {
+        ledger=usage??(handler==null?ApiUsageLedger.Shared:null);
         http = handler == null ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) : new HttpClient(handler);
         http.Timeout = Timeout.InfiniteTimeSpan;
     }
@@ -92,6 +94,7 @@ sealed class ChatApi : IDisposable
     {
         if (string.IsNullOrWhiteSpace(settings.Model)) throw new ArgumentException("请先选择或填写模型名称");
         if (settings.Protocol is not ("chat" or "responses")) throw new ArgumentException("不支持的接口类型");
+        var budget=ledger==null?new ApiUsageConfig():ApiUsageConfig.Load();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token); timeout.CancelAfter(TimeSpan.FromMinutes(5));
         try
         {
@@ -100,14 +103,17 @@ sealed class ChatApi : IDisposable
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
             var payload = new Dictionary<string, object> { ["model"] = settings.Model.Trim(), ["stream"] = true };
             if (responses) payload["input"] = ResponsesInput(messages);
-            else payload["messages"] = messages.Select(ChatMessage).ToArray();
+            else {payload["messages"] = messages.Select(ChatMessage).ToArray();if(budget.RequestTokens)payload["stream_options"]=new{include_usage=true};}
             if (tools?.Length > 0) payload["tools"] = tools;
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            timeout.Token.ThrowIfCancellationRequested();
+            using var usage=ledger?.Begin(budget.DailyLimit);
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             CheckStatus(response);
             if (response.Content.Headers.ContentType?.MediaType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) == true)
             {
                 using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+                usage?.Usage(json.RootElement);
                 string text = NonStreamingText(json.RootElement, responses);
                 var calls = ParseCalls(json.RootElement, responses);
                 if (calls.Length > 0 && tools?.Length is not > 0) throw new InvalidOperationException("请先开启应用工具");
@@ -115,10 +121,10 @@ sealed class ChatApi : IDisposable
                 bool limited = responses
                     ? json.RootElement.TryGetProperty("status", out var status) && status.GetString() == "incomplete"
                     : json.RootElement.GetProperty("choices")[0].TryGetProperty("finish_reason", out var reason) && reason.ValueKind == JsonValueKind.String && reason.GetString() is "length" or "content_filter";
-                onText(text); return new(text, false, limited, calls, responses ? OutputItems(json.RootElement) : null);
+                onText(text);if(usage!=null)usage.Completed=!limited; return new(text, false, limited, calls, responses ? OutputItems(json.RootElement) : null);
             }
             using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-            return await ReadSseAsync(stream, responses, onText, timeout.Token, tools?.Length > 0);
+            var reply=await ReadSseAsync(stream, responses, onText, timeout.Token, tools?.Length > 0,usage==null?null:usage.Usage);if(usage!=null)usage.Completed=!reply.Truncated;return reply;
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("等待中转站超过 5 分钟，已停止本次请求"); }
     }
@@ -135,7 +141,7 @@ sealed class ChatApi : IDisposable
         if (!responses && root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0 && choices[0].TryGetProperty("message", out var message) && message.TryGetProperty("content", out var content)) return ContentText(content);
         return "";
     }
-    public static async Task<ChatReply> ReadSseAsync(Stream stream, bool responses, Action<string> onText, CancellationToken token, bool allowTools = false)
+    public static async Task<ChatReply> ReadSseAsync(Stream stream, bool responses, Action<string> onText, CancellationToken token, bool allowTools = false,Action<JsonElement>? onUsage=null)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, true, 4096, leaveOpen: true);
         var text = new StringBuilder(); var data = new StringBuilder(); bool complete = false, truncated = false;
@@ -147,7 +153,7 @@ sealed class ChatApi : IDisposable
             string raw = data.ToString().Trim(); data.Clear();
             if (raw.Length == 0) return false;
             if (raw == "[DONE]") { complete = true; return true; }
-            using var json = JsonDocument.Parse(raw); var root = json.RootElement;
+            using var json = JsonDocument.Parse(raw); var root = json.RootElement;onUsage?.Invoke(root);
             if (root.TryGetProperty("error", out _)) throw new InvalidOperationException("中转站在生成过程中返回错误，请检查额度或模型状态");
             string delta = "";
             if (responses)

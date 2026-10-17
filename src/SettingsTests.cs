@@ -78,6 +78,7 @@ static class SettingsTests
         Capture("preview-settings-scenes.png");
         foreach(var check in CustomComboTests.Check(directory))checks[check.Key]=check.Value;
         foreach(var check in MusicFixTests.Check(directory))checks[check.Key]=check.Value;
+        foreach(var check in Feature40Tests.Check(directory))checks[check.Key]=check.Value;
         return checks;
     }
 }

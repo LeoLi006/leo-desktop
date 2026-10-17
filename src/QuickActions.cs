@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
@@ -29,7 +29,7 @@ sealed partial class ChatForm
                 case QuickKind.LeoCommand:if(appTools==null)throw new InvalidOperationException("功能尚未就绪");ClearResults();var result=await appTools.ExecuteLeoAsync(intent.Value,intent.Argument,request.Token);ResultText(result);LocalDone(result);break;
                 case QuickKind.Todos:case QuickKind.AddTodo:case QuickKind.CompleteTodo:if(todoAction==null)throw new InvalidOperationException("请从 Leo 脚下清单图标打开每日清单");todoAction(intent);LocalDone("已在独立清单中处理");break;
                 case QuickKind.Clipboard:if(openClipboard==null)throw new InvalidOperationException("请从 Leo 入口打开剪贴板");openClipboard();ClearResults();ResultText("剪贴板已打开",true);LocalDone("已打开剪贴板");break;
-                case QuickKind.Web:if(!preview)Process.Start(FootTools.EdgeStart(intent.Value));ClearResults();ResultText("已在浏览器搜索",true);ResultText(intent.Value);LocalDone("已打开网页搜索");break;
+                case QuickKind.Web:if(appTools!=null)await appTools.ExecuteLeoAsync("web_search",intent.Value,request.Token);else if(!preview)throw new InvalidOperationException("网页搜索尚未就绪");ClearResults();ResultText("已在浏览器搜索",true);ResultText(intent.Value);LocalDone("已打开网页搜索");break;
                 case QuickKind.OpenApp:case QuickKind.SearchApp:
                     ClearResults();ResultText("应用",true);
                     if(intent.Value is "应用" or "软件"||string.IsNullOrWhiteSpace(intent.Value)){ResultText("输入或说：打开微信、打开浏览器。");break;}

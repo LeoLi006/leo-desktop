@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.ComponentModel;
 namespace LeoLauncher;
 
@@ -7,10 +7,15 @@ sealed class FootTools : Form
     protected override bool ShowWithoutActivation => true;
     public const int Space = 64;
     float uiScale = 1f;
+    Preferences modules=new();
+    int CompactUnits=>modules.EdgeModule?94:64;
+    int UtilityUnits=>4+30*(1+(modules.TerminalModule?1:0)+(modules.ClashModule?1:0));
+    int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
+    public void ConfigureModules(Preferences p){modules=p;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
     Font? scaledFont;
     int S(int value) => Math.Max(1, (int)Math.Round(value * uiScale));
-    public int ScaledCompactWidth => S(CompactWidth);
+    public int ScaledCompactWidth => S(VisibleCompactUnits);
     public int Gap => S(4);
     public int ReservedSpace => S(64);
     public const int CompactWidth = 94;
@@ -80,13 +85,13 @@ sealed class FootTools : Form
         proxyButton.FlatStyle = FlatStyle.Flat; proxyButton.FlatAppearance.BorderSize = 0;
         void RefreshProxy()
         {
-            if (proxyBusy || IsDisposed) return;
+            if (proxyBusy || IsDisposed || !modules.ClashModule) return;
             var state = preview ? new ProxyStatus(true, true, "Clash 系统代理已开启 · 示例") : ClashProxy.ReadStatus();
             proxyButton.ActiveState = state.Enabled;
             tip.SetToolTip(proxyButton, state.Description); proxyButton.Invalidate();
         }
         async Task ChangeProxy(bool? target=null) {
-            if (preview || proxyBusy) return;
+            if (preview || proxyBusy || !modules.ClashModule) return;
             proxyBusy = true; proxyButton.Enabled = false; tip.SetToolTip(proxyButton, "正在切换 Clash 系统代理…");
             bool desired=target??(ClashProxy.ReadStatus().Enabled!=true);
             OperationFeedback.Pending(desired?"正在开启系统代理…":"正在关闭系统代理…");
@@ -114,13 +119,13 @@ sealed class FootTools : Form
         };
         Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, search]);
         ApplyScale(petSize);
-        Shown += (_, _) => { SetExpanded(false); RefreshProxy(); if (!preview) proxyTimer.Start(); };
+        Shown += (_, _) => { SetExpanded(false); RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
         Disposed += (_, _) => { proxyTimer.Dispose(); tip.Dispose(); scaledFont?.Dispose(); };
     }
     void SetExpanded(bool value)
     {
-        expanded = value;if(value)utilitiesOpen=false; search.Visible = value;
+        value=value&&modules.EdgeModule;expanded = value;if(value)utilitiesOpen=false; search.Visible = value;
         LayoutTools();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);
         Invalidate(true);
@@ -139,9 +144,11 @@ sealed class FootTools : Form
         moreButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
         todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));searchButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));
         terminal.Bounds=new Rectangle(S(3),S(32),S(28),S(24));proxyButton.Bounds=new Rectangle(S(33),S(32),S(28),S(24));chatButton.Bounds=new Rectangle(S(63),S(32),S(28),S(24));
-        terminal.Visible=proxyButton.Visible=chatButton.Visible=utilitiesOpen;
-        search.AutoSize=false;search.Bounds=new Rectangle(S(97),S(6),S(154),S(21));
-        ClientSize=new Size(S(expanded?262:CompactWidth),S(utilitiesOpen?58:28));
+        terminal.Visible=utilitiesOpen&&modules.TerminalModule;proxyButton.Visible=utilitiesOpen&&modules.ClashModule;chatButton.Visible=utilitiesOpen;
+        int toolX=3;foreach(var tool in new Button[]{terminal,proxyButton,chatButton}){bool enabled=tool==terminal?modules.TerminalModule:tool==proxyButton?modules.ClashModule:true;if(enabled){tool.Left=S(toolX);toolX+=30;}}
+        searchButton.Visible=modules.EdgeModule;search.Visible=expanded&&modules.EdgeModule;
+        search.AutoSize=false;search.Bounds=new Rectangle(S(CompactUnits+3),S(6),S(154),S(21));
+        ClientSize=new Size(S(expanded?CompactUnits+168:VisibleCompactUnits),S(utilitiesOpen?58:28));
         ResumeLayout();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);
         Invalidate(true);

@@ -100,6 +100,7 @@ sealed partial class PetForm
     }
     (string,Func<Task>) BuildComboStep(ComboStep step)
     {
+        Modules.Require(prefs,step.Kind is "proxy_on" or "proxy_off"?"clash":step.Kind is "url" or "watch"?"edge":step.Kind=="qq_client"?"music":null);
         string label=step.Label.Length>0?step.Label:step.Kind;
         switch(step.Kind)
         {

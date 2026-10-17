@@ -1,15 +1,18 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 namespace LeoLauncher;
 
 sealed class LauncherForm : Form
 {
     readonly TextBox query = new();
-    int selection;
+    int selection;bool keyboardNavigation;
+    Action? undoFavorite;
+    List<string>? pendingFavorites;Dictionary<string,string[]>? pendingAliases;
     readonly FlowLayoutPanel recent = new();
     readonly Label status = new();
     readonly Preferences prefs;
     readonly TodoStore tasks;
     readonly Action resizePet;
+    readonly Action<AppEntry> launchApplication;
     readonly ClipboardHistoryService? clipboard;
     bool menuOpen, sorting;
     const string SortFormat = "LeoFavoriteTarget";
@@ -91,9 +94,9 @@ sealed class LauncherForm : Form
         query.Text = "剪切板"; debounce.Stop(); Filter();
         return VisibleEntries().Any(x => x.Target == ClipboardTool.Target);
     }
-    public LauncherForm(Preferences p, Action openSettings, bool previewMode, bool demoMode,TodoStore? planner=null)
+    public LauncherForm(Preferences p, Action openSettings, bool previewMode, bool demoMode,TodoStore? planner=null,Action<AppEntry>? appLauncher=null)
     {
-        tasks=planner??new(previewMode?null:Path.Combine(Store.Root,"leo-todos.json"));prefs = p; resizePet = openSettings; preview = previewMode; demo = demoMode;
+        launchApplication=appLauncher??Catalog.Launch;tasks=planner??new(previewMode?null:Path.Combine(Store.Root,"leo-todos.json"));prefs = p; resizePet = openSettings; preview = previewMode; demo = demoMode;
         memory = new Memory(demo ? null : Path.Combine(Store.Root, "leo-history.json"));
         Text = "Leo · 应用搜索"; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
         StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 248);
@@ -104,6 +107,7 @@ sealed class LauncherForm : Form
         footballButton.FlatAppearance.BorderSize = 0;
         footballButton.Click += (_, _) => {
             if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks);
+            SetWatchVisibility(football);
             var area = Screen.FromControl(this).WorkingArea;
             football.StartPosition = FormStartPosition.Manual;
             if(!football.Visible)WindowPositions.Prepare(football,"football",PetBounds?.Invoke() ?? Bounds,preview);
@@ -137,10 +141,12 @@ sealed class LauncherForm : Form
         status.SetBounds(22, 248, 556, 24); status.ForeColor = Color.LightSalmon; status.Visible = false; Controls.Add(status);
         if (!preview) clipboard = new ClipboardHistoryService(prefs);
         debounce.Tick += (_, _) => { debounce.Stop(); Filter(); };
-        query.TextChanged += (_, _) => { debounce.Stop(); debounce.Start(); };
+        query.TextChanged += (_, _) => { keyboardNavigation=false;debounce.Stop(); debounce.Start(); };
         query.KeyDown += (_, e) => {
             if (e.KeyCode is Keys.Down or Keys.Up or Keys.Left or Keys.Right)
             {
+                if(e.KeyCode is Keys.Left or Keys.Right&&query.TextLength>0&&!keyboardNavigation)return;
+                keyboardNavigation=true;
                 debounce.Stop(); FilterIfChanged();
                 var entries = VisibleEntries();
                 selection = Math.Clamp(selection + (e.KeyCode == Keys.Down ? 7 : e.KeyCode == Keys.Up ? -7 : e.KeyCode == Keys.Right ? 1 : -1), 0, Math.Max(0, entries.Count - 1));
@@ -209,9 +215,14 @@ sealed class LauncherForm : Form
         lastExternal = match?.Name ?? active.Process;
         if (match != null && prefs.RememberHistory) memory.Record(match, previous, DateTimeOffset.UtcNow);
     }
+    public void RefreshModules(){foreach(var icon in Controls.OfType<GlyphButton>())if(icon.AccessibleName=="QQ音乐点歌")icon.Visible=prefs.MusicModule;
+        if(!prefs.MusicModule){music?.Close();music=null;}
+        if(football!=null)SetWatchVisibility(football);
+    }
+    void SetWatchVisibility(Control root){foreach(Control c in root.Controls){if(c is WatchLinksPanel)c.Visible=prefs.EdgeModule;else SetWatchVisibility(c);}}
     public void Open()
     {
-        Observe(); activationContext = prefs.ContextAware ? lastExternal : "";
+        RefreshModules();Observe(); activationContext = prefs.ContextAware ? lastExternal : "";
         query.Clear(); debounce.Stop(); Filter();
         Show(); Activate(); query.Focus();
     }
@@ -229,7 +240,7 @@ sealed class LauncherForm : Form
         foreach (var app in entries)
         {
             bool selected = tileIndex++ == selection;
-            var tile = new Button { Tag = app, AccessibleName = app.Name, Width = 74, Height = 76, Text = "", FlatStyle = FlatStyle.Flat, Font = Appearance.Body(8.5f), Margin = new Padding(3), ForeColor = Appearance.Ink, BackColor = selected ? Appearance.Blue : Appearance.Background };
+            var tile = new Button { Tag = app, AccessibleName = app.Name, Width = 74, Height = 76, Text = "",TabStop=false, FlatStyle = FlatStyle.Flat, Font = Appearance.Body(8.5f), Margin = new Padding(3), ForeColor = Appearance.Ink, BackColor = selected ? Appearance.Blue : Appearance.Background };
             Appearance.Round(tile, 12);
             tile.FlatAppearance.MouseOverBackColor = Appearance.Hover;
             tile.FlatAppearance.MouseDownBackColor = Appearance.Red;
@@ -247,17 +258,19 @@ sealed class LauncherForm : Form
             var menu = new ContextMenuStrip();
             bool pinned = prefs.Favorites.Contains(app.Target, StringComparer.OrdinalIgnoreCase);
             menu.Items.Add(pinned ? "取消收藏置顶" : "收藏置顶", null, (_, _) => {
+                RememberFavoriteUndo();
                 if (pinned) prefs.Favorites.RemoveAll(x => x.Equals(app.Target, StringComparison.OrdinalIgnoreCase));
                 else if (prefs.Favorites.Count < 14) prefs.Favorites.Add(app.Target);
                 else MessageBox.Show("最多置顶 14 个图标，请先取消一个收藏。", "Leo");
-                if (!preview) Store.Save(prefs);
+                FinishFavoriteUndo();if (!preview) Store.Save(prefs);
                 BeginInvoke((Action)(() => { PopulateRecent(); Activate(); query.Focus(); }));
             });
             menu.Items.Add("设置简称…", null, (_, _) => {
                 Hide();
                 using var editor = new AliasEditor(app, prefs.Aliases.GetValueOrDefault(app.Target) ?? Array.Empty<string>());
                 if (editor.ShowDialog() == DialogResult.OK) {
-                    if (editor.Aliases.Length == 0) prefs.Aliases.Remove(app.Target); else prefs.Aliases[app.Target] = editor.Aliases;
+                    RememberFavoriteUndo();
+                    if (editor.Aliases.Length == 0) prefs.Aliases.Remove(app.Target); else prefs.Aliases[app.Target] = editor.Aliases;FinishFavoriteUndo();
                     if (!preview) Store.Save(prefs);
                 }
                 Open();
@@ -276,7 +289,9 @@ sealed class LauncherForm : Form
             tile.DragDrop += (_, e) => {
                 if (!string.IsNullOrWhiteSpace(query.Text) || e.Data?.GetData(SortFormat) is not string source) return;
                 bool after = tile.PointToClient(new Point(e.X, e.Y)).X >= tile.Width / 2;
+                var beforeSort=prefs.Favorites.ToList();
                 if (FavoriteSorting.Move(prefs.Favorites, source, app.Target, after)) {
+                    var afterSort=prefs.Favorites.ToList();prefs.Favorites=beforeSort;RememberFavoriteUndo();prefs.Favorites=afterSort;FinishFavoriteUndo();
                     if (!preview) Store.Save(prefs);
                     BeginInvoke((Action)(() => { PopulateRecent(); Activate(); }));
                 }
@@ -312,12 +327,12 @@ sealed class LauncherForm : Form
     }
     public void LaunchFromAssistant(AppEntry app)
     {
-        Catalog.Launch(app);
+        launchApplication(app);
         if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
     }
     public bool VerifyMusicEntry(){if(!Visible)Show();var footballIcon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");var musicIcon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");musicIcon.PerformClick();Application.DoEvents();bool ok=musicIcon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
-    public MusicForm MusicWithoutOpening(){if(music==null||music.IsDisposed)music=new MusicForm(preview);return music;}
-    public MusicForm OpenMusicFromAssistant(string query=""){if(music==null||music.IsDisposed)music=new MusicForm(preview);if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);return music;}
+    public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview);return music;}
+    public MusicForm OpenMusicFromAssistant(string query=""){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview);if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);return music;}
     public void OpenFootballFromAssistant(){var button=Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
     public string PinClipboardText(string text){if(clipboard==null)throw new InvalidOperationException("剪贴板尚未就绪");if(string.IsNullOrWhiteSpace(text)||text.Length>100000)throw new ArgumentException("文字为空或过长");var item=new ClipItem("text",text,text.Replace('\n',' ')[..Math.Min(100,text.Length)],DateTimeOffset.Now);clipboard.History.Add(item);if(!clipboard.History.Pin(item,true))throw new InvalidOperationException("剪贴板收藏已达上限");if(clipboard.History.Error!=null)throw new IOException(clipboard.History.Error);return "已收藏这段文字到剪贴板。";}
     public void OpenClipboardFromAssistant()=>Launch(ClipboardTool.Entry);
@@ -326,10 +341,25 @@ sealed class LauncherForm : Form
         Hide();
         try
         {
-            if (app.Target == ClipboardTool.Target) ClipboardTool.Open(clipboard); else Catalog.Launch(app);
+            if (app.Target == ClipboardTool.Target) ClipboardTool.Open(clipboard); else launchApplication(app);
             if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
         }
         catch (Exception e) { MessageBox.Show("无法打开 " + app.Name + "：" + e.Message, "Leo"); }
+    }
+    void RememberFavoriteUndo(){pendingFavorites=prefs.Favorites.ToList();pendingAliases=prefs.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());}
+    string FavoriteSignature()=>System.Text.Json.JsonSerializer.Serialize(new{prefs.Favorites,prefs.Aliases});
+    void FinishFavoriteUndo(){var saved=pendingFavorites;var aliases=pendingAliases;if(saved==null||aliases==null)return;string expected=FavoriteSignature();undoFavorite=()=>{if(FavoriteSignature()!=expected)throw new InvalidOperationException("收藏或简称已有新变化，未覆盖这些变化。");prefs.Favorites=saved;prefs.Aliases=aliases;if(!preview)Store.Save(prefs);PopulateRecent();undoFavorite=null;};pendingFavorites=null;pendingAliases=null;OperationFeedback.Undo("应用收藏 / 简称已调整",()=>undoFavorite?.Invoke());}
+    protected override bool ProcessCmdKey(ref Message m,Keys key)
+    {
+        if(key==Keys.Escape){Hide();return true;}
+        if(key==(Keys.Control|Keys.L)||key==(Keys.Control|Keys.F)){query.Focus();query.SelectAll();return true;}
+        if(key==(Keys.Control|Keys.Z)&&query.TextLength==0&&undoFavorite!=null){try{undoFavorite();}catch(Exception e){OperationFeedback.Error(e.Message);}return true;}
+        if(key==Keys.Tab||key==(Keys.Shift|Keys.Tab)){
+            debounce.Stop();FilterIfChanged();int count=VisibleEntries().Count;if(count>0){selection=(selection+(key==Keys.Tab?1:count-1))%count;keyboardNavigation=true;PopulateRecent();}query.Focus();return true;
+        }
+        if(key==(Keys.Shift|Keys.F10)||key==Keys.Apps){var tile=recent.Controls.OfType<Button>().ElementAtOrDefault(selection);tile?.ContextMenuStrip?.Show(tile,new Point(0,tile.Height));return true;}
+        if(key is Keys.Home or Keys.End&&keyboardNavigation){selection=key==Keys.Home?0:Math.Max(0,VisibleEntries().Count-1);PopulateRecent();return true;}
+        return base.ProcessCmdKey(ref m,key);
     }
     protected override void Dispose(bool disposing)
     {

@@ -17,7 +17,7 @@ sealed partial class TodoStore
     void AutoBackup(){if(path==null||!File.Exists(path))return;try{string today=DateTime.Now.ToString("yyyyMMdd");if(!Backups().Any(f=>Path.GetFileName(f).StartsWith(today)&&f.EndsWith("-daily.json")))Snapshot(File.ReadAllText(path),"daily");BackupError=null;}catch(Exception e){BackupError="自动备份失败："+e.Message;}}
     void LatestBackup(){if(BackupDirectory==null)return;try{Directory.CreateDirectory(BackupDirectory);string latest=Path.Combine(BackupDirectory,"latest.json");File.WriteAllText(latest+".tmp",JsonSerializer.Serialize(records));File.Move(latest+".tmp",latest,true);foreach(var old in Backups().Skip(60))File.Delete(old);}catch(Exception e){BackupError="最新备份失败："+e.Message;}}
     public void BackupNow(){Snapshot(JsonSerializer.Serialize(records),"manual");BackupError=null;}
-    public void RestoreBackup(string file){if(!Backups().Contains(file))throw new ArgumentException("请选择本机清单备份");var next=ValidateSnapshot(File.ReadAllText(file));if(!corrupt)Snapshot(JsonSerializer.Serialize(records),"before-restore");if(path!=null){File.WriteAllText(path+".tmp",JsonSerializer.Serialize(next));File.Move(path+".tmp",path,true);}corrupt=false;records=next;Error=null;LatestBackup();Changed?.Invoke();}
+    public void RestoreBackup(string file){if(!Backups().Contains(file))throw new ArgumentException("请选择本机清单备份");var next=ValidateSnapshot(File.ReadAllText(file));if(!corrupt)Snapshot(JsonSerializer.Serialize(records),"before-restore");if(path!=null){File.WriteAllText(path+".tmp",JsonSerializer.Serialize(next));File.Move(path+".tmp",path,true);}corrupt=false;undoHistory.Clear();records=next;Error=null;LatestBackup();Changed?.Invoke();}
 }
 sealed class PlannerSettings:BarcaWindow
 {

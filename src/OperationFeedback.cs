@@ -5,6 +5,7 @@ static class OperationFeedback
 {
     public static Action<LeoNotice>? Sink;
     public static void Show(string text) => Sink?.Invoke(new(text));
+    public static void Undo(string text,Action action)=>Sink?.Invoke(new(text,Retry:()=>{action();Show("已撤销");return Task.CompletedTask;},ActionLabel:"撤销"));
     public static void Pending(string text) => Sink?.Invoke(new(text, Busy: true));
     public static void Error(string text, Func<Task>? retry = null,string label="重试") => Sink?.Invoke(new(text, true, retry,ActionLabel:label));
 }
@@ -29,11 +30,11 @@ sealed class LeoToast : Form
     {
         current = notice; message.Text = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
         message.ForeColor = notice.Error ? Color.LightSalmon : BarcaUi.Text;
-        ClientSize=new Size(270,notice.Error&&notice.Retry!=null?84:52);Appearance.Round(this,12);
-        message.SetBounds(15,14,216,notice.Error&&notice.Retry!=null?32:31);retry.SetBounds(194,51,64,25);
+        ClientSize=new Size(270,notice.Retry!=null?84:52);Appearance.Round(this,12);
+        message.SetBounds(15,14,216,notice.Retry!=null?32:31);retry.SetBounds(194,51,64,25);
         retry.Text=notice.ActionLabel;retry.Visible = notice.Retry != null; retry.Enabled = true;
         var pet = anchor(); Location = PopupPlacement.Place(pet, Size, Screen.FromRectangle(pet).WorkingArea);
-        timer.Stop(); timer.Interval = notice.Error ? 5000 : 1900; timer.Start();
+        timer.Stop(); timer.Interval = notice.Error ? 5000 : notice.Retry!=null?4500:1900; timer.Start();
         Show();
     }
     protected override void OnPaint(PaintEventArgs e)
