@@ -184,6 +184,7 @@ static class Program
             Pump(window.PreviewSendAsync("曼城排第几"));bool table=window.PreviewTableRows>0;string first=window.PreviewState;Pump(window.PreviewSendAsync("巴萨下一场什么时候"));bool matches=window.PreviewMatchCards>0;
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
+        if(args.Length==2&&args[0]=="--dock-animation-test"){var checks=DockAnimationTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--upgrade38-test"){var checks=Upgrade38Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--qq-pause-send"){try{string result=QQPlayback.ToggleAsync().GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(new{sent=true,result}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{sent=false,error=e.Message}));Environment.ExitCode=1;}return;}
         if(args.Length==2&&args[0]=="--startup-live-test"){

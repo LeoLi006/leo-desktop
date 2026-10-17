@@ -12,7 +12,7 @@ sealed class DockMotion
     public void Reveal(long now){lastInteraction=now;revealUntil=now+1000;}
     public void Tick(long now,bool docked,bool engaged)
     {
-        if(last<0){Reset(now);return;}float delta=Math.Clamp(now-last,0,80)/760f;last=now;
+        if(last<0){Reset(now);return;}float delta=Math.Clamp(now-last,0,80)/900f;last=now;
         if(engaged)Reveal(now);
         bool tuck=docked&&!engaged&&now>revealUntil&&now-lastInteraction>=1400;
         Progress=Math.Clamp(Progress+(tuck?delta:-delta),0,1);
@@ -28,51 +28,60 @@ sealed class DockMotion
 
 sealed class DockSprites:IDisposable
 {
-    readonly Bitmap sheet;readonly Rectangle[] cells=new Rectangle[4];
+    readonly Bitmap[] frames;readonly Rectangle[] sources;
+    public const int FramesPerDirection=6;
     public DockSprites()
     {
-        sheet=new Bitmap(Path.Combine(Store.Root,"assets","edge-directions-v3.png"));
+        using var sheet=new Bitmap(Path.Combine(Store.Root,"assets","edge-motion-v1.png"));
         var locked=sheet.LockBits(new Rectangle(0,0,sheet.Width,sheet.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
         var data=new byte[Math.Abs(locked.Stride)*sheet.Height];Marshal.Copy(locked.Scan0,data,0,data.Length);int stride=locked.Stride;sheet.UnlockBits(locked);
-        var visited=new bool[sheet.Width*sheet.Height];
-        for(int i=0;i<4;i++){
-            int left=(i%2)*sheet.Width/2,right=(i%2+1)*sheet.Width/2,top=(i/2)*sheet.Height/2,bottom=(i/2+1)*sheet.Height/2,best=0;
-            for(int y=top;y<bottom;y++)for(int x=left;x<right;x++){
-                int pixel=y*sheet.Width+x;if(visited[pixel]||data[y*stride+x*4+3]<=32)continue;
-                var queue=new List<int>{pixel};visited[pixel]=true;int minX=x,maxX=x,minY=y,maxY=y;
-                for(int n=0;n<queue.Count;n++){
-                    int current=queue[n],cx=current%sheet.Width,cy=current/sheet.Width;
-                    minX=Math.Min(minX,cx);maxX=Math.Max(maxX,cx);minY=Math.Min(minY,cy);maxY=Math.Max(maxY,cy);
-                    for(int direction=0;direction<4;direction++){
-                        int nx=cx+(direction==0?-1:direction==1?1:0),ny=cy+(direction==2?-1:direction==3?1:0);
-                        if(nx<left||nx>=right||ny<top||ny>=bottom)continue;
-                        int next=ny*sheet.Width+nx;if(visited[next]||data[ny*stride+nx*4+3]<=32)continue;
-                        visited[next]=true;queue.Add(next);
-                    }
+        var visited=new bool[sheet.Width*sheet.Height];var components=new List<(Rectangle box,List<int> pixels)>();
+        for(int y=0;y<sheet.Height;y++)for(int x=0;x<sheet.Width;x++){
+            int pixel=y*sheet.Width+x;if(visited[pixel]||data[y*stride+x*4+3]<=100)continue;
+            var queue=new List<int>{pixel};visited[pixel]=true;int minX=x,maxX=x,minY=y,maxY=y;
+            for(int n=0;n<queue.Count;n++){
+                int current=queue[n],cx=current%sheet.Width,cy=current/sheet.Width;
+                minX=Math.Min(minX,cx);maxX=Math.Max(maxX,cx);minY=Math.Min(minY,cy);maxY=Math.Max(maxY,cy);
+                for(int direction=0;direction<4;direction++){
+                    int nx=cx+(direction==0?-1:direction==1?1:0),ny=cy+(direction==2?-1:direction==3?1:0);
+                    if(nx<0||nx>=sheet.Width||ny<0||ny>=sheet.Height)continue;
+                    int next=ny*sheet.Width+nx;if(visited[next]||data[ny*stride+nx*4+3]<=100)continue;
+                    visited[next]=true;queue.Add(next);
                 }
-                if(queue.Count>best){best=queue.Count;cells[i]=Rectangle.FromLTRB(minX,minY,maxX+1,maxY+1);}
             }
+            if(queue.Count>1500)components.Add((Rectangle.FromLTRB(Math.Max(0,minX-1),Math.Max(0,minY-1),Math.Min(sheet.Width,maxX+2),Math.Min(sheet.Height,maxY+2)),queue));
+        }
+        if(components.Count!=24)throw new IOException("吸附动画必须包含四个方向各六帧");
+        var ordered=components.OrderBy(c=>(c.box.Top+c.box.Height/2)/(sheet.Height/4)).ThenBy(c=>c.box.Left).ToArray();
+        sources=ordered.Select(c=>c.box).ToArray();frames=new Bitmap[24];
+        for(int i=0;i<24;i++){
+            var (box,pixels)=ordered[i];var buffer=new byte[box.Width*box.Height*4];
+            foreach(int pixel in pixels){int cx=pixel%sheet.Width,cy=pixel/sheet.Width;
+                for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){
+                    int nx=cx+dx,ny=cy+dy;if(!box.Contains(nx,ny))continue;
+                    Buffer.BlockCopy(data,ny*stride+nx*4,buffer,((ny-box.Top)*box.Width+nx-box.Left)*4,4);
+                }
+            }
+            var image=new Bitmap(box.Width,box.Height,PixelFormat.Format32bppArgb);var target=image.LockBits(new Rectangle(Point.Empty,image.Size),ImageLockMode.WriteOnly,PixelFormat.Format32bppArgb);
+            Marshal.Copy(buffer,0,target.Scan0,buffer.Length);image.UnlockBits(target);frames[i]=image;
         }
     }
-    public Rectangle Source(float progress,long now,DockSide side=DockSide.Bottom)=>cells[Math.Clamp((int)side-1,0,3)];
+    public static int FrameIndex(float progress)=>Math.Clamp((int)(Math.Clamp(progress,0,1)*FramesPerDirection),0,FramesPerDirection-1);
+    int Index(float progress,DockSide side)=>Math.Clamp((int)side-1,0,3)*FramesPerDirection+FrameIndex(progress);
+    public Rectangle Source(float progress,long now,DockSide side=DockSide.Bottom)=>sources[Index(progress,side)];
     public RectangleF Destination(Size size,float progress,DockSide side,Rectangle source)
     {
-        float inset=Math.Max(2,size.Width*.025f);
-        float w=size.Width*.72f,h=w*source.Height/source.Width;
-        if(h>size.Height-inset*2){h=size.Height-inset*2;w=h*source.Width/source.Height;}
-        float x=(size.Width-w)/2,y=(size.Height-h)/2;
+        float inset=Math.Max(2,size.Width*.025f),scale=Math.Min((size.Width-inset*2)/sources.Max(r=>r.Width),(size.Height-inset*2)/sources.Max(r=>r.Height));
+        float w=source.Width*scale,h=source.Height*scale,x=(size.Width-w)/2,y=size.Height-h-inset;
         float edgeX=side==DockSide.Left?inset:side==DockSide.Right?size.Width-w-inset:x;
-        float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:y;
+        float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:(size.Height-h)/2;
         float t=progress*progress*(3-2*progress);return new(x+(edgeX-x)*t,y+(edgeY-y)*t,w,h);
     }
-    public static float HeadOpacity(float progress){float t=Math.Clamp((progress-.22f)/.55f,0,1);return t*t*(3-2*t);}
     public RectangleF Draw(Graphics graphics,Size size,float progress,DockSide side,long now)
     {
-        var source=Source(progress,now,side);var target=Destination(size,progress,side,source);
-        using var attributes=new ImageAttributes();attributes.SetColorMatrix(new ColorMatrix{Matrix33=HeadOpacity(progress)});
-        graphics.DrawImage(sheet,Rectangle.Round(target),source.X,source.Y,source.Width,source.Height,GraphicsUnit.Pixel,attributes);return target;
+        int index=Index(progress,side);var target=Destination(size,progress,side,sources[index]);graphics.DrawImage(frames[index],target);return target;
     }
-    public void Dispose()=>sheet.Dispose();
+    public void Dispose(){foreach(var frame in frames)frame.Dispose();}
 }
 
 sealed partial class PetForm
@@ -132,11 +141,7 @@ sealed partial class PetForm
     {
         if(dockMotion.Progress<=.001f)return false;
         dockSprites??=new();var state=graphics.Save();graphics.TranslateTransform(target.Left,target.Top);
-        float t=dockMotion.Progress*dockMotion.Progress*(3-2*dockMotion.Progress)*.28f;
-        var normal=new Rectangle(0,0,(int)target.Width,(int)target.Height);
-        normal.Offset(dockSide==DockSide.Left?-(int)(target.Width*t):dockSide==DockSide.Right?(int)(target.Width*t):0,dockSide==DockSide.Top?-(int)(target.Height*t):dockSide==DockSide.Bottom?(int)(target.Height*t):0);
-        graphics.SetClip(new Rectangle(Point.Empty,normal.Size));
-        using(var attributes=new ImageAttributes()){attributes.SetColorMatrix(new ColorMatrix{Matrix33=1-DockSprites.HeadOpacity(dockMotion.Progress)});graphics.DrawImage(atlas,normal,frame*192,row*208,192,208,GraphicsUnit.Pixel,attributes);}
+        graphics.SetClip(new Rectangle(Point.Empty,new Size((int)target.Width,(int)target.Height)));
         dockSprites.Draw(graphics,new Size((int)target.Width,(int)target.Height),dockMotion.Progress,dockSide,clock.ElapsedMilliseconds);graphics.Restore(state);return true;
     }
 }

@@ -7,7 +7,7 @@ static class Feature42Tests
     {
         var checks=new Dictionary<string,bool>();
         var motion=new DockMotion();motion.Reset(0);for(int t=0;t<=2400;t+=32)motion.Tick(t,true,false);checks["edge_motion_tucks_after_idle"]=motion.Progress>=.999f;
-        motion.Tick(2432,true,true);for(int t=2464;t<=3300;t+=32)motion.Tick(t,true,false);checks["brief_hover_latches_until_full_reveal"]=motion.Progress==0;
+        motion.Tick(2432,true,true);for(int t=2464;t<=3500;t+=32)motion.Tick(t,true,false);checks["brief_hover_latches_until_full_reveal"]=motion.Progress==0;
         for(int t=3200;t<=5500;t+=32)motion.Tick(t,true,false);float middle=motion.Progress;motion.Tick(5532,false,false);checks["undocking_reverses_tuck"]=middle>motion.Progress;
         using(var sprites=new DockSprites())using(var image=new Bitmap(720,350))using(var g=Graphics.FromImage(image)){
             g.Clear(BarcaUi.Canvas);foreach(var (side,index) in new[]{(DockSide.Left,0),(DockSide.Right,1),(DockSide.Top,2),(DockSide.Bottom,3)}){var state=g.Save();g.TranslateTransform(12+index*175,200);var box=sprites.Draw(g,new Size(150,150),1,side,0);checks["head_only_sprite_within_"+side]=new RectangleF(0,0,150,150).Contains(box)&&box.Height<125;g.Restore(state);}
@@ -59,7 +59,7 @@ sealed partial class PetForm
         checks["tucked_pet_hides_all_footer_buttons"]=dockMotion.Progress>=.999f&&!foot.Visible;
         checks["tucked_hit_target_is_only_visible_head"]=hit.Height<Height*.65&&hit.Bounds.Left>=Left&&hit.Bounds.Left<=Left+Width*.05;
         using(var image=new Bitmap(Width,Height)){DrawToBitmap(image,ClientRectangle);image.Save(Path.Combine(output,"preview-peeking-head42.png"));}
-        var hover=new Point(hit.Left+hit.Width/2,hit.Top+hit.Height/2);for(int t=2432;t<=3500;t+=32)AdvanceDock(t,hover);
+        var hover=new Point(hit.Left+hit.Width/2,hit.Top+hit.Height/2);for(int t=2432;t<=3700;t+=32)AdvanceDock(t,hover);
         checks["hover_restores_full_pet_hit_area_and_footer"]=dockMotion.Progress==0&&hit.Bounds==Bounds&&foot.Visible&&foot.Opacity>.99;
         RevealDock(true);Location=new Point(area.Left+(area.Width-Width)/2,area.Bottom-Height-foot.ReservedSpace);var original=Location;dockMotion.Reset(0);
         for(int t=0;t<=2400;t+=32)AdvanceDock(t,far);
