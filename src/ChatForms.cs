@@ -8,7 +8,7 @@ sealed class ApiSettingsForm : Form
     readonly Label status = new();
     readonly ChatSettings settings;
     readonly CancellationTokenSource lifetime = new();
-    public ApiSettingsForm(ChatSettings current, bool preview = false)
+    public ApiSettingsForm(ChatSettings current, bool preview = false, bool embedded = false, Action? onSaved = null)
     {
         settings = current;
         Text = "Leo · API 设置"; ClientSize = new Size(550, 350); StartPosition = FormStartPosition.CenterParent;
@@ -49,15 +49,16 @@ sealed class ApiSettingsForm : Form
                 string normalized = ChatSettings.NormalizeBase(url.Text);
                 if (string.IsNullOrWhiteSpace(model.Text)) throw new ArgumentException("请选择或手动填写模型名称");
                 if (string.IsNullOrWhiteSpace(key.Text)) throw new ArgumentException("请填写中转站 API Key");
-                var next = new ChatSettings { BaseUrl = normalized, Model = model.Text.Trim(), Protocol = protocol.SelectedIndex == 1 ? "responses" : "chat", RememberConversation = settings.RememberConversation, EnableAppTools = settings.EnableAppTools, VoiceAutoSend = settings.VoiceAutoSend, VoiceAutoSpeak = settings.VoiceAutoSpeak };
+                var latest = ChatSettings.Load();
+                var next = new ChatSettings { BaseUrl = normalized, Model = model.Text.Trim(), Protocol = protocol.SelectedIndex == 1 ? "responses" : "chat", RememberConversation = latest.RememberConversation, EnableAppTools = latest.EnableAppTools, VoiceAutoSend = latest.VoiceAutoSend, VoiceAutoSpeak = latest.VoiceAutoSpeak };
                 next.SetKey(key.Text); next.Save();
-                DialogResult = DialogResult.OK; Close();
+                if(embedded){status.Text="API 配置已保存，下次提问立即使用。";onSaved?.Invoke();}else{DialogResult = DialogResult.OK; Close();}
             }
             catch (Exception e) { status.Text = SafeError(e); }
         };
         var clear = new Button { Text = "清除已存 Key", Bounds = new Rectangle(20, 292, 140, 32) }; Controls.Add(clear);
-        clear.Click += (_, _) => { if (preview) return; try { settings.SetKey(""); settings.Save(); key.Clear(); status.Text = "已清除本地保存的 Key"; } catch { status.Text = "无法清除本地配置，请检查文件写入权限"; } };
-        var cancel = new Button { Text = "取消", Bounds = new Rectangle(318, 292, 100, 32), DialogResult = DialogResult.Cancel }; Controls.Add(cancel); CancelButton = cancel;
+        clear.Click += (_, _) => { if (preview) return; try { var latest = ChatSettings.Load(); latest.SetKey(""); latest.Save(); key.Clear(); onSaved?.Invoke(); status.Text = "已清除本地保存的 Key"; } catch { status.Text = "无法清除本地配置，请检查文件写入权限"; } };
+        var cancel = new Button { Text = "取消", Bounds = new Rectangle(318, 292, 100, 32), DialogResult = DialogResult.Cancel }; Controls.Add(cancel); CancelButton = cancel;if(embedded){cancel.Visible=false;TopLevel=false;FormBorderStyle=FormBorderStyle.None;Dock=DockStyle.Fill;}
         foreach (var button in Controls.OfType<Button>()) { button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderSize = 0; button.BackColor = Appearance.Field; button.ForeColor = Appearance.Ink; }
     }
     string SafeError(Exception error)
@@ -164,7 +165,8 @@ sealed partial class ChatForm : BarcaWindow
     }
     async Task ReceiveVoiceAsync(string text,bool confident){if(pending!=null)return;input.AppendText((input.TextLength>0?" ":"")+text);if((directVoice||autoSend.Checked||QuickRouter.IsLocalMusic(text)&&string.Equals(input.Text.Trim(),text.Trim(),StringComparison.Ordinal))&&confident){directVoice=false;voice.StopListening();await SendAsync();}else state.Text=confident?"已识别，可编辑后发送":"识别不确定，已填入草稿，请校对后发送";}
     public Task PreviewRecognizedAsync(string text,bool confident)=>ReceiveVoiceAsync(text,confident);
-    void UpdateState() => state.Text = "Ctrl+Alt+V 直接说话";
+    public void ReloadConfiguration(){if(preview)return;settings=ChatSettings.Load();remember.Checked=settings.RememberConversation;useTools.Checked=settings.EnableAppTools;autoSpeak.Checked=settings.VoiceAutoSpeak;autoSend.Checked=settings.VoiceAutoSend;}
+    void UpdateState() => state.Text = "按“说话”输入，快捷键可在 Leo 设置中调整";
     public static List<ApiMessage> Context(IEnumerable<ChatTurn> history, string prompt, bool toolsEnabled = false)
     {
         string instruction = "当前本地时间："+DateTimeOffset.Now.ToString("yyyy-MM-dd dddd HH:mm zzz")+"。你是桌面伙伴Leo的大脑，主要任务是理解用户的自然语言并协调Leo已有功能，不是办公助手。默认用中文简短自然回答，通常不超过150字，用户要求深入时再展开。语音输入和朗读由本地界面处理，你处理识别后的文字。只有明确附带的查询数据是已联网核验的事实；没有通用网页浏览能力，不得假装搜索新闻、伤停或实时信息。资料不足时直接说明并建议用户用网页搜索。提醒仅在Leo运行期间生效，退出期间错过的会在下次启动补报，不可声称关机也会响铃。清单和提醒使用leo_action工具实际处理后再报告结果；查询任务也要先调用工具读取。";

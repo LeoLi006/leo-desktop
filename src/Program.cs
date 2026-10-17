@@ -13,6 +13,9 @@ sealed class Preferences
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
     public int PetSize { get; set; } = 130;
+    public Keys SearchHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.Space;
+    public Keys VoiceHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.V;
+    public Keys LyricsHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.L;
     public bool RememberHistory { get; set; } = true;
     public bool ContextAware { get; set; } = true;
     public List<string> Favorites { get; set; } = new();
@@ -162,6 +165,7 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        if(args.Length==1&&args[0]=="--enable-startup"){LeoStartup.SetEnabled(true);return;}
         Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -435,6 +439,7 @@ sealed partial class PetForm : Form
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
         var menu = new ContextMenuStrip();
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
+        menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
         WireMusicMenu(menu);
         ContextMenuStrip = menu;
@@ -465,7 +470,7 @@ sealed partial class PetForm : Form
         animation.Start();
         fullscreenTimer.Tick += (_, _) => PollFullscreen();
         if (!preview) fullscreenTimer.Start();
-        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(!lyricsHotkeyRegistered){tray.BalloonTipTitle="Leo · 歌词快捷键";tray.BalloonTipText="Ctrl+Alt+L 已被占用，可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};Shown+=async(_,_)=>await launcher.MusicWithoutOpening().SyncDueAsync();reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
+        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle="Leo · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};Shown+=async(_,_)=>await launcher.MusicWithoutOpening().SyncDueAsync();reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
     }
     protected override bool ShowWithoutActivation => true;
     void ShowChat()
@@ -525,8 +530,7 @@ sealed partial class PetForm : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        if(!previewMode){Native.RegisterHotKey(Handle,2,0x4000|0x2|0x1,0x56);lyricsHotkeyRegistered=Native.RegisterHotKey(Handle,3,0x4000|0x2|0x1,0x4c);}
-        Native.RegisterHotKey(Handle, 1, 0x4000 | 0x2 | 0x1, 0x20);
+        if(!previewMode)RegisterConfiguredHotkeys();
     }
     protected override void OnHandleDestroyed(EventArgs e)
     {
@@ -597,8 +601,9 @@ sealed partial class PetForm : Form
     void OpenSettings()
     {
         launcher.Hide();
-        using var settings = new SettingsForm(prefs);
-        if (settings.ShowDialog() == DialogResult.OK) { Store.Save(prefs); ClientSize = new Size(prefs.PetSize, prefs.PetSize * 208 / 192); Location = Clamp(Location); }
+        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture);
+        if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
+        settingsWindow.Show();settingsWindow.Activate();
     }
     public void SavePreview(string path)
     {
@@ -752,7 +757,7 @@ sealed partial class PetForm : Form
     }
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
         base.OnFormClosed(e);
     }
 }

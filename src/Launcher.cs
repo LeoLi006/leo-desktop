@@ -337,23 +337,3 @@ sealed class LauncherForm : Form
         base.Dispose(disposing);
     }
 }
-
-sealed class SettingsForm : Form
-{
-    public SettingsForm(Preferences p)
-    {
-        Text = "Leo 设置"; ClientSize = new Size(530, 365); FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false; StartPosition = FormStartPosition.CenterScreen;
-        Font = new Font("Microsoft YaHei UI", 10);
-        Controls.Add(new Label { Text = "小羊大小", Left = 20, Top = 23, Width = 120 });
-        var size = new NumericUpDown { Left = 150, Top = 20, Width = 100, Minimum = 80, Maximum = 230, Value = Math.Clamp(p.PetSize, 80, 230) }; Controls.Add(size);
-        var remember = new CheckBox { Text = "保留本地应用使用记录", Left = 20, Top = 65, Width = 450, Checked = p.RememberHistory };
-        var context = new CheckBox { Text = "结合前台应用和使用时段调整候选排序", Left = 20, Top = 100, Width = 470, Checked = p.ContextAware };
-        Controls.AddRange([remember, context]);
-        var fullscreen = new CheckBox { Text = "同屏游戏或视频全屏时自动隐藏 Leo", Left = 20, Top = 135, Width = 470, Checked = p.HideInFullscreen };
-        Controls.Add(fullscreen);
-        Controls.Add(new Label { Text = "点击 Leo 或按 Ctrl + Alt + Space 呼出搜索。\n收藏和最近使用最多显示两排、每排七个；记录保存在程序旁。\n上下文只使用前台应用和使用时段，不读取窗口内容。\n关闭记录后不再新增或使用历史，已有历史文件会保留。", Left = 20, Top = 175, Width = 490, Height = 135 });
-        var save = new Button { Text = "保存", Left = 385, Top = 325, Width = 110, DialogResult = DialogResult.OK };
-        save.Click += (_, _) => { p.PetSize = (int)size.Value; p.RememberHistory = remember.Checked; p.ContextAware = context.Checked; p.HideInFullscreen = fullscreen.Checked; };
-        Controls.Add(save); AcceptButton = save;
-    }
-}
