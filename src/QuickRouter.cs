@@ -4,7 +4,7 @@ enum QuickKind{Ai,LeoCommand,OpenApp,SearchApp,Clipboard,Web,Todos,AddTodo,Compl
 sealed record QuickIntent(QuickKind Kind,string Value="",string Team="",int DayOffset=0,string Argument="");
 static class QuickRouter
 {
-    public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&intent.Value is "music_step" or "music_playlist_name" or "scene_watch" or "combo_name" or "music_pause";}
+    public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&(intent.Value is "music_step" or "scene_watch" or "combo_name" or "music_pause"||intent.Value=="music_open"&&intent.Argument.Length>0);}
     public static string Team(string text)=>text.Contains("曼城")?"曼城":text.Contains("迈阿密")?"迈阿密国际":text.Contains("巴萨")||text.Contains("巴塞罗那")?"巴塞罗那":"";
     public static QuickIntent Route(string text){text=text.Trim().TrimEnd('。','！','？','?','!');string team=Team(text);
         var combo=Regex.Match(text,@"^(?:执行自定义|运行组合|启动组合)[：:\s]*(.+)$");if(combo.Success)return new(QuickKind.LeoCommand,"combo_name",Argument:combo.Groups[1].Value.Trim());
@@ -17,10 +17,11 @@ static class QuickRouter
         if(task.Success)return new(QuickKind.AddTodo,task.Groups[2].Value,DayOffset:task.Groups[1].Value=="明天"?1:0);
         task=Regex.Match(text,@"^(?:完成|勾选完成)(?:待办|任务)[：:,，\s]*(.+)$");if(task.Success)return new(QuickKind.CompleteTodo,task.Groups[1].Value);
         if(text is "剪贴板" or "剪切板" or "打开剪贴板" or "打开剪切板" or "搜索剪贴板")return new(QuickKind.Clipboard);
+        if(Regex.IsMatch(text,@"^(?:打开|播放|听)(?:我的)?歌单.*$"))return new(QuickKind.LeoCommand,"music_client");
         if(text is "播放暂停" or "切换音乐播放状态")return new(QuickKind.LeoCommand,"music_pause");
         if(text is "下一首" or "切歌" or "换一首" or "播放下一首" or "下一曲")return new(QuickKind.LeoCommand,"music_step",Argument:"1");
         if(text is "上一首" or "播放上一首" or "上一曲")return new(QuickKind.LeoCommand,"music_step",Argument:"-1");
-        var musicName=Regex.Match(text,@"^(?:请|帮我)?(?:听|播放)(?:一下)?(?:我的)?(?:歌单)?[：:\s“""「]*(.+?)[”""」]*(?:歌单)?$");if(musicName.Success&&text.Length<=36&&!Regex.IsMatch(text,"然后|并且|分析|为什么|如何|怎么样|再播放|^听说|^听起来|^听到|^听不"))return new(QuickKind.LeoCommand,"music_playlist_name",Argument:musicName.Groups[1].Value.Trim());
+        var musicName=Regex.Match(text,@"^(?:请|帮我)?(?:听|播放)(?:一下)?(?:我的)?[：:\s“""「]*(.+?)[”""」]*$");if(musicName.Success&&text.Length<=36&&!Regex.IsMatch(text,"然后|并且|分析|为什么|如何|怎么样|再播放|^听说|^听起来|^听到|^听不"))return new(QuickKind.LeoCommand,"music_open",Argument:musicName.Groups[1].Value.Trim());
         if(text is "点歌" or "打开点歌" or "音乐面板")return new(QuickKind.LeoCommand,"music_open");
         if(text is "打开足球" or "打开足球窗口" or "足球界面")return new(QuickKind.LeoCommand,"football_open");
         if(text is "打开应用搜索" or "应用搜索")return new(QuickKind.LeoCommand,"launcher_open");

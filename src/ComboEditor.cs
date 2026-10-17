@@ -19,19 +19,18 @@ sealed class ComboEditor : BarcaWindow
         foreach(var (text,y,action) in new (string,int,Action)[]{("上移",186,()=>Move(-1)),("下移",231,()=>Move(1)),("移除",276,()=>{int index=list.SelectedIndex;if(index<0)return;steps.RemoveAt(index);RefreshSteps(index);})}){var button=new BarcaButton{Text=text,Bounds=new Rectangle(547,y,105,33)};button.Click+=(_,_)=>action();Controls.Add(button);}
         Controls.Add(new Label{Text="选择操作和参数，再点“添加一步”",Bounds=new Rectangle(24,370,628,25),ForeColor=BarcaUi.Gold,Font=BarcaUi.Font(9.5f,true)});
         var kind=new ComboBox{Bounds=new Rectangle(24,407,166,30),DropDownStyle=ComboBoxStyle.DropDownList};
-        var types=new[]{new ComboChoice("打开应用","app"),new("打开网址","url"),new("播放歌单","playlist"),new("开启系统代理","proxy_on"),new("关闭系统代理","proxy_off"),new("打开每日清单","todos"),new("打开足球窗口","football"),new("打开聊天窗口","chat"),new("打开观赛入口","watch")};kind.Items.AddRange(types);
+        var types=new[]{new ComboChoice("打开应用","app"),new("打开网址","url"),new("打开QQ音乐","qq_client"),new("开启系统代理","proxy_on"),new("关闭系统代理","proxy_off"),new("打开每日清单","todos"),new("打开足球窗口","football"),new("打开聊天窗口","chat"),new("打开观赛入口","watch")};kind.Items.AddRange(types);
         var value=new ComboBox{Bounds=new Rectangle(202,407,327,30),DropDownStyle=ComboBoxStyle.DropDown,AutoCompleteMode=AutoCompleteMode.SuggestAppend,AutoCompleteSource=AutoCompleteSource.ListItems};
         var url=new TextBox{Bounds=value.Bounds,PlaceholderText="填写网址，例如 https://…",BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle,MaxLength=2048};
         var hint=new Label{Bounds=new Rectangle(24,451,505,65),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)};
         Controls.AddRange([kind,value,url,hint]);
         void Choices()
         {
-            string type=((ComboChoice)kind.SelectedItem!).Value;value.Items.Clear();value.Text="";url.Visible=type=="url";value.Visible=type is "app" or "playlist" or "watch";
+            string type=((ComboChoice)kind.SelectedItem!).Value;value.Items.Clear();value.Text="";url.Visible=type=="url";value.Visible=type is "app" or "watch";
             if(type=="app")foreach(var app in apps().Where(a=>a.Target!=ClipboardTool.Target).OrderBy(a=>a.Name))value.Items.Add(new ComboChoice(app.Name,app.Target));
-            if(type=="playlist"){value.Items.Add(new ComboChoice("默认：赛前热身",""));foreach(var item in new MusicLibrary(preview?null:Path.Combine(Store.Root,"leo-playlists.json")).Items)value.Items.Add(new ComboChoice(item.Name,item.Id));}
             if(type=="watch"){value.Items.Add(new ComboChoice("第一个已填写的观赛入口","-1"));var links=new WatchLinkStore(preview?null:Path.Combine(Store.Root,"leo-watch-links.json")).Items;for(int i=0;i<links.Length;i++)value.Items.Add(new ComboChoice(links[i].Name,i.ToString()));}
             if(value.Items.Count>0)value.SelectedIndex=0;
-            hint.Text=type=="app"?"可输入应用名查找，然后从下拉列表选择。若列表为空，先打开一次 Leo 应用搜索，再回来选择。":type=="url"?"在 Edge 中打开网址。可添加多条网址或应用操作。":type=="playlist"?"向QQ音乐发送歌单首曲；客户端未运行时会自动启动。":type.StartsWith("proxy")?"Clash 未运行时，开启操作会自动启动它。关闭操作不会启动客户端。":"操作按列表从上到下依次执行。";
+            hint.Text=type=="app"?"可输入应用名查找，然后从下拉列表选择。若列表为空，先打开一次 Leo 应用搜索，再回来选择。":type=="url"?"在 Edge 中打开网址。可添加多条网址或应用操作。":type.StartsWith("proxy")?"Clash 未运行时，开启操作会自动启动它。关闭操作不会启动客户端。":"操作按列表从上到下依次执行。";
         }
         kind.SelectedIndexChanged+=(_,_)=>Choices();kind.SelectedIndex=0;
         ComboStep ReadStep()
@@ -63,7 +62,7 @@ sealed class SceneSettings : Panel
         Controls.Add(new Label{Text="自定义组合",Bounds=new Rectangle(8,12,550,28),ForeColor=BarcaUi.Gold,Font=BarcaUi.Font(11,true)});
         Controls.Add(new Label{Text="右键 Leo → 自定义，悬停后选择组合。",Bounds=new Rectangle(8,48,560,26),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});
         var rows=new FlowLayoutPanel{Bounds=new Rectangle(8,88,560,205),AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false};Controls.Add(rows);
-        void Edit(string? id){using var editor=new ComboEditor(new ComboStore(preview?null:ComboStore.FilePath),id,applications??(()=>[]),preview);editor.ShowDialog(FindForm());Refresh();}
+        void Edit(string? id){using var editor=new ComboEditor(new ComboStore(preview?null:ComboStore.FilePath),id,applications??(()=>[]),preview);var owner=FindForm();var anchor=owner?.Bounds??new Rectangle(Cursor.Position,new Size(1,1));editor.StartPosition=FormStartPosition.Manual;editor.Location=PopupPlacement.Beside(anchor,editor.Size,Screen.FromRectangle(anchor).WorkingArea);editor.ShowDialog(owner);Refresh();}
         void Refresh(){foreach(Control c in rows.Controls.Cast<Control>().ToArray())c.Dispose();var store=new ComboStore(preview?null:ComboStore.FilePath);foreach(var combo in store.Items){var row=new Panel{Size=new Size(530,45),BackColor=BarcaUi.Surface};row.Controls.Add(new Label{Text=combo.Name+"  ·  "+combo.Steps.Count+"步",Bounds=new Rectangle(12,11,390,25),ForeColor=BarcaUi.Text});var edit=new BarcaButton{Text="编辑",Bounds=new Rectangle(437,7,75,30)};string id=combo.Id;edit.Click+=(_,_)=>Edit(id);row.Controls.Add(edit);rows.Controls.Add(row);}if(store.Items.Count==0)rows.Controls.Add(new Label{Text=store.Error??"暂无组合，点击下方新建。",Size=new Size(520,50),ForeColor=BarcaUi.Muted});}
         var create=new BarcaButton{Text="＋ 新建自定义",Bounds=new Rectangle(8,310,155,34),ForeColor=BarcaUi.Gold};create.Click+=(_,_)=>Edit(null);Controls.Add(create);Refresh();
     }

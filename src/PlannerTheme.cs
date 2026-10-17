@@ -2,7 +2,21 @@
 namespace LeoLauncher;
 static class BarcaMenus
 {
-    public static void Apply(ContextMenuStrip menu){var font=BarcaUi.Font(9.5f);menu.Renderer=new BarcaMenuRenderer();menu.Font=font;menu.BackColor=BarcaUi.Surface;menu.ForeColor=BarcaUi.Text;menu.ShowImageMargin=false;menu.ShowCheckMargin=false;menu.Padding=new Padding(5,7,5,5);menu.DropShadowEnabled=true;menu.AutoSize=false;menu.Opening+=(_,_)=>{foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(174,35);item.Padding=new Padding(10,0,23,0);}menu.Size=new Size(184,menu.Padding.Vertical+menu.Items.Cast<ToolStripItem>().Sum(i=>i.Height)+2);menu.PerformLayout();};menu.Disposed+=(_,_)=>font.Dispose();}
+    public static void Apply(ContextMenuStrip menu){var font=BarcaUi.Font(9.5f);menu.Renderer=new BarcaMenuRenderer();menu.Font=font;menu.BackColor=BarcaUi.Surface;menu.ForeColor=BarcaUi.Text;menu.ShowImageMargin=false;menu.ShowCheckMargin=false;menu.DropShadowEnabled=true;menu.Opening+=(_,_)=>Fit(menu);menu.Disposed+=(_,_)=>font.Dispose();}
+    public static void Fit(ToolStripDropDown menu)
+    {
+        menu.AutoSize=false;menu.Padding=new Padding(4,5,4,5);int width=96;
+        foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;int text=TextRenderer.MeasureText(item.Text??"",menu.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;int extra=0;if(item is ToolStripMenuItem entry){if(entry.HasDropDownItems)extra+=15;if(!string.IsNullOrEmpty(entry.ShortcutKeyDisplayString))extra+=TextRenderer.MeasureText(entry.ShortcutKeyDisplayString,menu.Font).Width+14;}width=Math.Max(width,text+extra+32);}
+        foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(width,34);item.Padding=new Padding(9,0,20,0);}
+        menu.Size=new Size(width+menu.Padding.Horizontal,menu.Padding.Vertical+menu.Items.Cast<ToolStripItem>().Sum(i=>i.Height)+2);menu.PerformLayout();
+    }
+    public static void StyleSubmenu(ToolStripMenuItem item,Font font)
+    {
+        var drop=(ToolStripDropDownMenu)item.DropDown;drop.Renderer=new BarcaMenuRenderer();drop.BackColor=BarcaUi.Surface;drop.ForeColor=BarcaUi.Text;drop.Font=font;drop.ShowImageMargin=false;drop.ShowCheckMargin=false;
+        drop.Opening+=(_,_)=>{drop.Font=item.Owner?.Font??font;Fit(drop);};
+        void Align(){if(drop.IsDisposed||!drop.Visible||item.Owner==null||item.Owner.IsDisposed)return;var itemPoint=item.Owner.PointToScreen(item.Bounds.Location);var anchor=new Rectangle(item.Owner.PointToScreen(Point.Empty).X,itemPoint.Y,item.Owner.Width,item.Bounds.Height);drop.Location=PopupPlacement.Beside(anchor,drop.Size,Screen.FromRectangle(anchor).WorkingArea,0);}
+        drop.Opened+=(_,_)=>{Align();drop.BeginInvoke((Action)Align);};
+    }
 }
 sealed class BarcaMenuRenderer:ToolStripProfessionalRenderer
 {
@@ -10,9 +24,15 @@ sealed class BarcaMenuRenderer:ToolStripProfessionalRenderer
     protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e){e.Graphics.Clear(BarcaUi.Surface);if(e.ToolStrip.Width<2)return;using var stripe=new LinearGradientBrush(new Rectangle(0,0,e.ToolStrip.Width,3),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,0,0,e.ToolStrip.Width,3);}
     protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e){using var p=new Pen(BarcaUi.Line);e.Graphics.DrawRectangle(p,0,0,e.ToolStrip.Width-1,e.ToolStrip.Height-1);}
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e){if(e.Item.Width<8||e.Item.Height<4)return;var r=new Rectangle(2,1,e.Item.Width-4,e.Item.Height-2);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using var path=Appearance.Path(r,8);bool check=e.Item is ToolStripMenuItem item&&item.Checked;if(e.Item.Enabled&&(e.Item.Selected||check)){using var b=new LinearGradientBrush(r,check?Appearance.Blue:BarcaUi.Raised,check?Appearance.Red:Color.FromArgb(40,39,59),0f);e.Graphics.FillPath(b,path);}if(check){using var p=new Pen(BarcaUi.Gold,1.6f){StartCap=LineCap.Round,EndCap=LineCap.Round};float x=e.Item.Width-24,y=e.Item.Height/2f;e.Graphics.DrawLines(p,[new PointF(x-4,y),new PointF(x-1,y+3),new PointF(x+5,y-4)]);}}
-    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e){var color=!e.Item.Enabled?BarcaUi.Muted:e.Item is ToolStripMenuItem item&&item.Checked?BarcaUi.Gold:BarcaUi.Text;bool shortcut=e.Item is ToolStripMenuItem key&&!string.IsNullOrEmpty(key.ShortcutKeyDisplayString)&&e.Text==key.ShortcutKeyDisplayString;bool hasShortcut=e.Item is ToolStripMenuItem keyed&&!string.IsNullOrEmpty(keyed.ShortcutKeyDisplayString);var bounds=shortcut?new Rectangle(e.Item.Width-102,0,92,e.Item.Height):new Rectangle(13,0,e.Item.Width-(hasShortcut?125:45),e.Item.Height);TextRenderer.DrawText(e.Graphics,e.Text,e.TextFont,bounds,shortcut?BarcaUi.Muted:color,(shortcut?TextFormatFlags.Right:TextFormatFlags.Left)|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);}
-    protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e){e.ArrowColor=BarcaUi.Gold;base.OnRenderArrow(e);}
-    protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e){using var p=new Pen(BarcaUi.Line);e.Graphics.DrawLine(p,12,e.Item.Height/2,e.Item.Width-12,e.Item.Height/2);}
+    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+    {
+        var item=e.Item as ToolStripMenuItem;var color=!e.Item.Enabled?BarcaUi.Muted:item?.Checked==true?BarcaUi.Gold:BarcaUi.Text;
+        string shortcut=item?.ShortcutKeyDisplayString??"";bool drawingShortcut=shortcut.Length>0&&e.Text==shortcut;
+        int shortcutWidth=shortcut.Length>0?TextRenderer.MeasureText(shortcut,e.TextFont,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width+10:0;
+        var bounds=drawingShortcut?new Rectangle(e.Item.Width-shortcutWidth-10,0,shortcutWidth,e.Item.Height):new Rectangle(10,0,e.Item.Width-20-(shortcutWidth>0?shortcutWidth+10:item?.HasDropDownItems==true?15:0),e.Item.Height);
+        TextRenderer.DrawText(e.Graphics,e.Text,e.TextFont,bounds,drawingShortcut?BarcaUi.Muted:color,(drawingShortcut?TextFormatFlags.Right:TextFormatFlags.Left)|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix|TextFormatFlags.NoPadding|TextFormatFlags.SingleLine);
+    }
+
 }
 sealed class BarcaMenuColors:ProfessionalColorTable
 {

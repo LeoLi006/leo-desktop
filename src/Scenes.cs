@@ -8,7 +8,6 @@ sealed class WatchScene
     public bool Website { get; set; } = true;
     public bool Music { get; set; } = true;
     public int WatchIndex { get; set; } = -1;
-    public string PlaylistId { get; set; } = "";
     static string FilePath => Path.Combine(Store.Root, "leo-scenes.json");
     public static WatchScene Load() { try { return JsonSerializer.Deserialize<WatchScene>(File.ReadAllText(FilePath)) ?? new(); } catch { return new(); } }
     public void Save() { if (WatchIndex is < -1 or > 3) throw new ArgumentException("请选择有效的观赛入口"); File.WriteAllText(FilePath + ".tmp", JsonSerializer.Serialize(this)); File.Move(FilePath + ".tmp", FilePath, true); }

@@ -8,9 +8,9 @@ static class CustomComboTests
     {
         var checks=new Dictionary<string,bool>();string root=Path.Combine(directory,"combos-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         string file=Path.Combine(root,"leo-custom-combos.json"),legacy=Path.Combine(root,"leo-scenes.json");
-        File.WriteAllText(legacy,JsonSerializer.Serialize(new WatchScene{Proxy=false,WatchIndex=2,PlaylistId="fixture-list"}));
+        File.WriteAllText(legacy,JsonSerializer.Serialize(new WatchScene{Proxy=false,WatchIndex=2}));
         var store=new ComboStore(file);var migrated=store.Items.Single();
-        checks["legacy_watch_scene_migrates_without_changing_options"]=migrated.Name=="准备看球"&&migrated.Steps.Count==2&&migrated.Steps[0].Value=="2"&&migrated.Steps[1].Value=="fixture-list"&&!File.Exists(file);
+        checks["legacy_watch_scene_migrates_without_changing_options"]=migrated.Name=="准备看球"&&migrated.Steps.Count==2&&migrated.Steps[0].Value=="2"&&migrated.Steps[1].Kind=="qq_client"&&!File.Exists(file);
         using(var editor=new ComboEditor(store,null,()=>[new AppEntry("测试应用","fixture-app")],true))
         {
             editor.Show();Application.DoEvents();
@@ -35,7 +35,12 @@ static class CustomComboTests
         checks["custom_combo_voice_text_routes_without_model"]=QuickRouter.Route("运行组合晚间放松").Value=="combo_name"&&QuickRouter.Route("运行组合晚间放松").Argument=="晚间放松";
         using(var pet=new PetForm(new Preferences(),true))
         {
-            pet.Show();var menu=pet.ContextMenuStrip!;menu.Show(new Point(20,20));Application.DoEvents();var rootMenu=menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="自定义");rootMenu.ShowDropDown();Application.DoEvents();checks["custom_combo_submenu_contains_presets_and_create"]=rootMenu.DropDown.Visible&&rootMenu.DropDownItems.Cast<ToolStripItem>().Any(i=>i.Text=="准备看球")&&rootMenu.DropDownItems.Cast<ToolStripItem>().Any(i=>i.Text=="＋ 新建自定义…")&&menu.Items.Cast<ToolStripItem>().All(i=>i.Text!="准备看球");using var image=new Bitmap(rootMenu.DropDown.Width,rootMenu.DropDown.Height);rootMenu.DropDown.DrawToBitmap(image,rootMenu.DropDown.ClientRectangle);image.Save(Path.Combine(directory,"preview-custom-combo-menu.png"));rootMenu.HideDropDown();menu.Close();
+            pet.Show();var menu=pet.ContextMenuStrip!;menu.Show(new Point(20,20));Application.DoEvents();var rootMenu=menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="自定义");rootMenu.ShowDropDown();Application.DoEvents();checks["custom_combo_submenu_contains_presets_and_create"]=rootMenu.DropDown.Visible&&rootMenu.DropDownItems.Cast<ToolStripItem>().Any(i=>i.Text=="准备看球")&&rootMenu.DropDownItems.Cast<ToolStripItem>().Any(i=>i.Text=="＋ 新建自定义…")&&menu.Items.Cast<ToolStripItem>().All(i=>i.Text!="准备看球");using var image=new Bitmap(rootMenu.DropDown.Width,rootMenu.DropDown.Height);rootMenu.DropDown.DrawToBitmap(image,rootMenu.DropDown.ClientRectangle);image.Save(Path.Combine(directory,"preview-custom-combo-menu.png"));var edit=rootMenu.DropDownItems.OfType<ToolStripMenuItem>().Single(i=>i.Text=="编辑 / 删除");edit.ShowDropDown();Application.DoEvents();
+            File.WriteAllText(Path.Combine(directory,"submenu-geometry.txt"),"Parent="+rootMenu.DropDown.Bounds+" Child="+edit.DropDown.Bounds);checks["edit_submenu_touches_custom_menu"]=Math.Min(Math.Abs(edit.DropDown.Left-rootMenu.DropDown.Right),Math.Abs(edit.DropDown.Right-rootMenu.DropDown.Left))<=12;
+            var editorAnchor=edit.DropDown.Bounds;Point editorLocation=Point.Empty;Size editorSize=Size.Empty;
+            using(var closer=new System.Windows.Forms.Timer{Interval=80}){closer.Tick+=(_,_)=>{var editor=Application.OpenForms.OfType<ComboEditor>().FirstOrDefault();if(editor==null)return;editorLocation=editor.Location;editorSize=editor.Size;editor.Close();closer.Stop();};closer.Start();edit.DropDownItems.OfType<ToolStripMenuItem>().First().PerformClick();}
+            checks["editing_combo_ignores_old_distant_position"]=editorSize.Width>0&&editorLocation==PopupPlacement.Beside(editorAnchor,editorSize,Screen.FromRectangle(editorAnchor).WorkingArea);
+            rootMenu.HideDropDown();menu.Close();
         }
         File.Delete(file);File.Delete(legacy);Directory.Delete(root);
         return checks;

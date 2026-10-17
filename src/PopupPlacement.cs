@@ -12,6 +12,12 @@ static class FavoriteOrder
 
 static class PopupPlacement
 {
+    public static Point Beside(Rectangle anchor,Size popup,Rectangle area,int gap=5)
+    {
+        int x=anchor.Right+gap;
+        if(x+popup.Width>area.Right)x=anchor.Left-popup.Width-gap;
+        return new Point(Math.Clamp(x,area.Left,Math.Max(area.Left,area.Right-popup.Width)),Math.Clamp(anchor.Top,area.Top,Math.Max(area.Top,area.Bottom-popup.Height)));
+    }
     public static (Point Popup, Point Pet) Arrange(Rectangle pet, Size popup, Rectangle area)
     {
         var point = Place(pet, popup, area);
