@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows.Automation;
-using System.Runtime.InteropServices;
 using Microsoft.Win32;
 namespace LeoLauncher;
 
@@ -84,31 +83,35 @@ static class ClashProxy
         return candidates.Count == 1 ? candidates[0] : null;
     }
     public static bool IsHomeLabel(string name)=>Regex.Replace(name,@"\s","").ToLowerInvariant() is "首页" or "主页" or "home";
-    sealed class ProxyWindowSession:IDisposable
+    static void PrepareSwitch()
     {
-        [DllImport("user32.dll")]static extern bool ShowWindowAsync(IntPtr window,int command);
-        [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr window);
-        [DllImport("user32.dll")]static extern bool IsIconic(IntPtr window);
-        IntPtr handle;bool visible,minimized;
-        public ProxyWindowSession(){try{Open();}catch{Dispose();throw;}}
-        void Open()
-        {
-            foreach(var process in Process.GetProcessesByName("clash-verge"))using(process){
-                foreach(AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children,new PropertyCondition(AutomationElement.ProcessIdProperty,process.Id))){
-                    var home=window.FindAll(TreeScope.Descendants,Condition.TrueCondition).Cast<AutomationElement>().FirstOrDefault(e=>IsHomeLabel(e.Current.Name));
-                    if(home==null)continue;
-                    handle=(IntPtr)window.Current.NativeWindowHandle;visible=IsWindowVisible(handle);minimized=IsIconic(handle);
-                    if(window.Current.IsOffscreen){ShowWindowAsync(handle,9);Thread.Sleep(200);}
-                    if(FindSwitch()==null){
-                        var button=home.TryGetCurrentPattern(InvokePattern.Pattern,out _)?home:home.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.IsInvokePatternAvailableProperty,true));
-                        if(button?.TryGetCurrentPattern(InvokePattern.Pattern,out var invoke)==true)((InvokePattern)invoke).Invoke();
-                        else if(home.TryGetCurrentPattern(SelectionItemPattern.Pattern,out var selection))((SelectionItemPattern)selection).Select();
-                    }
-                    return;
+        foreach(var process in Process.GetProcessesByName("clash-verge"))using(process){
+            foreach(AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children,new PropertyCondition(AutomationElement.ProcessIdProperty,process.Id))){
+                var home=window.FindAll(TreeScope.Descendants,Condition.TrueCondition).Cast<AutomationElement>().FirstOrDefault(e=>IsHomeLabel(e.Current.Name));
+                if(home==null)continue;
+                // Invoke accessibility actions in-place, including minimized/hidden WebViews.
+                // Do not restore, activate, show, hide or minimize the client's window.
+                if(FindSwitch()==null){
+                    var button=home.TryGetCurrentPattern(InvokePattern.Pattern,out _)?home:home.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.IsInvokePatternAvailableProperty,true));
+                    if(button?.TryGetCurrentPattern(InvokePattern.Pattern,out var invoke)==true)((InvokePattern)invoke).Invoke();
+                    else if(home.TryGetCurrentPattern(SelectionItemPattern.Pattern,out var selection))((SelectionItemPattern)selection).Select();
                 }
+                return;
             }
         }
-        public void Dispose(){if(handle==IntPtr.Zero)return;if(!visible)ShowWindowAsync(handle,0);else if(minimized)ShowWindowAsync(handle,7);}
+    }
+    public static string SilentStartConfig(string text)
+    {
+        const string pattern=@"(?m)^enable_silent_start:[^\r\n]*";
+        if(Regex.IsMatch(text,pattern))return Regex.Replace(text,pattern,"enable_silent_start: true");
+        string newline=text.Contains("\r\n")?"\r\n":"\n";
+        return text+(text.Length==0||text.EndsWith('\n')?"":newline)+"enable_silent_start: true"+newline;
+    }
+    static void PrepareSilentStart()
+    {
+        if(!File.Exists(ConfigPath))return;
+        string original=File.ReadAllText(ConfigPath),updated=SilentStartConfig(original);
+        if(original!=updated)ConfigMigration.Write(ConfigPath,updated);
     }
     public static object InspectDetails()
     {
@@ -169,6 +172,7 @@ static class ClashProxy
         {
             if (!desired) return new(false, false, "Clash Verge 未运行，无需关闭代理");
             string path = ClientPath() ?? throw new InvalidOperationException("未找到 Clash Verge，请先安装客户端");
+            PrepareSilentStart();
             using var started = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden });
             if (started == null) throw new IOException("Clash Verge 未能启动");
             var wait = Stopwatch.StartNew();
@@ -190,7 +194,7 @@ static class ClashProxy
         var watch = Stopwatch.StartNew();
         var before = ReadStatus();
         if (!before.Running || before.Enabled == null) throw new InvalidOperationException(before.Description);
-        using var session=new ProxyWindowSession();
+        PrepareSwitch();
         AutomationElement? control=null;
         while(watch.ElapsedMilliseconds<6000){try{control=FindSwitch();if(control!=null)break;}catch(ElementNotAvailableException){}Thread.Sleep(150);}
         if(control==null)throw new InvalidOperationException("未找到 Clash 的系统代理开关。请确认客户端已就绪，再点击重试。");
