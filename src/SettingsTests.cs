@@ -52,6 +52,10 @@ static class SettingsTests
         using var pet = new PetForm(new Preferences(), true);
         checks["pet_context_menu_has_settings"] = pet.ContextMenuStrip!.Items.Cast<ToolStripItem>().Any(i => i.Text == "设置");
         int retries=0;using(var toast=new LeoToast(()=>new Rectangle(800,600,130,140))){toast.Present(new("测试失败",true,()=>{retries++;toast.Present(new("重试成功"));return Task.CompletedTask;}));Application.DoEvents();checks["failure_toast_offers_retry_without_taskbar_window"]=toast.PreviewHasRetry&&!toast.ShowInTaskbar;All(toast).OfType<Button>().Single(b=>b.Text=="重试").PerformClick();Application.DoEvents();checks["feedback_retry_runs_once_and_clears_retry"]=retries==1&&!toast.PreviewHasRetry;}
+        var summaryNow=DateTimeOffset.Now;var summaryDay=DateOnly.FromDateTime(summaryNow.LocalDateTime);var summaryTasks=new[]{new DailyTask("a","尚未完成",summaryDay,summaryNow),new DailyTask("b","已完成",summaryDay,summaryNow,Completed:summaryNow),new DailyTask("c","未来事项",summaryDay.AddDays(1),summaryNow)};
+        var summary=LeoSummary.Build(summaryTasks,[new("fixture",summaryNow.AddHours(2),"esp.1","83","Barcelona","86","Real Madrid","pre","Scheduled","VS",true)],summaryNow);
+        checks["hover_summary_filters_tasks_and_localizes_next_match"]=summary.Contains("尚未完成")&&!summary.Contains("· 已完成")&&!summary.Contains("未来事项")&&summary.Contains("巴塞罗那")&&summary.Contains("缓存");
+        using(var card=new HoverCard()){card.Present(summary,new Rectangle(800,600,130,140));Application.DoEvents();checks["hover_summary_is_non_taskbar_and_avoids_pet"]=!card.ShowInTaskbar&&!card.Bounds.IntersectsWith(new Rectangle(800,600,130,140));using var image=new Bitmap(card.Width,card.Height);card.DrawToBitmap(image,card.ClientRectangle);image.Save(Path.Combine(directory,"preview-hover-summary.png"));card.Hide();checks["hover_summary_hides_without_disposal"]=!card.Visible&&!card.IsDisposed;}
         return checks;
     }
 }

@@ -463,6 +463,7 @@ sealed partial class PetForm : Form
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
             }
         };
+        Shown+=(_,_)=>StartHoverSummary();
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; hit.Show(this); PositionFoot(); foot.Show(this); };
         LocationChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot(); };
         ClientSizeChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot(); };
@@ -492,7 +493,7 @@ sealed partial class PetForm : Form
     {
         if (hide == hiddenForFullscreen) return;
         hiddenForFullscreen = hide;
-        if (hide) { if(reminders?.Visible==true)reminders.Hide();launcher.Hide(); foot.CollapseSearch(); hit.Hide(); foot.Hide(); Hide(); }
+        if (hide) { hoverCard?.Hide();feedback?.Hide();if(reminders?.Visible==true)reminders.Hide();launcher.Hide(); foot.CollapseSearch(); hit.Hide(); foot.Hide(); Hide(); }
         else { Show(); hit.Show(this); PositionFoot(); foot.Show(this);if(reminders!=null&&!reminders.IsDisposed&&reminders.PendingCount>0&&!QuietHours.Load().Contains(DateTime.Now))reminders.Present([]); }
     }
     void Animate()
@@ -759,7 +760,7 @@ sealed partial class PetForm : Form
     }
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        if(!previewMode)OperationFeedback.Sink=null;feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode)OperationFeedback.Sink=null;feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
         base.OnFormClosed(e);
     }
 }
