@@ -5,7 +5,7 @@ sealed class TodoForm:BarcaWindow
     public int Count=>store.Items.Count;
     public int CompletedCount=>store.Items.Count(t=>t.Completed!=null);
     public TodoView View=>view;
-    public TodoForm(bool preview=false,TodoStore? shared=null){store=shared??new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));view=new TodoView(store);Text="Leo · 清单";ClientSize=new Size(920,660);BackColor=BarcaUi.Canvas;Font=BarcaUi.Font(10);TopMost=false;ShowInTaskbar=true;Controls.Add(view);Controls.Add(BarcaUi.Chrome(this,"LEO  /  清单","日历安排 · 每日 / 每周清单"));CanResize=false;MaximizeBox=false;MinimumSize=Size;MaximumSize=Size;store.Changed+=Reload;}
+    public TodoForm(bool preview=false,TodoStore? shared=null){store=shared??new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));view=new TodoView(store);Text="Leo · 清单";StartPosition=FormStartPosition.Manual;ClientSize=new Size(920,660);BackColor=BarcaUi.Canvas;Font=BarcaUi.Font(10);TopMost=false;ShowInTaskbar=true;Controls.Add(view);Controls.Add(BarcaUi.Chrome(this,"LEO  /  清单","日历安排 · 每日 / 每周清单"));CanResize=false;MaximizeBox=false;MinimumSize=Size;MaximumSize=Size;store.Changed+=Reload;}
     bool refreshQueued;
     void Reload(){if(IsDisposed||!IsHandleCreated||refreshQueued)return;refreshQueued=true;try{BeginInvoke((Action)(()=>{refreshQueued=false;if(!IsDisposed)view.Render();}));}catch(InvalidOperationException){refreshQueued=false;}}
     protected override void Dispose(bool disposing){if(disposing)store.Changed-=Reload;base.Dispose(disposing);}

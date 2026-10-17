@@ -750,7 +750,7 @@ sealed partial class PetForm : Form
         checks["chat_is_independent_non_topmost_window"] = chat != null && chat.Owner == null && !chat.TopMost;
         checks["football_button_opens_independent_panel"] = launcher.VerifyFootballEntry();
         checks["music_button_beside_football_opens_independent_panel"]=launcher.VerifyMusicEntry();
-        ShowTodos();checks["daily_list_has_independent_non_topmost_window"]=todoWindow!=null&&todoWindow.Visible&&todoWindow.Owner==null&&!todoWindow.TopMost;todoWindow?.Close();
+        ShowTodos();checks["daily_list_has_independent_non_topmost_window"]=todoWindow!=null&&todoWindow.Visible&&todoWindow.Owner==null&&!todoWindow.TopMost;checks["daily_list_keeps_requested_initial_position"]=todoWindow!=null&&todoWindow.StartPosition==FormStartPosition.Manual&&todoWindow.Location==PopupPlacement.Place(Bounds,todoWindow.Size,Screen.FromControl(this).WorkingArea);todoWindow?.Close();
         var voiceMessage=Message.Create(Handle,0x312,(IntPtr)2,IntPtr.Zero);WndProc(ref voiceMessage);checks["voice_shortcut_opens_chat_directly"]=chat?.Visible==true&&chat.PreviewState=="示例模式，不启用麦克风";
         chat?.Close();
         File.WriteAllText(path, JsonSerializer.Serialize(new { ok = checks.Values.All(x => x), checks }, new JsonSerializerOptions { WriteIndented = true }));
