@@ -85,13 +85,13 @@ sealed class SettingsForm : BarcaWindow
         var host = new Panel { Dock = DockStyle.Fill, Padding = new Padding(22, 4, 22, 8) };
         var footer = new Panel { Dock = DockStyle.Bottom, Height = 77, Padding = new Padding(24, 8, 24, 12) };
         var general = new Panel { Dock = DockStyle.Fill }; var shortcuts = new Panel { Dock = DockStyle.Fill }; var api = new Panel { Dock = DockStyle.Fill };
-        host.Controls.AddRange([general, shortcuts, api]);
+        var scene=new SceneSettings(preview);host.Controls.AddRange([general, shortcuts, api,scene]);
         var status = new Label { Bounds = new Rectangle(24, 7, 440, 59), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(8.5f) };
         var save = new BarcaButton { Text = "保存设置", Bounds = new Rectangle(500, 14, 112, 36), ForeColor = BarcaUi.Gold };
         footer.Controls.AddRange([status, save]);
-        var pages = new[] { general, shortcuts, api }; var tabs = new List<BarcaButton>();
-        void Select(int index) { for (int i = 0; i < 3; i++) { pages[i].Visible = i == index; tabs[i].Selected = i == index; tabs[i].Invalidate(); } save.Visible = index != 2; status.Text = index == 2 ? "API 单独保存；Key 只在本机加密存储。" : "常规与快捷键统一保存，立即生效。"; }
-        foreach (var (label, index) in new[] { ("常规", 0), ("快捷键", 1), ("API", 2) }) { var tab = new BarcaButton { Text = label, Size = new Size(105, 31), Margin = new Padding(0, 0, 9, 0) }; tab.Click += (_, _) => Select(index); tabs.Add(tab); navigation.Controls.Add(tab); }
+        Control[] pages = [general, shortcuts, api,scene]; var tabs = new List<BarcaButton>();
+        void Select(int index) { for (int i = 0; i < pages.Length; i++) { pages[i].Visible = i == index; tabs[i].Selected = i == index; tabs[i].Invalidate(); } save.Visible = index < 2; status.Text = index == 3 ? "场景单独保存；执行时不调用模型 API。" : index == 2 ? "API 单独保存；Key 只在本机加密存储。" : "常规与快捷键统一保存，立即生效。"; }
+        foreach (var (label, index) in new[] { ("常规", 0), ("快捷键", 1), ("API", 2), ("场景",3) }) { var tab = new BarcaButton { Text = label, Size = new Size(105, 31), Margin = new Padding(0, 0, 9, 0) }; tab.Click += (_, _) => Select(index); tabs.Add(tab); navigation.Controls.Add(tab); }
         Label Label(string text, int y, bool title = false) { var label = new Label { Text = text, Bounds = new Rectangle(5, y, 550, title ? 30 : 24), ForeColor = title ? BarcaUi.Gold : BarcaUi.Muted, Font = BarcaUi.Font(title ? 11 : 9, title) }; general.Controls.Add(label); return label; }
         Label("外观与启动", 10, true);
         Label("Leo 大小", 55);

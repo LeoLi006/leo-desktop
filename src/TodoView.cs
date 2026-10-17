@@ -35,7 +35,7 @@ sealed partial class TodoView:UserControl
         postponeButton.Click+=(_,_)=>Run(()=>{int count=store.Postpone(store.ForDay(day).Where(t=>t.Completed==null).Select(t=>t.Id));Render();hint.Text=$"已顺延 {count} 项，提醒时间同步移动";});
         undo.Click+=(_,_)=>Run(()=>{if(deleted!=null){store.Restore(deleted);deleted=null;}Render();});
         right.Controls.Add(list);right.Controls.Add(hint);right.Controls.Add(addRow);right.Controls.Add(nav);right.Controls.Add(progress);right.Controls.Add(header);Controls.Add(right);Controls.Add(sidebar);Render();}
-    void Run(Action action){try{action();}catch(Exception error){hint.Text=error.Message;}}
+    void Run(Action action){try{action();OperationFeedback.Show("清单已更新");}catch(Exception error){hint.Text=error.Message;OperationFeedback.Error(error.Message);}}
     void Add()=>Run(()=>{if(repeatMode.Length==0)store.Add(entry.Text,day);else store.AddRepeating(entry.Text,day,repeatMode);entry.Clear();Render();entry.Focus();});
     public void SetWeek(bool value){weekly=value;Render();}
     public void Render(){if(IsDisposed||rendering)return;rendering=true;try{

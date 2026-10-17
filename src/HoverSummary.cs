@@ -6,7 +6,7 @@ static class LeoSummary
     {
         var day = DateOnly.FromDateTime(now.LocalDateTime);
         var pending = tasks.Where(t => t.Day <= day && t.Completed == null && !t.Deleted).OrderBy(t => t.Day).ThenBy(t => t.Created).ToArray();
-        string todos = pending.Length == 0 ? "今日清单已完成 ✓" : $"今日待办 {pending.Length} 项" + (pending.Any(t => t.Day < day) ? "（含未完成旧事项）" : "") + "\n" + string.Join("\n", pending.Take(3).Select(t => "· " + t.Title)) + (pending.Length > 3 ? "\n· 还有 " + (pending.Length - 3) + " 项" : "");
+        string todos = pending.Length == 0 ? "今天没有未完成事项 ✓" : $"今日待办 {pending.Length} 项" + (pending.Any(t => t.Day < day) ? "（含未完成旧事项）" : "") + "\n" + string.Join("\n", pending.Take(3).Select(t => "· " + (t.Title.Length>24?t.Title[..24]+"…":t.Title))) + (pending.Length > 3 ? "\n· 还有 " + (pending.Length - 3) + " 项" : "");
         var next = matches.Where(m => m.TimeKnown && m.State == "pre" && m.Kickoff > now && !m.Status.Contains("POSTPON", StringComparison.OrdinalIgnoreCase) && !m.Status.Contains("CANCEL", StringComparison.OrdinalIgnoreCase) && FootballFeed.FollowTags(m, FootballForm.FixedFollowing).Length > 0).OrderBy(m => m.Kickoff).FirstOrDefault();
         string football = next == null ? "暂无已缓存的关注比赛" : next.Kickoff.ToLocalTime().ToString("MM-dd HH:mm") + "  " + FootballFeed.Name(next.Home) + " vs " + FootballFeed.Name(next.Away);
         return todos + "\n\n下一场关注比赛 · 缓存\n" + football;
@@ -30,7 +30,7 @@ sealed class HoverCard : Form
     }
     public void Present(string text, Rectangle anchor)
     {
-        body.Text = text; Location = PopupPlacement.Place(anchor, Size, Screen.FromRectangle(anchor).WorkingArea); Show();
+        body.Text = text;Height=Math.Clamp(TextRenderer.MeasureText(text,body.Font,new Size(body.Width,1000),TextFormatFlags.WordBreak).Height+65,120,255);body.Height=Height-50;Appearance.Round(this,14); Location = PopupPlacement.Place(anchor, Size, Screen.FromRectangle(anchor).WorkingArea); Show();
     }
 }
 

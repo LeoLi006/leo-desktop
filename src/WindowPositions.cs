@@ -9,6 +9,7 @@ static class WindowPositions
     static readonly Dictionary<Form, Action> tracked = new();
     static string FilePath => Path.Combine(Store.Root, "leo-window-layouts.json");
     public static Func<Rectangle>? PetBounds;
+    public static Action? MonitorsChanged;
     static Dictionary<string, WindowPosition> Load() { try { return JsonSerializer.Deserialize<Dictionary<string, WindowPosition>>(File.ReadAllText(FilePath)) ?? new(); } catch { return new(); } }
     static WindowPositions()
     {
@@ -17,7 +18,9 @@ static class WindowPositions
     }
     static void DisplayChanged(object? sender, EventArgs e)
     {
-        foreach (var form in tracked.Keys.ToArray())
+        MonitorsChanged?.Invoke();
+        Form[] forms; lock(tracked)forms=tracked.Keys.ToArray();
+        foreach (var form in forms)
             if (!form.IsDisposed && form.IsHandleCreated) try { form.BeginInvoke(() => { if (!form.IsDisposed) Prepare(form, form.Name, PetBounds?.Invoke() ?? Rectangle.Empty, false); }); } catch (InvalidOperationException) { }
     }
     public static Rectangle Restore(WindowPosition position, Rectangle area, Size size)
@@ -50,10 +53,10 @@ static class WindowPositions
             saved[name] = new(bounds, monitor.WorkingArea, monitor.DeviceName, form.WindowState == FormWindowState.Maximized);
             try { File.WriteAllText(FilePath + ".tmp", JsonSerializer.Serialize(saved)); File.Move(FilePath + ".tmp", FilePath, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        tracked[form] = Save;
+        lock(tracked)tracked[form] = Save;
         form.ResizeEnd += (_, _) => Save();
         form.FormClosing += (_, _) => Save();
         form.VisibleChanged += (_, _) => { if (!form.Visible) Save(); };
-        form.FormClosed += (_, _) => tracked.Remove(form);
+        form.FormClosed += (_, _) => { lock(tracked)tracked.Remove(form); };
     }
 }

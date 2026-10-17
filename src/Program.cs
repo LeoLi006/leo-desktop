@@ -436,10 +436,11 @@ sealed partial class PetForm : Form
         hit.DragEnter += (_, e) => e.Effect = e.Data?.GetData(DataFormats.FileDrop) is string[] paths && FileDropActions.ValidPaths(paths).Length > 0 ? DragDropEffects.Copy : DragDropEffects.None;
         hit.DragDrop += (_, e) => { if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths) { launcher.Hide(); FileDropActions.Open(paths, launcher.FileApplications); } };
         launcher.PetBounds = () => Bounds;
-        if(!preview){WindowPositions.PetBounds=()=>Bounds;OperationFeedback.Sink=PresentFeedback;}
+        if(!preview){WindowPositions.PetBounds=()=>Bounds;WindowPositions.MonitorsChanged=OnMonitorsChanged;OperationFeedback.Sink=PresentFeedback;}
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
         var menu = new ContextMenuStrip();
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
+        menu.Items.Add("准备看球",null,async(_,_)=>await PrepareWatch());
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
         WireMusicMenu(menu);
@@ -465,7 +466,7 @@ sealed partial class PetForm : Form
         };
         Shown+=(_,_)=>StartHoverSummary();
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; hit.Show(this); PositionFoot(); foot.Show(this); };
-        LocationChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot(); };
+        LocationChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot();feedback?.Follow();hoverCard?.Hide(); };
         ClientSizeChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot(); };
         animation.Interval = 140;
         animation.Tick += (_, _) => Animate();
@@ -760,7 +761,7 @@ sealed partial class PetForm : Form
     }
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode)OperationFeedback.Sink=null;feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
         base.OnFormClosed(e);
     }
 }

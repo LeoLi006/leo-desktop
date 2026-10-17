@@ -9,6 +9,7 @@ static class SettingsTests
     {
         var checks = new Dictionary<string, bool>();
         var area=new Rectangle(-1600,0,1600,900);var layout=new WindowPosition(new Rectangle(1500,650,420,400),new Rectangle(0,0,1920,1080),"removed-monitor",false);
+        checks["window_layout_survives_json_roundtrip"]=JsonSerializer.Deserialize<WindowPosition>(JsonSerializer.Serialize(layout))==layout;
         var restored=WindowPositions.Restore(layout,area,new Size(700,500));
         checks["window_position_restores_inside_changed_monitor"]=area.Contains(restored)&&restored.Left<0;
         checks["window_right_bottom_alignment_survives_resolution_change"]=WindowPositions.Restore(new(new Rectangle(1500,680,420,400),new(0,0,1920,1080),"",false),new(0,0,1280,720),new(420,400)).Location==new Point(860,320);
@@ -56,6 +57,14 @@ static class SettingsTests
         var summary=LeoSummary.Build(summaryTasks,[new("fixture",summaryNow.AddHours(2),"esp.1","83","Barcelona","86","Real Madrid","pre","Scheduled","VS",true)],summaryNow);
         checks["hover_summary_filters_tasks_and_localizes_next_match"]=summary.Contains("尚未完成")&&!summary.Contains("· 已完成")&&!summary.Contains("未来事项")&&summary.Contains("巴塞罗那")&&summary.Contains("缓存");
         using(var card=new HoverCard()){card.Present(summary,new Rectangle(800,600,130,140));Application.DoEvents();checks["hover_summary_is_non_taskbar_and_avoids_pet"]=!card.ShowInTaskbar&&!card.Bounds.IntersectsWith(new Rectangle(800,600,130,140));using var image=new Bitmap(card.Width,card.Height);card.DrawToBitmap(image,card.ClientRectangle);image.Save(Path.Combine(directory,"preview-hover-summary.png"));card.Hide();checks["hover_summary_hides_without_disposal"]=!card.Visible&&!card.IsDisposed;}
+        int websiteCalls=0,musicCalls=0;var sceneRun=new SceneRun(("网址",()=>{websiteCalls++;return Task.CompletedTask;}),("音乐",()=>{musicCalls++;if(musicCalls==1)throw new IOException("fixture failure");return Task.CompletedTask;}));
+        try{sceneRun.Execute(_=>{}).GetAwaiter().GetResult();}catch(IOException){}
+        checks["scene_failure_retains_completed_steps"]=sceneRun.Completed==1;
+        sceneRun.Execute(_=>{}).GetAwaiter().GetResult();checks["scene_retry_does_not_repeat_opened_website"]=websiteCalls==1&&musicCalls==2&&sceneRun.Completed==2;
+        checks["watch_scene_routes_locally_and_keeps_casual_chat"]=QuickRouter.Route("准备看球").Value=="scene_watch"&&QuickRouter.Route("我准备看球的时候吃什么").Kind==QuickKind.Ai;
+        All(window).OfType<Button>().Single(b=>b.Text=="场景").PerformClick();Application.DoEvents();checks["watch_scene_can_be_configured_in_settings"]=All(window).OfType<SceneSettings>().Single().Visible;
+        checks["scene_save_and_status_fit_inside_page"]=All(window).OfType<SceneSettings>().Single().Controls.Cast<Control>().All(c=>c.Parent!.ClientRectangle.Contains(c.Bounds));
+        Capture("preview-settings-scenes.png");
         return checks;
     }
 }
