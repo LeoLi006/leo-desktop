@@ -7,10 +7,10 @@ static class Feature42Tests
     {
         var checks=new Dictionary<string,bool>();
         var motion=new DockMotion();motion.Reset(0);for(int t=0;t<=2400;t+=32)motion.Tick(t,true,false);checks["edge_motion_tucks_after_idle"]=motion.Progress>=.999f;
-        motion.Tick(2432,true,true);for(int t=2464;t<=3104;t+=32)motion.Tick(t,true,false);checks["brief_hover_latches_until_full_reveal"]=motion.Progress==0;
+        motion.Tick(2432,true,true);for(int t=2464;t<=3300;t+=32)motion.Tick(t,true,false);checks["brief_hover_latches_until_full_reveal"]=motion.Progress==0;
         for(int t=3200;t<=5500;t+=32)motion.Tick(t,true,false);float middle=motion.Progress;motion.Tick(5532,false,false);checks["undocking_reverses_tuck"]=middle>motion.Progress;
         using(var sprites=new DockSprites())using(var image=new Bitmap(720,350))using(var g=Graphics.FromImage(image)){
-            g.Clear(BarcaUi.Canvas);foreach(var (side,index) in new[]{(DockSide.Left,0),(DockSide.Right,1),(DockSide.Top,2),(DockSide.Bottom,3)}){var state=g.Save();g.TranslateTransform(12+index*175,200);var box=sprites.Draw(g,new Size(150,150),1,side,0);checks["head_only_sprite_within_"+side]=new RectangleF(0,0,150,150).Contains(box)&&box.Height<100;g.Restore(state);}
+            g.Clear(BarcaUi.Canvas);foreach(var (side,index) in new[]{(DockSide.Left,0),(DockSide.Right,1),(DockSide.Top,2),(DockSide.Bottom,3)}){var state=g.Save();g.TranslateTransform(12+index*175,200);var box=sprites.Draw(g,new Size(150,150),1,side,0);checks["head_only_sprite_within_"+side]=!new RectangleF(0,0,150,150).Contains(box)&&new RectangleF(0,0,150,150).IntersectsWith(box)&&box.Height<110;g.Restore(state);}
             for(int i=0;i<6;i++){var state=g.Save();g.TranslateTransform(i*120,0);sprites.Draw(g,new Size(115,150),i/5f,DockSide.Bottom,0);g.Restore(state);}image.Save(Path.Combine(output,"preview-edge-animation42.png"));
         }
         using(var pet=new PetForm(new Preferences(),true)){pet.Show();Application.DoEvents();foreach(var check in pet.VerifyDockPeeking(output))checks[check.Key]=check.Value;}
@@ -46,12 +46,20 @@ sealed partial class PetForm
         checks["tucked_pet_hides_all_footer_buttons"]=dockMotion.Progress>=.999f&&!foot.Visible;
         checks["tucked_hit_target_is_only_visible_head"]=hit.Height<Height*.65&&hit.Bounds.Left==Left;
         using(var image=new Bitmap(Width,Height)){DrawToBitmap(image,ClientRectangle);image.Save(Path.Combine(output,"preview-peeking-head42.png"));}
-        var hover=new Point(hit.Left+hit.Width/2,hit.Top+hit.Height/2);for(int t=2432;t<=3300;t+=32)AdvanceDock(t,hover);
+        var hover=new Point(hit.Left+hit.Width/2,hit.Top+hit.Height/2);for(int t=2432;t<=3500;t+=32)AdvanceDock(t,hover);
         checks["hover_restores_full_pet_hit_area_and_footer"]=dockMotion.Progress==0&&hit.Bounds==Bounds&&foot.Visible&&foot.Opacity>.99;
         RevealDock(true);Location=new Point(area.Left+(area.Width-Width)/2,area.Bottom-Height-foot.ReservedSpace);var original=Location;dockMotion.Reset(0);
         for(int t=0;t<=2400;t+=32)AdvanceDock(t,far);
         checks["bottom_peek_reaches_working_area_edge_without_taskbar_overlap"]=Bottom==area.Bottom&&hit.Bounds.Bottom<=area.Bottom&&!foot.Visible;
         RevealDock(true);checks["revealing_bottom_dock_restores_saved_anchor"]=Location==original&&hit.Bounds==Bounds;
+        RevealDock(true);Location=new Point(area.Left+Width+40,area.Top+80);
+        var target=new Point(area.Left,Top+30);
+        hit.SimulateClick(new Point(10,10),()=>ApplyDrag(new Size(target.X-Left,target.Y-Top)));
+        checks["actual_drag_release_clears_dragging_and_commits_tuck"]=!dragging&&dockAwaitExit;
+        long start=clock.ElapsedMilliseconds;for(int t=0;t<=1200;t+=32)AdvanceDock(start+t,far);
+        checks["actual_drag_release_reaches_half_hidden_without_footer"]=dockMotion.Progress>=.999f&&!foot.Visible;
+        int opens=launcherOpens;hit.SimulateClick(new Point(5,5));
+        checks["half_hidden_click_only_reveals_without_opening_launcher"]=launcherOpens==opens&&!dockAwaitExit;
         return checks;
     }
 }

@@ -8,10 +8,11 @@ sealed class DockMotion
     public float Progress{get;private set;}
     long last=-1,lastInteraction,revealUntil;
     public void Reset(long now){Progress=0;last=now;lastInteraction=now;revealUntil=now+1000;}
+    public void BeginTuck(long now){last=now;lastInteraction=now-2000;revealUntil=0;}
     public void Reveal(long now){lastInteraction=now;revealUntil=now+1000;}
     public void Tick(long now,bool docked,bool engaged)
     {
-        if(last<0){Reset(now);return;}float delta=Math.Clamp(now-last,0,80)/480f;last=now;
+        if(last<0){Reset(now);return;}float delta=Math.Clamp(now-last,0,80)/760f;last=now;
         if(engaged)Reveal(now);
         bool tuck=docked&&!engaged&&now>revealUntil&&now-lastInteraction>=1400;
         Progress=Math.Clamp(Progress+(tuck?delta:-delta),0,1);
@@ -27,31 +28,46 @@ sealed class DockMotion
 
 sealed class DockSprites:IDisposable
 {
-    readonly Bitmap sheet;readonly Rectangle[] cells=new Rectangle[6];readonly Rectangle[] heads=new Rectangle[6];
+    readonly Bitmap sheet;readonly Rectangle[] cells=new Rectangle[4];
     public DockSprites()
     {
-        sheet=new Bitmap(Path.Combine(Store.Root,"assets","edge-hide-v2.png"));
+        sheet=new Bitmap(Path.Combine(Store.Root,"assets","edge-directions-v1.png"));
         var locked=sheet.LockBits(new Rectangle(0,0,sheet.Width,sheet.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
         var data=new byte[Math.Abs(locked.Stride)*sheet.Height];Marshal.Copy(locked.Scan0,data,0,data.Length);int stride=locked.Stride;sheet.UnlockBits(locked);
-        for(int i=0;i<6;i++){
-            int left=i*sheet.Width/6,right=(i+1)*sheet.Width/6,minX=right,minY=sheet.Height,maxX=left,maxY=0;
-            for(int y=0;y<sheet.Height;y++)for(int x=left;x<right;x++)if(data[y*stride+x*4+3]>32){minX=Math.Min(minX,x);maxX=Math.Max(maxX,x);minY=Math.Min(minY,y);maxY=Math.Max(maxY,y);}
-            cells[i]=Rectangle.FromLTRB(minX,minY,maxX+1,maxY+1);heads[i]=cells[i];
-
+        var visited=new bool[sheet.Width*sheet.Height];
+        for(int i=0;i<4;i++){
+            int left=i*sheet.Width/4,right=(i+1)*sheet.Width/4,best=0;
+            for(int y=0;y<sheet.Height;y++)for(int x=left;x<right;x++){
+                int pixel=y*sheet.Width+x;if(visited[pixel]||data[y*stride+x*4+3]<=32)continue;
+                var queue=new List<int>{pixel};visited[pixel]=true;int minX=x,maxX=x,minY=y,maxY=y;
+                for(int n=0;n<queue.Count;n++){
+                    int current=queue[n],cx=current%sheet.Width,cy=current/sheet.Width;
+                    minX=Math.Min(minX,cx);maxX=Math.Max(maxX,cx);minY=Math.Min(minY,cy);maxY=Math.Max(maxY,cy);
+                    for(int direction=0;direction<4;direction++){
+                        int nx=cx+(direction==0?-1:direction==1?1:0),ny=cy+(direction==2?-1:direction==3?1:0);
+                        if(nx<left||nx>=right||ny<0||ny>=sheet.Height)continue;
+                        int next=ny*sheet.Width+nx;if(visited[next]||data[ny*stride+nx*4+3]<=32)continue;
+                        visited[next]=true;queue.Add(next);
+                    }
+                }
+                if(queue.Count>best){best=queue.Count;cells[i]=Rectangle.FromLTRB(minX,minY,maxX+1,maxY+1);}
+            }
         }
     }
-    public Rectangle Source(float progress,long now)=>progress>=.995f?heads[now%4000>3650?5:4]:cells[Math.Clamp((int)(progress*5),0,4)];
+    public Rectangle Source(float progress,long now,DockSide side=DockSide.Bottom)=>cells[Math.Clamp((int)side-1,0,3)];
     public RectangleF Destination(Size size,float progress,DockSide side,Rectangle source)
     {
-        float scale=size.Width*.80f/cells.Max(r=>r.Width),w=source.Width*scale,h=source.Height*scale;
-        float x=(size.Width-w)/2,y=size.Height-h-size.Height*.035f;
-        float edgeX=side==DockSide.Left?0:side==DockSide.Right?size.Width-w:x;
-        float edgeY=side==DockSide.Top?0:side==DockSide.Bottom?size.Height-h:(size.Height-h)/2;
+        float w=size.Width*.64f,h=w*source.Height/source.Width;
+        float x=(size.Width-w)/2,y=(size.Height-h)/2;
+        float edgeX=side==DockSide.Left?-w*.28f:side==DockSide.Right?size.Width-w*.72f:x;
+        float edgeY=side==DockSide.Top?-h*.28f:side==DockSide.Bottom?size.Height-h*.72f:y;
         float t=progress*progress*(3-2*progress);return new(x+(edgeX-x)*t,y+(edgeY-y)*t,w,h);
     }
     public RectangleF Draw(Graphics graphics,Size size,float progress,DockSide side,long now)
     {
-        var source=Source(progress,now);var target=Destination(size,progress,side,source);graphics.DrawImage(sheet,target,source,GraphicsUnit.Pixel);return target;
+        var source=Source(progress,now,side);var target=Destination(size,progress,side,source);
+        using var attributes=new ImageAttributes();attributes.SetColorMatrix(new ColorMatrix{Matrix33=Math.Clamp((progress-.12f)/.65f,0,1)});
+        graphics.DrawImage(sheet,Rectangle.Round(target),source.X,source.Y,source.Width,source.Height,GraphicsUnit.Pixel,attributes);return target;
     }
     public void Dispose()=>sheet.Dispose();
 }
@@ -65,6 +81,8 @@ sealed partial class PetForm
     Point dockShift;
     bool movingDock;
     long dockFootShownAt;
+    bool dockAwaitExit,dockClickReveal;
+    void BeginDockTuck(){var side=DockMotion.Detect(Bounds,Screen.FromControl(this).WorkingArea,foot.ReservedSpace);if(!prefs.EdgeDocking||side==DockSide.None)return;dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
     void StartDockAnimation(){if(previewMode)return;dockMotion.Reset(clock.ElapsedMilliseconds);dockTimer.Tick+=(_,_)=>UpdateDockAnimation();dockTimer.Start();}
     void RevealDock(bool immediate=false)
     {
@@ -72,7 +90,7 @@ sealed partial class PetForm
         dockMotion.Reveal(clock.ElapsedMilliseconds);
         if(!immediate)return;
         var shift=dockShift;dockShift=Point.Empty;movingDock=true;try{Location=new Point(Left-shift.X,Top-shift.Y);}finally{movingDock=false;}
-        dockMotion.Reset(clock.ElapsedMilliseconds);SyncDockHit();Invalidate();
+        dockAwaitExit=false;dockMotion.Reset(clock.ElapsedMilliseconds);SyncDockHit();Invalidate();
         if(!hiddenForFullscreen&&IsHandleCreated){PositionFoot();foot.Opacity=1;if(!foot.Visible)foot.Show(this);}
     }
     void OnDockLocationChanged()
@@ -84,7 +102,7 @@ sealed partial class PetForm
     {
         if(hit==null||hit.IsDisposed)return;
         Rectangle relative=ClientRectangle;
-        if(dockMotion.Progress>.01f){dockSprites??=new();var source=dockSprites.Source(dockMotion.Progress,clock.ElapsedMilliseconds);relative=Rectangle.Ceiling(dockSprites.Destination(ClientSize,dockMotion.Progress,dockSide,source));relative=Rectangle.Intersect(ClientRectangle,relative);}
+        if(dockMotion.Progress>.01f){dockSprites??=new();var source=dockSprites.Source(dockMotion.Progress,clock.ElapsedMilliseconds,dockSide);relative=Rectangle.Ceiling(dockSprites.Destination(ClientSize,dockMotion.Progress,dockSide,source));relative=Rectangle.Intersect(ClientRectangle,relative);}
         hit.Bounds=new Rectangle(new Point(Left+relative.Left,Top+relative.Top),relative.Size);
     }
     void UpdateDockAnimation()
@@ -96,7 +114,8 @@ sealed partial class PetForm
     {
         var anchor=new Rectangle(new Point(Left-dockShift.X,Top-dockShift.Y),Size);var area=Screen.FromRectangle(anchor).WorkingArea;
         var side=prefs.EdgeDocking?DockMotion.Detect(anchor,area,foot.ReservedSpace):DockSide.None;
-        bool engaged=hit.Bounds.Contains(pointer)||foot.Visible&&(foot.Bounds.Contains(pointer)||foot.IsSearchOpen)||dragging||launcher.Visible||ContextMenuStrip?.Visible==true;
+        if(dockAwaitExit&&dockMotion.Progress>.995f&&!hit.Bounds.Contains(pointer))dockAwaitExit=false;
+        bool engaged=!dockAwaitExit&&hit.Bounds.Contains(pointer)||foot.Visible&&(foot.Bounds.Contains(pointer)||foot.IsSearchOpen)||dragging||launcher.Visible||ContextMenuStrip?.Visible==true;
         if(side!=DockSide.None)dockSide=side;
         float before=dockMotion.Progress;dockMotion.Tick(now,side!=DockSide.None,engaged);
         int shiftY=dockSide==DockSide.Bottom?(int)Math.Round(dockMotion.Progress*foot.ReservedSpace):0;
@@ -110,6 +129,11 @@ sealed partial class PetForm
     {
         if(dockMotion.Progress<=.001f)return false;
         dockSprites??=new();var state=graphics.Save();graphics.TranslateTransform(target.Left,target.Top);
+        float t=dockMotion.Progress*dockMotion.Progress*(3-2*dockMotion.Progress);
+        var normal=new Rectangle(0,0,(int)target.Width,(int)target.Height);
+        normal.Offset(dockSide==DockSide.Left?-(int)(target.Width*t):dockSide==DockSide.Right?(int)(target.Width*t):0,dockSide==DockSide.Top?-(int)(target.Height*t):dockSide==DockSide.Bottom?(int)(target.Height*t):0);
+        graphics.SetClip(new Rectangle(Point.Empty,normal.Size));
+        using(var attributes=new ImageAttributes()){attributes.SetColorMatrix(new ColorMatrix{Matrix33=1-t});graphics.DrawImage(atlas,normal,frame*192,row*208,192,208,GraphicsUnit.Pixel,attributes);}
         dockSprites.Draw(graphics,new Size((int)target.Width,(int)target.Height),dockMotion.Progress,dockSide,clock.ElapsedMilliseconds);graphics.Restore(state);return true;
     }
 }
