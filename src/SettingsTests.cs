@@ -34,6 +34,7 @@ static class SettingsTests
         var field = fields.Single(f => f.AccessibleName == "应用搜索快捷键");
         typeof(Control).GetMethod("OnKeyDown", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(field, [new KeyEventArgs(desired[0])]);
         checks["shortcut_field_records_combination"] = field.Chord == desired[0];
+        checks["restore_button_is_fully_visible"]=All(window).OfType<Button>().Where(b=>b.Text=="恢复默认按键").All(b=>b.Parent!.ClientRectangle.Contains(b.Bounds));
         Capture("preview-settings-hotkeys.png");
         All(window).OfType<Button>().Single(b => b.Text == "保存设置").PerformClick();
         checks["settings_apply_size_and_hotkeys_together"] = saved?.PetSize == 180 && saved.SearchHotkey == desired[0] && prefs.PetSize == 130;

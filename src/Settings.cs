@@ -110,11 +110,11 @@ sealed class SettingsForm : BarcaWindow
         Deactivate+=(_,_)=>capture?.Invoke(false);
         Activated+=(_,_)=>{if(fields.Any(field=>field.Focused))capture?.Invoke(true);};
         FormClosed+=(_,_)=>capture?.Invoke(false);
-        shortcuts.Controls.Add(new Label { Text = "点击输入框，再按组合键", Bounds = new Rectangle(5, 12, 550, 30), ForeColor = BarcaUi.Gold, Font = BarcaUi.Font(11, true) });
+        shortcuts.Controls.Add(new Label { Text = "点击输入框，再按组合键", Bounds = new Rectangle(5, 12, 370, 30), ForeColor = BarcaUi.Gold, Font = BarcaUi.Font(11, true) });
         var names = new[] { "应用搜索", "直接说话", "显示 / 隐藏歌词" };
         for (int i = 0; i < 3; i++) { int y = 65 + i * 68; shortcuts.Controls.Add(new Label { Text = names[i], Bounds = new Rectangle(8, y + 5, 180, 27), ForeColor = BarcaUi.Text }); fields[i].SetBounds(210, y, 340, 31); fields[i].AccessibleName = names[i] + "快捷键"; shortcuts.Controls.Add(fields[i]); }
-        shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 280, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
-        var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(8, 337, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < 3; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
+        shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 250, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
+        var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(405, 8, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < 3; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
         var apiEditor = new ApiSettingsForm(preview ? new ChatSettings() : ChatSettings.Load(), preview, true, apiChanged); api.Controls.Add(apiEditor); apiEditor.Show();
         save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord; LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。"; } catch (Exception e) { status.Text = e.Message; } };
         Controls.Add(host); Controls.Add(footer); Controls.Add(navigation); Controls.Add(header); MinimumSize = MaximumSize = Size; Select(0);
