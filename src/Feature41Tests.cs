@@ -16,6 +16,17 @@ static class Feature41Tests
             c["expanded_tools_fit_with_no_clipped_icons"]=buttons.Where(b=>b.Visible).All(b=>footer.ClientRectangle.Contains(b.Bounds));
             Capture(footer,"preview-footer41.png",output);
             Button("展开 Edge 搜索").PerformClick();c["edge_input_fits_alongside_optional_row"]=All(footer).OfType<TextBox>().Single().Visible&&footer.ClientRectangle.Contains(All(footer).OfType<TextBox>().Single().Bounds);
+            bool collapse=true;
+            foreach(int size in new[]{80,130,230}){footer.ApplyScale(size);for(int i=0;i<10;i++){
+                footer.CollapseSearch();Button("展开更多工具").PerformClick();Button("展开 Edge 搜索").PerformClick();
+                var field=All(footer).OfType<TextBox>().Single();field.Text="保留搜索草稿";
+                bool opened=field.Visible&&footer.Width>footer.ScaledCompactWidth;
+                Button("展开更多工具").PerformClick();
+                collapse&=opened&&!field.Visible&&!footer.HasTextInput&&footer.Width==footer.ScaledCompactWidth&&buttons.Count(b=>b.Visible)==3;
+                Button("展开更多工具").PerformClick();collapse&=!field.Visible&&footer.Width==footer.ScaledCompactWidth;
+            }}
+            c["collapse_dropdown_closes_search_and_restores_compact_width_at_all_sizes"]=collapse;
+            footer.ApplyScale(130);
             footer.ConfigureModules(new(){TerminalModule=false,ClashModule=false,MusicModule=false,EdgeModule=false});footer.PreviewUtilities();
             c["disabling_all_modules_keeps_three_main_buttons_without_empty_row"]=buttons.Count(b=>b.Visible)==3&&footer.Height==28;
         }

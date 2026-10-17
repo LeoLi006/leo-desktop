@@ -131,7 +131,7 @@ sealed class FootTools : Form
         Invalidate(true);
         if (value) { Activate(); search.Focus(); }
     }
-    void SetUtilities(bool value){if(value&&UtilityUnits==4){OperationFeedback.Show("下拉区暂无工具，可在设置中开启终端、Clash 或 Edge。");value=false;}utilitiesOpen=value;if(value){expanded=false;search.Visible=false;}moreButton.ActiveState=value;LayoutTools();Invalidate(true);}
+    void SetUtilities(bool value){if(value&&UtilityUnits==4){OperationFeedback.Show("下拉区暂无工具，可在设置中开启终端、Clash 或 Edge。");value=false;}utilitiesOpen=value;expanded=false;search.Visible=false;moreButton.ActiveState=value;LayoutTools();Invalidate(true);}
     public void ApplyScale(int petSize)
     {
         uiScale = Math.Clamp(petSize, 80, 230) / 130f;
@@ -140,6 +140,7 @@ sealed class FootTools : Form
     }
     void LayoutTools()
     {
+        if(!utilitiesOpen||!modules.EdgeModule)expanded=false;
         SuspendLayout();
         chatButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));moreButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
         chatButton.Visible=todoButton.Visible=moreButton.Visible=true;
