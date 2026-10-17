@@ -7,9 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>LeoLauncher</AssemblyName><ApplicationIcon>leo.ico</ApplicationIcon>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>0.41.2</Version><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>0.42.0</Version><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="Assets/**/*" Link="assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="leo.ico" CopyToOutputDirectory="PreserveNewest" /><PackageReference Include="System.Speech" Version="9.0.0" />
     <Reference Include="NAudio.WinMM"><HintPath>../.deps/naudio.winmm/lib/netstandard2.0/NAudio.WinMM.dll</HintPath></Reference>
     <Reference Include="NAudio.Core"><HintPath>../.deps/naudio.core/lib/netstandard2.0/NAudio.Core.dll</HintPath></Reference>

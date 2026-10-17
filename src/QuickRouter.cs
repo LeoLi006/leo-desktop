@@ -5,7 +5,7 @@ sealed record QuickIntent(QuickKind Kind,string Value="",string Team="",int DayO
 static class QuickRouter
 {
     public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&(intent.Value is "music_step" or "scene_watch" or "combo_name" or "music_pause"||intent.Value=="music_open"&&intent.Argument.Length>0);}
-    public static string Team(string text)=>text.Contains("曼城")?"曼城":text.Contains("迈阿密")?"迈阿密国际":text.Contains("巴萨")||text.Contains("巴塞罗那")?"巴塞罗那":"";
+    public static string Team(string text)=>ClubCatalog.Mention(text);
     public static QuickIntent Route(string text){text=text.Trim().TrimEnd('。','！','？','?','!');string team=Team(text);
         if(text is "撤销上一步" or "撤销清单操作")return new(QuickKind.LeoCommand,"todo_undo");
         var combo=Regex.Match(text,@"^(?:执行自定义|运行组合|启动组合)[：:\s]*(.+)$");if(combo.Success)return new(QuickKind.LeoCommand,"combo_name",Argument:combo.Groups[1].Value.Trim());
@@ -39,8 +39,8 @@ static class QuickRouter
             bool analysis=Regex.IsMatch(text,"为什么|分析|解读|总结|怎么看|原因|预测|战术");
             if(analysis)return new(QuickKind.FootballAnalysis,text,team);
             // Only explicit fact queries bypass conversation; a club mention is not a command.
-            const string club=@"(?:巴萨|巴塞罗那|曼城|迈阿密国际|迈阿密)";
-            bool facts=Regex.IsMatch(text,@"^(?:(?:请|帮我|看看|查查|查询|查看|看一下|查一下)\s*)?(?:"+club+@"(?:的)?\s*)?(?:下一场(?:比赛)?(?:什么时候|几点|何时|时间|对手|和谁踢)?|上一场(?:比赛)?(?:比分|赛果|结果)?|(?:今天|明天|今晚|昨天|前天|最近|近期)(?:的)?(?:比赛|赛程|赛果|比分|看球)(?:有哪些|有什么|安排|时间|几点)?|(?:今天|明天|今晚)(?:有什么值得看|有什么比赛|有哪些比赛|有什么球赛)|(?:联赛)?(?:积分榜|积分|排名)|排第几|近况|球队近况|赛程|赛果|比分|比赛计划|比赛安排)$");
+            string club=ClubCatalog.Pattern;
+            bool facts=Regex.IsMatch(text,@"^(?:(?:请|帮我|看看|查查|查询|查看|看一下|查一下)\s*)?(?:"+club+@"(?:的)?\s*)?(?:下一场(?:比赛)?(?:什么时候|几点|何时|时间|对手|和谁踢)?|上一场(?:比赛)?(?:比分|赛果|结果)?|(?:今天|明天|今晚|昨天|前天|最近|近期)(?:的)?(?:比赛|赛程|赛果|比分|看球)(?:有哪些|有什么|安排|时间|几点)?|(?:今天|明天|今晚)(?:有什么值得看|有什么比赛|有哪些比赛|有什么球赛)|(?:联赛)?(?:积分榜|积分|排名)|排第几|近况|球队近况|赛程|赛果|比分|比赛计划|比赛安排)$",RegexOptions.IgnoreCase);
             if(facts)return new(QuickKind.Football,text,team,text.Contains("明天")?1:0);
         }
         return new(QuickKind.Ai,text);

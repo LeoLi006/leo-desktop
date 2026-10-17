@@ -7,7 +7,7 @@ static class LeoSummary
         var day = DateOnly.FromDateTime(now.LocalDateTime);
         var pending = tasks.Where(t => t.Day <= day && t.Completed == null && !t.Deleted).OrderBy(t => t.Day).ThenBy(t => t.Created).ToArray();
         string todos = pending.Length == 0 ? "今天没有未完成事项 ✓" : $"今日待办 {pending.Length} 项" + (pending.Any(t => t.Day < day) ? "（含未完成旧事项）" : "") + "\n" + string.Join("\n", pending.Take(3).Select(t => "· " + (t.Title.Length>24?t.Title[..24]+"…":t.Title))) + (pending.Length > 3 ? "\n· 还有 " + (pending.Length - 3) + " 项" : "");
-        var next = matches.Where(m => m.TimeKnown && m.State == "pre" && m.Kickoff > now && !m.Status.Contains("POSTPON", StringComparison.OrdinalIgnoreCase) && !m.Status.Contains("CANCEL", StringComparison.OrdinalIgnoreCase) && FootballFeed.FollowTags(m, FootballForm.FixedFollowing).Length > 0).OrderBy(m => m.Kickoff).FirstOrDefault();
+        var next = matches.Where(m => m.TimeKnown && m.State == "pre" && m.Kickoff > now && !m.Status.Contains("POSTPON", StringComparison.OrdinalIgnoreCase) && !m.Status.Contains("CANCEL", StringComparison.OrdinalIgnoreCase) && FootballFeed.FollowTags(m, FootballForm.FollowingNames).Length > 0).OrderBy(m => m.Kickoff).FirstOrDefault();
         string football = next == null ? "暂无已缓存的关注比赛" : next.Kickoff.ToLocalTime().ToString("MM-dd HH:mm") + "  " + FootballFeed.Name(next.Home) + " vs " + FootballFeed.Name(next.Away);
         if(next!=null&&DateOnly.FromDateTime(next.Kickoff.LocalDateTime)==day){var left=next.Kickoff-now;int minutes=(int)Math.Ceiling(left.TotalMinutes);football+="\n距开球 "+(minutes>=60?(minutes/60)+" 小时 ":"")+(minutes%60)+" 分钟";}
         return todos + "\n\n下一场关注比赛 · 缓存\n" + football;
@@ -15,7 +15,7 @@ static class LeoSummary
     public static FootballMatch[] CachedMatches()
     {
         var matches = FootballFeed.LoadCache().Matches.ToList();
-        foreach (string name in FootballForm.FixedFollowing) matches.AddRange(TeamData.Load(Club.For(name)).Matches);
+        foreach (string name in FootballForm.FollowingNames) matches.AddRange(TeamData.Load(Club.For(name)).Matches);
         return matches.GroupBy(m => m.Id).Select(g => g.Last()).ToArray();
     }
 }
@@ -42,6 +42,7 @@ sealed partial class PetForm
     long hoverSince;
     Point hoverOrigin;
     long summaryRenderedAt;
+    int summaryFollowingVersion=-1;
     long summaryLoadedAt = -60000;
     FootballMatch[] summaryMatches = [];
     void StartHoverSummary()
@@ -49,13 +50,13 @@ sealed partial class PetForm
         if (previewMode) return;
         hoverTimer.Tick += (_, _) =>
         {
-            bool over = hit.Visible && hit.Bounds.Contains(Cursor.Position) && Control.MouseButtons == MouseButtons.None && !dragging && !launcher.Visible && ContextMenuStrip?.Visible != true && !hiddenForFullscreen && feedback?.Visible != true;
+            bool over = hit.Visible && hit.Bounds.Contains(Cursor.Position) && Control.MouseButtons == MouseButtons.None && !dragging && !launcher.Visible && ContextMenuStrip?.Visible != true && !hiddenForFullscreen && dockMotion.Progress<.001f && feedback?.Visible != true;
             if (!over) { hoverSince = 0; hoverCard?.Hide(); return; }
             if (hoverSince == 0) { hoverSince = clock.ElapsedMilliseconds; hoverOrigin = Cursor.Position; return; }
             if (Math.Abs(Cursor.Position.X-hoverOrigin.X)>5||Math.Abs(Cursor.Position.Y-hoverOrigin.Y)>5) { hoverSince=clock.ElapsedMilliseconds;hoverOrigin=Cursor.Position;hoverCard?.Hide();return; }
             if (clock.ElapsedMilliseconds - hoverSince < 650) return;
             if(hoverCard?.Visible==true&&clock.ElapsedMilliseconds-summaryRenderedAt<30000)return;summaryRenderedAt=clock.ElapsedMilliseconds;
-            if (clock.ElapsedMilliseconds - summaryLoadedAt > 60000) { summaryMatches = LeoSummary.CachedMatches(); summaryLoadedAt = clock.ElapsedMilliseconds; }
+            if (clock.ElapsedMilliseconds - summaryLoadedAt > 60000||summaryFollowingVersion!=FootballFollowing.Current.Version) { summaryFollowingVersion=FootballFollowing.Current.Version;summaryMatches = LeoSummary.CachedMatches(); summaryLoadedAt = clock.ElapsedMilliseconds; }
             hoverCard ??= new HoverCard(); hoverCard.Present(LeoSummary.Build(todoStore.Items, summaryMatches, DateTimeOffset.Now), Bounds);
         };
         hoverTimer.Start();

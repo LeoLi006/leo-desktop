@@ -47,9 +47,9 @@ static class FootballFeed
     public static string[] FollowTags(FootballMatch m, IEnumerable<string> following)
     {
         bool Has(string id) => m.HomeId == id || m.AwayId == id;
-        return following.Where(x => x switch { "巴塞罗那" => Has("83"), "迈阿密国际" => Has("20232"), "曼城" => Has("382"), _ => false }).ToArray();
+        return following.Where(x=>ClubCatalog.Find(x) is {} club&&Has(club.Id)).ToArray();
     }
-    static readonly HashSet<string> BigClubs = new() { "83", "86", "1068", "382", "364", "360", "359", "363", "367", "160", "132", "111", "110", "103", "124" };
+    static readonly HashSet<string> BigClubs = new() { "83", "86", "1068", "382", "364", "360", "359", "363", "367", "160", "132", "111", "110", "103", "124", "114", "104", "105", "131", "11420", "176", "167", "174" };
     public static bool IsFocus(FootballMatch m) => BigClubs.Contains(m.HomeId) && BigClubs.Contains(m.AwayId);
     static readonly Dictionary<string, string> Names = new(StringComparer.OrdinalIgnoreCase) {
         ["Barcelona"]="巴塞罗那", ["Inter Miami CF"]="迈阿密国际", ["Manchester City"]="曼城", ["Argentina"]="阿根廷", ["Real Madrid"]="皇家马德里", ["Atlético Madrid"]="马德里竞技", ["Atletico Madrid"]="马德里竞技", ["Liverpool"]="利物浦", ["Arsenal"]="阿森纳", ["Chelsea"]="切尔西", ["Manchester United"]="曼联", ["Tottenham Hotspur"]="热刺", ["Bayern Munich"]="拜仁慕尼黑", ["Borussia Dortmund"]="多特蒙德", ["Paris Saint-Germain"]="巴黎圣日耳曼", ["Juventus"]="尤文图斯", ["AC Milan"]="AC米兰", ["Internazionale"]="国际米兰", ["Spanish LALIGA"]="西甲", ["English Premier League"]="英超", ["UEFA Champions League"]="欧冠", ["MLS"]="美职联", ["Italian Serie A"]="意甲", ["German Bundesliga"]="德甲", ["French Ligue 1"]="法甲"
@@ -57,13 +57,14 @@ static class FootballFeed
     public static string Name(string text)
     {
         if (text.StartsWith("UEFA Champions League", StringComparison.OrdinalIgnoreCase)) return "欧冠";
+        var known=ClubCatalog.Find(text);if(known!=null)return known.Name;
         return text switch { "LALIGA" => "西甲", "Bundesliga" => "德甲", "Serie A" => "意甲", "Ligue 1" => "法甲", "Ipswich Town" => "伊普斯维奇", "Real Betis" => "皇家贝蒂斯", "Atlanta United FC" => "亚特兰大联", "AEK Athens" => "雅典AEK", "Aston Villa" => "阿斯顿维拉", "Red Bull New York" => "纽约红牛", "New York Red Bulls" => "纽约红牛", "FC Cincinnati" => "辛辛那提FC", _ => ClubNames.Translate(Names.GetValueOrDefault(text, text)) };
     }
     public static string Status(FootballMatch m) => m.Status.Contains("Postpon", StringComparison.OrdinalIgnoreCase) ? "延期" : m.Status.Contains("Cancel", StringComparison.OrdinalIgnoreCase) ? "取消" : m.State == "in" ? "进行中" : m.State == "post" ? "已结束" : "未开赛";
     public static async Task<FootballCache> FetchAsync(FootballCache old, CancellationToken token)
     {
         var paths = Enumerable.Range(-4, 12).Select(i => "all/scoreboard?dates=" + DateTimeOffset.UtcNow.AddDays(i).ToString("yyyyMMdd") + "&limit=1000").ToList();
-        paths.AddRange(new[] { "all/teams/83/schedule?fixture=true", "all/teams/382/schedule?fixture=true", "all/teams/20232/schedule?fixture=true" });
+        paths.AddRange(FootballFollowing.Current.Ids.Select(id=>"all/teams/"+id+"/schedule?fixture=true"));
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(18) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd("LeoFootball/1.0");
         using var gate = new SemaphoreSlim(4);
@@ -91,7 +92,9 @@ sealed class FootballForm : BarcaWindow
 {
     readonly bool preview;
     readonly TodoStore tasks;
-    public static readonly string[] FixedFollowing={"巴塞罗那","迈阿密国际","曼城"};
+    public static string[] FollowingNames=>FootballFollowing.Current.Names;
+    readonly FootballFollowing following;
+    readonly FlowLayoutPanel followed=new(){Width=180,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true};
     readonly Panel home=new(){Dock=DockStyle.Fill};
     readonly Panel pages=new(){Dock=DockStyle.Fill};
     TeamView? detail;
@@ -104,19 +107,16 @@ sealed class FootballForm : BarcaWindow
     readonly Dictionary<string,FollowButton> follows=new();
     readonly CancellationTokenSource lifetime=new();
     int filterIndex;bool busy,disposed;
-    public FootballForm(bool previewMode=false,TodoStore? planner=null)
+    public FootballForm(bool previewMode=false,TodoStore? planner=null,FootballFollowing? favorites=null)
     {
-        preview=previewMode;tasks=planner??new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));cache=preview?new():FootballFeed.LoadCache();
+        following=favorites??(previewMode?new FootballFollowing(null):FootballFollowing.Current);preview=previewMode;tasks=planner??new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));cache=preview?new():FootballFeed.LoadCache();
         Text="Leo · 足球";StartPosition=FormStartPosition.Manual;ClientSize=new Size(900,760);MinimumSize=new Size(780,580);TopMost=false;
         var chrome=BarcaUi.Chrome(this,"LEO  /  MATCHDAY","BLAUGRANA  ·  你的足球日程");
         CanResize=false;MaximizeBox=false;MinimumSize=Size;MaximumSize=Size;
         var content=new Panel(){Dock=DockStyle.Fill,Padding=new Padding(20,14,12,0)};
         var sidebar=new FlowLayoutPanel(){Dock=DockStyle.Left,Width=198,WrapContents=false,FlowDirection=FlowDirection.TopDown,Padding=new Padding(0,6,16,0)};
         sidebar.Controls.Add(new Label{Text="我的关注",Width=174,Height=31,ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});
-        foreach(var pair in new[]{("巴塞罗那","83"),("迈阿密国际","20232"),("曼城","382")}){
-            var name=pair.Item1;var button=new FollowButton(name,pair.Item2);
-            button.Click+=(_,_)=>OpenTeam(name);follows[name]=button;sidebar.Controls.Add(button);
-        }
+        var manage=new BarcaButton{Text="＋ 管理关注",Width=174,Height=31,Margin=new Padding(0,0,0,9)};manage.Click+=async(_,_)=>{using var dialog=new FollowingManager(following);if(dialog.ShowDialog(this)==DialogResult.OK){RenderFollowing();Render();if(!preview)await LoadAsync(true);}};sidebar.Controls.Add(manage);sidebar.Controls.Add(followed);RenderFollowing();
         sidebar.Controls.Add(new WatchLinksPanel(preview));
 
         var main=new Panel{Dock=DockStyle.Fill};var toolbar=new Panel{Dock=DockStyle.Top,Height=51};
@@ -127,6 +127,7 @@ sealed class FootballForm : BarcaWindow
         home.Controls.Add(content);home.Controls.Add(status);pages.Controls.Add(home);Controls.Add(pages);Controls.Add(chrome);Shown+=async(_,_)=>{Render();if(!preview)await LoadAsync(false);};
         KeyPreview=true;KeyDown+=(_,e)=>{if(detail!=null&&(e.KeyCode==Keys.BrowserBack||e.Alt&&e.KeyCode==Keys.Left)){BackToSchedule();e.Handled=true;e.SuppressKeyPress=true;}};Render();
     }
+    void RenderFollowing(){foreach(Control c in followed.Controls.Cast<Control>().ToArray())c.Dispose();follows.Clear();foreach(var club in following.Clubs){var button=new FollowButton(club.Name,club.Id){Width=157};button.Click+=(_,_)=>OpenTeam(club.Name);follows[club.Name]=button;followed.Controls.Add(button);}followed.Height=Math.Clamp(following.Clubs.Length*76,42,250);if(follows.Count==0)followed.Controls.Add(new Label{Text="尚未关注球队",ForeColor=BarcaUi.Muted,Width=170,Height=35});}
     public bool VerifyNoResize(){var before=Size;foreach(var point in new[]{new Point(1,1),new Point(Width-2,1),new Point(1,Height-2),new Point(Width-2,Height-2)}){var screen=PointToScreen(point);var msg=Message.Create(Handle,0x84,IntPtr.Zero,(IntPtr)((screen.Y<<16)|(screen.X&0xffff)));WndProc(ref msg);if(msg.Result.ToInt64() is >=10 and <=17)return false;}var command=Message.Create(Handle,0x112,(IntPtr)0xF000,IntPtr.Zero);WndProc(ref command);return Size==before&&MinimumSize==MaximumSize&&!CanResize;}
     void OpenTeam(string name)
     {
@@ -157,7 +158,7 @@ sealed class FootballForm : BarcaWindow
     {
         if(IsDisposed)return;for(int i=0;i<tabs.Count;i++){tabs[i].Selected=i==filterIndex;tabs[i].Invalidate();}
         list.SuspendLayout();foreach(Control c in list.Controls.Cast<Control>().ToArray())c.Dispose();
-        var rows=cache.Matches.Where(m=>FootballFeed.IsRecent(m,DateTimeOffset.UtcNow)).Select(m=>(Match:m,Tags:FootballFeed.FollowTags(m,FixedFollowing))).Where(x=>filterIndex==0?x.Tags.Length>0:FootballFeed.IsFocus(x.Match)).OrderBy(x=>x.Match.State=="post"?1:0).ThenBy(x=>(x.Match.State=="post"?-x.Match.Kickoff.UtcTicks:x.Match.Kickoff.UtcTicks)).Take(80).ToArray();
+        var rows=cache.Matches.Where(m=>FootballFeed.IsRecent(m,DateTimeOffset.UtcNow)).Select(m=>(Match:m,Tags:FootballFeed.FollowTags(m,following.Names))).Where(x=>filterIndex==0?x.Tags.Length>0:FootballFeed.IsFocus(x.Match)).OrderBy(x=>x.Match.State=="post"?1:0).ThenBy(x=>(x.Match.State=="post"?-x.Match.Kickoff.UtcTicks:x.Match.Kickoff.UtcTicks)).Take(80).ToArray();
         if(rows.Length==0)list.Controls.Add(new Label{Text="暂无已公布的匹配赛程\n可稍后刷新",Width=480,Height=100,Padding=new Padding(22,30,0,0),ForeColor=BarcaUi.Muted});
         string day="";
         foreach(var row in rows){var m=row.Match;string next=m.Kickoff.ToLocalTime().ToString("MM月dd日 dddd");if(next!=day){day=next;list.Controls.Add(new Label{Text=day,Width=Math.Max(400,list.ClientSize.Width-35),Height=34,Padding=new Padding(3,8,0,0),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});}
@@ -165,7 +166,7 @@ sealed class FootballForm : BarcaWindow
             card.Click+=(_,_)=>{if(preview)return;try{if(m.Id.Length>0&&m.Id.All(char.IsAsciiDigit))Process.Start(new ProcessStartInfo("https://www.espn.com/soccer/match/_/gameId/"+m.Id){UseShellExecute=true});}catch{status.Text="无法打开浏览器";}};list.Controls.Add(card);
         }list.ResumeLayout();
     }
-    public bool VerifyFixedFollowing()=>follows.Count==3&&follows.Keys.Order().SequenceEqual(FixedFollowing.Order());
+    public bool VerifyFollowing()=>follows.Keys.Order().SequenceEqual(following.Names.Order());
     public bool VerifyTabs(){for(int pass=0;pass<4;pass++)foreach(var tab in tabs)tab.PerformClick();tabs[0].PerformClick();return tabs.Count==2&&filterIndex==0&&tabs[0].Selected&&!tabs[1].Selected;}
     public bool VerifyTeamNavigation()
     {

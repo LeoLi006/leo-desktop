@@ -246,7 +246,7 @@ static class Program
             try {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
                 var cache = Task.Run(() => FootballFeed.FetchAsync(FootballFeed.LoadCache(), timeout.Token)).GetAwaiter().GetResult();
-                var following = FootballForm.FixedFollowing;
+                var following = FootballForm.FollowingNames;
                 report = new { ok = cache.Matches.Count > 0, cache.Updated, cache.FailedSources, matches = cache.Matches.Count,
                     followed_matches = cache.Matches.Count(m => FootballFeed.FollowTags(m, following).Length > 0), focus_matches = cache.Matches.Count(FootballFeed.IsFocus),
                     sample = cache.Matches.Where(m => FootballFeed.FollowTags(m, following).Length > 0).Take(5), ai_api_requests = 0 };
@@ -257,7 +257,7 @@ static class Program
         {
             using var form = new FootballForm(true);
             form.PreviewData(FootballFeed.LoadCache().Matches); form.Show(); Application.DoEvents();
-            var uiChecks = new Dictionary<string,bool> { ["border_resize_disabled"] = form.VerifyNoResize(), ["following_list_is_fixed"] = form.VerifyFixedFollowing(), ["tabs_survive_repeated_switching"] = form.VerifyTabs(), ["team_card_opens_detail"] = form.VerifyTeamNavigation(), ["football_is_not_topmost"] = !form.TopMost && form.Owner == null };
+            var uiChecks = new Dictionary<string,bool> { ["border_resize_disabled"] = form.VerifyNoResize(), ["following_sidebar_matches_preferences"] = form.VerifyFollowing(), ["tabs_survive_repeated_switching"] = form.VerifyTabs(), ["team_card_opens_detail"] = form.VerifyTeamNavigation(), ["football_is_not_topmost"] = !form.TopMost && form.Owner == null };
             File.WriteAllText(Path.ChangeExtension(args[1], ".interaction.json"), JsonSerializer.Serialize(new { ok=uiChecks.Values.All(x=>x), checks=uiChecks },new JsonSerializerOptions{WriteIndented=true}));
             using var bitmap = new Bitmap(form.Width, form.Height); form.DrawToBitmap(bitmap, form.ClientRectangle with { Width = form.Width, Height = form.Height }); bitmap.Save(args[1]); return;
         }
@@ -459,7 +459,8 @@ sealed partial class PetForm : Form
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
         tray.DoubleClick += (_, _) => ShowLauncher();
-        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
+        hit.MouseEnter+=(_,_)=>RevealDock();
+        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
         hit.MouseMove += (_, e) => {
             if (!hit.Capture || (Control.MouseButtons & MouseButtons.Left) == 0) return;
             var delta = new Size(Cursor.Position.X - mouseDown.X, Cursor.Position.Y - mouseDown.Y);
@@ -475,10 +476,10 @@ sealed partial class PetForm : Form
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
             }
         };
-        Shown+=(_,_)=>StartHoverSummary();
+        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();};
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; hit.Show(this); PositionFoot(); foot.Show(this); };
-        LocationChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot();feedback?.Follow();hoverCard?.Hide(); };
-        ClientSizeChanged += (_, _) => { hit.Bounds = Bounds; PositionFoot(); };
+        LocationChanged += (_, _) => OnDockLocationChanged();
+        ClientSizeChanged += (_, _) => { SyncDockHit(); PositionFoot(); };
         animation.Interval = 140;
         animation.Tick += (_, _) => Animate();
         animation.Start();
@@ -489,18 +490,19 @@ sealed partial class PetForm : Form
     protected override bool ShowWithoutActivation => true;
     void ShowChat()
     {
+        RevealDock(true);
         launcher.Hide(); foot.CollapseSearch();
         if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction), clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
         if (!chat.Visible) WindowPositions.Prepare(chat,"chat",Bounds,previewMode);
         chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; chat.Show(); chat.Activate();
     }
     void ShowVoice(){ShowChat();chat!.ToggleVoiceInput();}
-    void ShowTodos(QuickIntent? intent=null){launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);todoWindow.Show();todoWindow.Activate();if(intent!=null)todoWindow.Apply(intent);}
+    void ShowTodos(QuickIntent? intent=null){RevealDock(true);launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);todoWindow.Show();todoWindow.Activate();if(intent!=null)todoWindow.Apply(intent);}
     void PollFullscreen()
     {
         if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;
         bool hide = prefs.HideInFullscreen && FullscreenMonitor.IsFullscreenOn(Screen.FromControl(this));
-        SetFullscreenHidden(hide);UpdateDockTools();
+        SetFullscreenHidden(hide);
     }
     void SetFullscreenHidden(bool hide)
     {
@@ -508,7 +510,7 @@ sealed partial class PetForm : Form
         if (hide == hiddenForFullscreen) return;
         hiddenForFullscreen = hide;
         if (hide) { hoverCard?.Hide();feedback?.Hide();if(reminders?.Visible==true)reminders.Hide();launcher.Hide(); foot.CollapseSearch(); hit.Hide(); foot.Hide(); Hide(); }
-        else { Show(); hit.Show(this); PositionFoot(); foot.Show(this);if(reminders!=null&&!reminders.IsDisposed&&reminders.PendingCount>0&&!QuietHours.Load().Contains(DateTime.Now))reminders.Present([]); }
+        else { Show(); hit.Show(this); PositionFoot(); if(dockMotion.Progress<.001f)foot.Show(this);if(reminders!=null&&!reminders.IsDisposed&&reminders.PendingCount>0&&!QuietHours.Load().Contains(DateTime.Now))reminders.Present([]); }
     }
     void Animate()
     {
@@ -581,6 +583,7 @@ sealed partial class PetForm : Form
     }
     void DrawPet(Graphics graphics, RectangleF destination)
     {
+        if(DrawDockPet(graphics,destination))return;
         bool vertical = row is 11 or 12;
         graphics.DrawImage(vertical ? verticalAtlas : atlas, destination, new Rectangle(frame * 192, (vertical ? row - 11 : row) * 208, 192, 208), GraphicsUnit.Pixel);
     }
@@ -592,6 +595,7 @@ sealed partial class PetForm : Form
     }
     public void ShowLauncher()
     {
+        RevealDock(true);
         if (hiddenForFullscreen) SetFullscreenHidden(false);
         launcherOpens++;
         var area = Screen.FromControl(this).WorkingArea;
@@ -606,6 +610,7 @@ sealed partial class PetForm : Form
     }
     void ResizePet()
     {
+        RevealDock(true);
         foot.ApplyScale(prefs.PetSize);
         ClientSize = new Size(prefs.PetSize, prefs.PetSize * 208 / 192);
         Location = Clamp(Location);
@@ -617,6 +622,7 @@ sealed partial class PetForm : Form
     }
     void OpenSettings()
     {
+        RevealDock(true);
         launcher.Hide();
         if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications,ShortcutStatus,()=>{todoStore.ReloadImported();launcher.ReloadImportedConfiguration();todoWindow?.View.Render();});
         if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
@@ -777,6 +783,7 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
+        dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }

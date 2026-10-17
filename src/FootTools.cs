@@ -33,6 +33,7 @@ sealed class FootTools : Form
     bool proxyBusy;
     Rectangle petBounds, workArea;
     bool expanded;
+    public bool IsSearchOpen=>expanded;
     public bool HasTextInput => expanded && search.Focused && !string.IsNullOrWhiteSpace(search.Text);
     public void PreviewTyping(string text) { SetExpanded(true); search.Text = text; search.Focus(); }
     public void CollapseSearch(){SetExpanded(false);SetUtilities(false);}

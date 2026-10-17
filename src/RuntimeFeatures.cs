@@ -40,17 +40,3 @@ static class EdgeDock
         return new Point(x,y);
     }
 }
-
-sealed partial class PetForm
-{
-    long dockLastInteraction;
-    void UpdateDockTools()
-    {
-        if(previewMode||hiddenForFullscreen||resourcesDisposed)return;
-        var area=Screen.FromControl(this).WorkingArea;
-        bool docked=prefs.EdgeDocking&&(Math.Abs(Left-area.Left)<3||Math.Abs(Right-area.Right)<3||Math.Abs(Top-area.Top)<3||Math.Abs(Bottom+foot.ReservedSpace-area.Bottom)<3);
-        bool over=Bounds.Contains(Cursor.Position)||foot.Visible&&foot.Bounds.Contains(Cursor.Position)||foot.ContainsFocus||dragging||launcher.Visible||ContextMenuStrip?.Visible==true;
-        if(!docked||over){dockLastInteraction=clock.ElapsedMilliseconds;if(!foot.Visible)foot.Show(this);}
-        else if(clock.ElapsedMilliseconds-dockLastInteraction>1400){foot.CollapseSearch();foot.Hide();}
-    }
-}

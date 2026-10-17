@@ -1,0 +1,3 @@
+Bundled team directory snapshot: 2026-10-17. 97 clubs, including five major European league directories and Inter Miami CF.
+Primary source: https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/teams?limit=100
+League keys: eng.1, esp.1, ita.1, ger.1, fra.1. IDs and English display names verified against source; Chinese names and common aliases are local presentation metadata. League membership may change with seasons.

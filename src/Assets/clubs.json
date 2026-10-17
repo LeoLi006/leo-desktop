@@ -1,0 +1,810 @@
+[
+  {
+    "Name": "伯恩茅斯",
+    "Id": "349",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "AFC Bournemouth",
+    "Aliases": []
+  },
+  {
+    "Name": "阿森纳",
+    "Id": "359",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Arsenal",
+    "Aliases": []
+  },
+  {
+    "Name": "阿斯顿维拉",
+    "Id": "362",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Aston Villa",
+    "Aliases": []
+  },
+  {
+    "Name": "布伦特福德",
+    "Id": "337",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Brentford",
+    "Aliases": []
+  },
+  {
+    "Name": "布莱顿",
+    "Id": "331",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Brighton & Hove Albion",
+    "Aliases": []
+  },
+  {
+    "Name": "切尔西",
+    "Id": "363",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Chelsea",
+    "Aliases": []
+  },
+  {
+    "Name": "考文垂",
+    "Id": "388",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Coventry City",
+    "Aliases": []
+  },
+  {
+    "Name": "水晶宫",
+    "Id": "384",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Crystal Palace",
+    "Aliases": []
+  },
+  {
+    "Name": "埃弗顿",
+    "Id": "368",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Everton",
+    "Aliases": []
+  },
+  {
+    "Name": "富勒姆",
+    "Id": "370",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Fulham",
+    "Aliases": []
+  },
+  {
+    "Name": "赫尔城",
+    "Id": "306",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Hull City",
+    "Aliases": []
+  },
+  {
+    "Name": "伊普斯维奇",
+    "Id": "373",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Ipswich Town",
+    "Aliases": []
+  },
+  {
+    "Name": "利兹联",
+    "Id": "357",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Leeds United",
+    "Aliases": []
+  },
+  {
+    "Name": "利物浦",
+    "Id": "364",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Liverpool",
+    "Aliases": []
+  },
+  {
+    "Name": "曼城",
+    "Id": "382",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Manchester City",
+    "Aliases": [
+      "曼彻斯特城"
+    ]
+  },
+  {
+    "Name": "曼联",
+    "Id": "360",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Manchester United",
+    "Aliases": [
+      "曼彻斯特联"
+    ]
+  },
+  {
+    "Name": "纽卡斯尔联",
+    "Id": "361",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Newcastle United",
+    "Aliases": []
+  },
+  {
+    "Name": "诺丁汉森林",
+    "Id": "393",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Nottingham Forest",
+    "Aliases": []
+  },
+  {
+    "Name": "桑德兰",
+    "Id": "366",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Sunderland",
+    "Aliases": []
+  },
+  {
+    "Name": "热刺",
+    "Id": "367",
+    "League": "eng.1",
+    "LeagueName": "英超",
+    "English": "Tottenham Hotspur",
+    "Aliases": [
+      "托特纳姆热刺"
+    ]
+  },
+  {
+    "Name": "阿拉维斯",
+    "Id": "96",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Alavés",
+    "Aliases": []
+  },
+  {
+    "Name": "毕尔巴鄂竞技",
+    "Id": "93",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Athletic Club",
+    "Aliases": []
+  },
+  {
+    "Name": "马德里竞技",
+    "Id": "1068",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Atlético Madrid",
+    "Aliases": [
+      "马竞"
+    ]
+  },
+  {
+    "Name": "巴塞罗那",
+    "Id": "83",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Barcelona",
+    "Aliases": [
+      "巴萨",
+      "巴塞"
+    ]
+  },
+  {
+    "Name": "塞尔塔",
+    "Id": "85",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Celta Vigo",
+    "Aliases": []
+  },
+  {
+    "Name": "拉科鲁尼亚",
+    "Id": "90",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Deportivo",
+    "Aliases": []
+  },
+  {
+    "Name": "埃尔切",
+    "Id": "3751",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Elche",
+    "Aliases": []
+  },
+  {
+    "Name": "西班牙人",
+    "Id": "88",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Espanyol",
+    "Aliases": []
+  },
+  {
+    "Name": "赫塔费",
+    "Id": "2922",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Getafe",
+    "Aliases": []
+  },
+  {
+    "Name": "莱万特",
+    "Id": "1538",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Levante",
+    "Aliases": []
+  },
+  {
+    "Name": "马拉加",
+    "Id": "99",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Málaga",
+    "Aliases": []
+  },
+  {
+    "Name": "奥萨苏纳",
+    "Id": "97",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Osasuna",
+    "Aliases": []
+  },
+  {
+    "Name": "桑坦德竞技",
+    "Id": "87",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Racing Santander",
+    "Aliases": []
+  },
+  {
+    "Name": "巴列卡诺",
+    "Id": "101",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Rayo Vallecano",
+    "Aliases": []
+  },
+  {
+    "Name": "皇家贝蒂斯",
+    "Id": "244",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Real Betis",
+    "Aliases": []
+  },
+  {
+    "Name": "皇家马德里",
+    "Id": "86",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Real Madrid",
+    "Aliases": [
+      "皇马"
+    ]
+  },
+  {
+    "Name": "皇家社会",
+    "Id": "89",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Real Sociedad",
+    "Aliases": []
+  },
+  {
+    "Name": "塞维利亚",
+    "Id": "243",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Sevilla",
+    "Aliases": []
+  },
+  {
+    "Name": "瓦伦西亚",
+    "Id": "94",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Valencia",
+    "Aliases": []
+  },
+  {
+    "Name": "比利亚雷亚尔",
+    "Id": "102",
+    "League": "esp.1",
+    "LeagueName": "西甲",
+    "English": "Villarreal",
+    "Aliases": []
+  },
+  {
+    "Name": "AC米兰",
+    "Id": "103",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "AC Milan",
+    "Aliases": [
+      "米兰"
+    ]
+  },
+  {
+    "Name": "罗马",
+    "Id": "104",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "AS Roma",
+    "Aliases": []
+  },
+  {
+    "Name": "亚特兰大",
+    "Id": "105",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Atalanta",
+    "Aliases": []
+  },
+  {
+    "Name": "博洛尼亚",
+    "Id": "107",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Bologna",
+    "Aliases": []
+  },
+  {
+    "Name": "卡利亚里",
+    "Id": "2925",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Cagliari",
+    "Aliases": []
+  },
+  {
+    "Name": "科莫",
+    "Id": "2572",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Como",
+    "Aliases": []
+  },
+  {
+    "Name": "佛罗伦萨",
+    "Id": "109",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Fiorentina",
+    "Aliases": []
+  },
+  {
+    "Name": "弗罗西诺内",
+    "Id": "4057",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Frosinone",
+    "Aliases": []
+  },
+  {
+    "Name": "热那亚",
+    "Id": "3263",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Genoa",
+    "Aliases": []
+  },
+  {
+    "Name": "国际米兰",
+    "Id": "110",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Internazionale",
+    "Aliases": [
+      "国米",
+      "Inter Milan"
+    ]
+  },
+  {
+    "Name": "尤文图斯",
+    "Id": "111",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Juventus",
+    "Aliases": [
+      "尤文"
+    ]
+  },
+  {
+    "Name": "拉齐奥",
+    "Id": "112",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Lazio",
+    "Aliases": []
+  },
+  {
+    "Name": "莱切",
+    "Id": "113",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Lecce",
+    "Aliases": []
+  },
+  {
+    "Name": "蒙扎",
+    "Id": "4007",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Monza",
+    "Aliases": []
+  },
+  {
+    "Name": "那不勒斯",
+    "Id": "114",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Napoli",
+    "Aliases": []
+  },
+  {
+    "Name": "帕尔马",
+    "Id": "115",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Parma",
+    "Aliases": []
+  },
+  {
+    "Name": "萨索洛",
+    "Id": "3997",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Sassuolo",
+    "Aliases": []
+  },
+  {
+    "Name": "都灵",
+    "Id": "239",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Torino",
+    "Aliases": []
+  },
+  {
+    "Name": "乌迪内斯",
+    "Id": "118",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Udinese",
+    "Aliases": []
+  },
+  {
+    "Name": "威尼斯",
+    "Id": "17530",
+    "League": "ita.1",
+    "LeagueName": "意甲",
+    "English": "Venezia",
+    "Aliases": []
+  },
+  {
+    "Name": "柏林联合",
+    "Id": "598",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "1. FC Union Berlin",
+    "Aliases": []
+  },
+  {
+    "Name": "勒沃库森",
+    "Id": "131",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Bayer Leverkusen",
+    "Aliases": [
+      "药厂"
+    ]
+  },
+  {
+    "Name": "拜仁慕尼黑",
+    "Id": "132",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Bayern Munich",
+    "Aliases": [
+      "拜仁"
+    ]
+  },
+  {
+    "Name": "多特蒙德",
+    "Id": "124",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Borussia Dortmund",
+    "Aliases": [
+      "多特"
+    ]
+  },
+  {
+    "Name": "门兴格拉德巴赫",
+    "Id": "268",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Borussia Mönchengladbach",
+    "Aliases": []
+  },
+  {
+    "Name": "法兰克福",
+    "Id": "125",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Eintracht Frankfurt",
+    "Aliases": []
+  },
+  {
+    "Name": "奥格斯堡",
+    "Id": "3841",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "FC Augsburg",
+    "Aliases": []
+  },
+  {
+    "Name": "科隆",
+    "Id": "122",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "FC Cologne",
+    "Aliases": []
+  },
+  {
+    "Name": "汉堡",
+    "Id": "127",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Hamburg SV",
+    "Aliases": []
+  },
+  {
+    "Name": "美因茨",
+    "Id": "2950",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Mainz",
+    "Aliases": []
+  },
+  {
+    "Name": "莱比锡",
+    "Id": "11420",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "RB Leipzig",
+    "Aliases": []
+  },
+  {
+    "Name": "弗赖堡",
+    "Id": "126",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "SC Freiburg",
+    "Aliases": []
+  },
+  {
+    "Name": "帕德博恩",
+    "Id": "3307",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "SC Paderborn 07",
+    "Aliases": []
+  },
+  {
+    "Name": "埃尔弗斯贝格",
+    "Id": "10388",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "SV Elversberg",
+    "Aliases": []
+  },
+  {
+    "Name": "沙尔克04",
+    "Id": "133",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Schalke 04",
+    "Aliases": []
+  },
+  {
+    "Name": "霍芬海姆",
+    "Id": "7911",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "TSG Hoffenheim",
+    "Aliases": []
+  },
+  {
+    "Name": "斯图加特",
+    "Id": "134",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "VfB Stuttgart",
+    "Aliases": []
+  },
+  {
+    "Name": "云达不莱梅",
+    "Id": "137",
+    "League": "ger.1",
+    "LeagueName": "德甲",
+    "English": "Werder Bremen",
+    "Aliases": []
+  },
+  {
+    "Name": "欧塞尔",
+    "Id": "172",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "AJ Auxerre",
+    "Aliases": []
+  },
+  {
+    "Name": "摩纳哥",
+    "Id": "174",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "AS Monaco",
+    "Aliases": []
+  },
+  {
+    "Name": "昂热",
+    "Id": "7868",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Angers",
+    "Aliases": []
+  },
+  {
+    "Name": "布雷斯特",
+    "Id": "6997",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Brest",
+    "Aliases": []
+  },
+  {
+    "Name": "勒阿弗尔",
+    "Id": "3236",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Le Havre AC",
+    "Aliases": []
+  },
+  {
+    "Name": "勒芒",
+    "Id": "2697",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Le Mans",
+    "Aliases": []
+  },
+  {
+    "Name": "朗斯",
+    "Id": "175",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Lens",
+    "Aliases": []
+  },
+  {
+    "Name": "里尔",
+    "Id": "166",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Lille",
+    "Aliases": []
+  },
+  {
+    "Name": "洛里昂",
+    "Id": "273",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Lorient",
+    "Aliases": []
+  },
+  {
+    "Name": "里昂",
+    "Id": "167",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Lyon",
+    "Aliases": []
+  },
+  {
+    "Name": "马赛",
+    "Id": "176",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Marseille",
+    "Aliases": []
+  },
+  {
+    "Name": "尼斯",
+    "Id": "2502",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Nice",
+    "Aliases": []
+  },
+  {
+    "Name": "巴黎FC",
+    "Id": "6851",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Paris FC",
+    "Aliases": []
+  },
+  {
+    "Name": "巴黎圣日耳曼",
+    "Id": "160",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Paris Saint-Germain",
+    "Aliases": [
+      "巴黎",
+      "大巴黎",
+      "PSG"
+    ]
+  },
+  {
+    "Name": "雷恩",
+    "Id": "169",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Stade Rennais",
+    "Aliases": []
+  },
+  {
+    "Name": "斯特拉斯堡",
+    "Id": "180",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Strasbourg",
+    "Aliases": []
+  },
+  {
+    "Name": "图卢兹",
+    "Id": "179",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Toulouse",
+    "Aliases": []
+  },
+  {
+    "Name": "特鲁瓦",
+    "Id": "170",
+    "League": "fra.1",
+    "LeagueName": "法甲",
+    "English": "Troyes",
+    "Aliases": []
+  },
+  {
+    "Name": "迈阿密国际",
+    "Id": "20232",
+    "League": "usa.1",
+    "LeagueName": "美职联",
+    "English": "Inter Miami CF",
+    "Aliases": [
+      "迈阿密"
+    ]
+  }
+]

@@ -1,9 +1,9 @@
 ﻿using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
-sealed record Club(string Name,string Id,string League,string LeagueName)
+sealed record Club(string Name,string Id,string League,string LeagueName,string English="",string[]? Aliases=null)
 {
-    public static Club For(string name)=>name switch { "曼城"=>new(name,"382","eng.1","英超"), "迈阿密国际"=>new("迈阿密国际","20232","usa.1","美职联"), _=>new("巴塞罗那","83","esp.1","西甲") };
+    public static Club For(string name)=>ClubCatalog.Find(name)??throw new ArgumentException("球队尚未收录："+name);
 }
 sealed record LeagueRow(string Group,string Id,string Name,string Rank,string Played,string Won,string Drawn,string Lost,string Goals,string Difference,string Points);
 sealed class TeamData

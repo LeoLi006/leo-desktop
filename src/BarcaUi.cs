@@ -84,7 +84,7 @@ class BarcaFollowBase:Control
     readonly string name,id;
     readonly Font font=BarcaUi.Font(10,true),small=BarcaUi.Font(8.5f);
     public BarcaFollowBase(string label,string badge){name=label;id=badge;Width=174;Height=66;Margin=new Padding(0,0,0,10);Cursor=Cursors.Hand;AccessibleName=label;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
-    protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.Clear(Parent?.BackColor??BarcaUi.Canvas);g.SmoothingMode=SmoothingMode.AntiAlias;using var p=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),12);using var b=new SolidBrush(BarcaUi.Surface);g.FillPath(b,p);BarcaUi.DrawBadge(g,id,new Rectangle(12,17,31,31),"M");TextRenderer.DrawText(g,name,font,new Rectangle(53,13,115,24),BarcaUi.Text,TextFormatFlags.EndEllipsis);TextRenderer.DrawText(g,"比赛与积分榜  ›",small,new Rectangle(54,39,115,18),BarcaUi.Muted);}
+    protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.Clear(Parent?.BackColor??BarcaUi.Canvas);g.SmoothingMode=SmoothingMode.AntiAlias;using var p=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),12);using var b=new SolidBrush(BarcaUi.Surface);g.FillPath(b,p);BarcaUi.DrawBadge(g,id,new Rectangle(12,17,31,31),"M");TextRenderer.DrawText(g,name,font,new Rectangle(53,13,115,24),BarcaUi.Text,TextFormatFlags.EndEllipsis);TextRenderer.DrawText(g,"比赛与积分榜  ›",small,new Rectangle(54,39,Math.Max(30,Width-60),18),BarcaUi.Muted);}
     protected override void Dispose(bool disposing){if(disposing){font.Dispose();small.Dispose();}base.Dispose(disposing);}
 }
 sealed class ConversationView:Panel

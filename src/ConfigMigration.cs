@@ -1,7 +1,7 @@
 using System.Text.Json;
 namespace LeoLauncher;
 
-sealed record ConfigBundle(string Format,int Version,DateTimeOffset Created,Preferences Preferences,List<CustomCombo> Combos,WatchLink[] WatchLinks,QuietHours Quiet,ApiUsageConfig Budget,List<DailyTask>? Tasks,List<AppEntry>? Applications=null);
+sealed record ConfigBundle(string Format,int Version,DateTimeOffset Created,Preferences Preferences,List<CustomCombo> Combos,WatchLink[] WatchLinks,QuietHours Quiet,ApiUsageConfig Budget,List<DailyTask>? Tasks,List<AppEntry>? Applications=null,List<string>? FollowingIds=null);
 sealed record ConfigImport(ConfigBundle Bundle,string[] Notes);
 sealed class ConfigMigration
 {
@@ -15,7 +15,7 @@ sealed class ConfigMigration
         var combos=Read("leo-custom-combos.json",()=>new ComboStore(null).Items);
         var targets=copy.Favorites.Concat(copy.Aliases.Keys).Concat(combos.SelectMany(c=>c.Steps).Where(s=>s.Kind=="app").Select(s=>s.Value)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var hints=applications?.Invoke().Where(a=>targets.Contains(a.Target)).Select(a=>a with{ExePath=Path.GetFileName(a.ExePath)}).ToList();
-        return new("LeoConfig",1,DateTimeOffset.Now,copy,combos,Read("leo-watch-links.json",()=>new WatchLinkStore(null).Items),Read("leo-reminder-settings.json",()=>new QuietHours()),Read("leo-api-budget.json",()=>new ApiUsageConfig()),tasks?Read("leo-todos.json",()=>new List<DailyTask>()):null,hints);
+        return new("LeoConfig",1,DateTimeOffset.Now,copy,combos,Read("leo-watch-links.json",()=>new WatchLinkStore(null).Items),Read("leo-reminder-settings.json",()=>new QuietHours()),Read("leo-api-budget.json",()=>new ApiUsageConfig()),tasks?Read("leo-todos.json",()=>new List<DailyTask>()):null,hints,Read("leo-football-following.json",()=>FootballFollowing.Defaults.ToList()));
     }
     public void Export(string destination,Preferences prefs,bool tasks)=>Write(destination,JsonSerializer.Serialize(Capture(prefs,tasks),json));
     public static void Write(string path,string content){File.WriteAllText(path+".tmp",content);File.Move(path+".tmp",path,true);}
@@ -35,6 +35,7 @@ sealed class ConfigMigration
         var links=bundle.WatchLinks.Select(WatchLinkStore.Normalize).ToArray();
         if(bundle.Quiet==null||bundle.Quiet.Start is <0 or >=1440||bundle.Quiet.End is <0 or >=1440||bundle.Quiet.Start==bundle.Quiet.End||bundle.Budget==null||bundle.Budget.DailyLimit is <0 or >100000)throw new ArgumentException("提醒时段或 API 限额无效。");
         if(bundle.Tasks!=null){if(bundle.Tasks.Count>20000)throw new ArgumentException("清单数量过多。");TodoStore.ValidateSnapshot(JsonSerializer.Serialize(bundle.Tasks));if(bundle.Tasks.Any(t=>t.Repeat!=null&&t.Repeat.Frequency is not("daily" or "weekly")))throw new ArgumentException("清单中包含不支持的重复规则。");}
+        if(bundle.FollowingIds!=null)FootballFollowing.Validate(bundle.FollowingIds);
         var notes=new List<string>();var catalog=applications?.Invoke().ToArray()??[];var mapping=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
         if(bundle.Applications!=null&&catalog.Length>0)foreach(var hint in bundle.Applications){
             if(hint==null||string.IsNullOrWhiteSpace(hint.Target)||string.IsNullOrWhiteSpace(hint.Name)||hint.ExePath==null)throw new ArgumentException("应用迁移信息不完整。");
@@ -58,6 +59,7 @@ sealed class ConfigMigration
         // Only these local configuration files can be written; imported JSON cannot supply paths.
         var bundle=plan.Bundle;var prefs=bundle.Preferences;prefs.X=current.X;prefs.Y=current.Y;
         var files=new Dictionary<string,string>{["leo-settings.json"]=JsonSerializer.Serialize(prefs,json),["leo-custom-combos.json"]=JsonSerializer.Serialize(bundle.Combos,json),["leo-watch-links.json"]=JsonSerializer.Serialize(bundle.WatchLinks,json),["leo-reminder-settings.json"]=JsonSerializer.Serialize(bundle.Quiet,json),["leo-api-budget.json"]=JsonSerializer.Serialize(bundle.Budget,json)};
+        if(bundle.FollowingIds!=null)files["leo-football-following.json"]=JsonSerializer.Serialize(bundle.FollowingIds,json);
         if(bundle.Tasks!=null)files["leo-todos.json"]=JsonSerializer.Serialize(bundle.Tasks,json);
         var before=files.Keys.ToDictionary(name=>name,name=>File.Exists(Path.Combine(root,name))?File.ReadAllBytes(Path.Combine(root,name)):null);
         var previous=JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(current))!;
@@ -84,7 +86,7 @@ sealed class ConfigMigrationForm:BarcaWindow
     {
         prefs=p;apply=applySettings;reload=reloadSettings;preview=demo;migration=new(Store.Root,applications);Text="Leo · 配置迁移与恢复";StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(620,525);
         Controls.Add(BarcaUi.Chrome(this,"配置迁移与恢复","一份配置文件，带走你习惯的 Leo。"));
-        Controls.Add(new Label{Text="包含收藏、简称、快捷键、模块路径、组合动作、观赛网址、\n提醒时段及 API 限额。开机启动和窗口位置沿用本机设置。",Bounds=new Rectangle(25,108,565,58),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(9.5f)});
+        Controls.Add(new Label{Text="包含收藏、简称、快捷键、模块路径、组合动作、观赛网址、\n提醒时段、球队关注及 API 限额。开机启动和窗口位置沿用本机设置。",Bounds=new Rectangle(25,108,565,58),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(9.5f)});
         var export=new BarcaButton{Text="导出配置…",Bounds=new Rectangle(25,223,170,36)};var import=new BarcaButton{Text="导入配置…",Bounds=new Rectangle(211,223,170,36)};
         export.Click+=(_,_)=>{if(preview)return;using var picker=new SaveFileDialog{Filter="Leo 配置 (*.leo.json)|*.leo.json",FileName="Leo配置-"+DateTime.Today.ToString("yyyyMMdd")+".leo.json"};if(picker.ShowDialog(this)!=DialogResult.OK)return;Run(()=>{migration.Export(picker.FileName,prefs,includeTasks.Checked);result.Text="配置已导出。API 配置与 Key、聊天、剪贴板、使用历史和语音模型均未导出。";});};
         import.Click+=(_,_)=>{if(preview)return;using var picker=new OpenFileDialog{Filter="Leo 配置 (*.leo.json)|*.leo.json|JSON 文件 (*.json)|*.json"};if(picker.ShowDialog(this)==DialogResult.OK)Import(picker.FileName,false);};

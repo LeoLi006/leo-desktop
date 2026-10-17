@@ -18,7 +18,7 @@ static class FootballTests
             ["prematch_zero_score_hidden"] = m.Score == "VS",
             ["unknown_kickoff_marked"] = !m.TimeKnown,
             ["followed_clubs_tagged"] = FootballFeed.FollowTags(m, new[] { "巴塞罗那", "曼城" }).SequenceEqual(new[] { "巴塞罗那", "曼城" }),
-            ["fixed_list_contains_only_three_clubs"] = FootballForm.FixedFollowing.SequenceEqual(new[]{"巴塞罗那","迈阿密国际","曼城"}),
+            ["default_following_preserves_previous_choices"] = FootballForm.FollowingNames.SequenceEqual(new[]{"巴塞罗那","迈阿密国际","曼城"}),
             ["club_names_localized"] = new[]{"巴塞罗那","曼城","迈阿密国际"}.Select(Club.For).Select(TeamData.Load).SelectMany(d=>d.Rows.Select(r=>r.Name).Concat(d.Matches.SelectMany(m=>new[]{m.Home,m.Away}))).All(n=>System.Text.RegularExpressions.Regex.IsMatch(FootballFeed.Name(n),"[\\u4e00-\\u9fff]")),
             ["unfollow_removes_match_tag"] = FootballFeed.FollowTags(miami, Array.Empty<string>()).Length == 0,
             ["focus_requires_two_preset_strong_teams"] = FootballFeed.IsFocus(m) && !FootballFeed.IsFocus(miami),
