@@ -461,7 +461,7 @@ sealed partial class PetForm : Form
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
         tray.DoubleClick += (_, _) => ShowLauncher();
         // Dock hover is handled by the animation timer so shrinking hit bounds cannot cancel tucking.
-        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { if(dockMotion.Progress>.001f){dockClickReveal=true;dockAwaitExit=false;RevealDock();return;} RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
+        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { dockClickReveal=dockMotion.Progress>.001f; RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
         hit.MouseMove += (_, e) => {
             if (!hit.Capture || (Control.MouseButtons & MouseButtons.Left) == 0) return;
             var delta = new Size(Cursor.Position.X - mouseDown.X, Cursor.Position.Y - mouseDown.Y);
@@ -469,11 +469,11 @@ sealed partial class PetForm : Form
         };
         hit.MouseUp += (_, e) => {
             if (e.Button != MouseButtons.Left) return;
-            if(dockClickReveal){dockClickReveal=false;return;}
+            bool revealOnly=dockClickReveal;dockClickReveal=false;
             hit.Capture = false;
             if (movedWhileLocked) return;
-            if (dragging) { if(prefs.EdgeDocking)Location=Clamp(EdgeDock.Snap(Bounds,Screen.FromControl(this).WorkingArea,foot.ReservedSpace)); prefs.X = Left; prefs.Y = Top; Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
-            else {
+            if (dragging) { if(prefs.EdgeDocking)Location=Clamp(EdgeDock.Snap(Bounds,Screen.FromControl(this).WorkingArea,foot.ReservedSpace)); prefs.X = Left; prefs.Y = Top; if(!previewMode)Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
+            else if(!revealOnly) {
                 row = 3; rowUntil = clock.ElapsedMilliseconds + 800; frame = 0;
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
             }

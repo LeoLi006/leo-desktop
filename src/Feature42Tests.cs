@@ -81,6 +81,14 @@ sealed partial class PetForm
         checks["actual_drag_release_reaches_half_hidden_without_footer"]=dockMotion.Progress>=.999f&&!foot.Visible;
         int opens=launcherOpens;hit.SimulateClick(new Point(5,5));
         checks["half_hidden_click_only_reveals_without_opening_launcher"]=launcherOpens==opens&&!dockAwaitExit;
+        foreach(var side in new[]{DockSide.Left,DockSide.Right,DockSide.Top,DockSide.Bottom}){
+            RevealDock(true);Location=side switch{DockSide.Left=>new Point(area.Left,area.Top+Height),DockSide.Right=>new Point(area.Right-Width,area.Top+Height),DockSide.Top=>new Point(area.Left+Width*2,area.Top),_=>new Point(area.Left+Width*2,area.Bottom-Height-foot.ReservedSpace)};
+            BeginDockTuck();long begun=clock.ElapsedMilliseconds;for(int t=32;t<=1200;t+=32)AdvanceDock(begun+t,far);
+            var destination=new Point(area.Left+area.Width/2,area.Top+area.Height/2);
+            hit.SimulateClick(new Point(5,5),()=>{checks[side+"_hidden_press_captures_drag"]=hit.Capture;ApplyDrag(new Size(destination.X-Left,destination.Y-Top));});
+            long released=clock.ElapsedMilliseconds;for(int t=32;t<=1800;t+=32)AdvanceDock(released+t,far);Animate();
+            checks[side+"_drag_out_ends_animation_and_restores_tools"]=!dragging&&!hit.Capture&&!dockClickReveal&&!dockAwaitExit&&dockMotion.Progress==0&&row==0&&foot.Visible&&Location==destination;
+        }
         return checks;
     }
 }
