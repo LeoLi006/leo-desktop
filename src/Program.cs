@@ -177,6 +177,7 @@ static class Program
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
         if(args.Length==2&&args[0]=="--upgrade38-test"){var checks=Upgrade38Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
+        if(args.Length==2&&args[0]=="--qq-pause-send"){try{string result=QQPlayback.ToggleAsync().GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(new{sent=true,result}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{sent=false,error=e.Message}));Environment.ExitCode=1;}return;}
         if(args.Length==2&&args[0]=="--startup-live-test"){
             var result=Task.Run(async()=>{
                 bool coldMusic=System.Diagnostics.Process.GetProcessesByName("QQMusic").Length==0;
@@ -486,11 +487,13 @@ sealed partial class PetForm : Form
     void ShowTodos(QuickIntent? intent=null){launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);todoWindow.Show();todoWindow.Activate();if(intent!=null)todoWindow.Apply(intent);}
     void PollFullscreen()
     {
+        if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;
         bool hide = prefs.HideInFullscreen && FullscreenMonitor.IsFullscreenOn(Screen.FromControl(this));
         SetFullscreenHidden(hide);
     }
     void SetFullscreenHidden(bool hide)
     {
+        if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;
         if (hide == hiddenForFullscreen) return;
         hiddenForFullscreen = hide;
         if (hide) { hoverCard?.Hide();feedback?.Hide();if(reminders?.Visible==true)reminders.Hide();launcher.Hide(); foot.CollapseSearch(); hit.Hide(); foot.Hide(); Hide(); }
@@ -498,6 +501,7 @@ sealed partial class PetForm : Form
     }
     void Animate()
     {
+        if(resourcesDisposed||IsDisposed||Disposing)return;
         if (dragging) { int next = dragTransition.Advance(clock.ElapsedMilliseconds); if (row != next) { row = next; frame = 0; } }
         bool thinking = launcher.HasTextInput || foot.HasTextInput || chat?.IsThinking == true;
         int desired = dragging ? row : thinking ? 8 : row != 0 && row != 8 && clock.ElapsedMilliseconds <= rowUntil ? row : 0;
@@ -758,10 +762,14 @@ sealed partial class PetForm : Form
         chat?.Close();
         File.WriteAllText(path, JsonSerializer.Serialize(new { ok = checks.Values.All(x => x), checks }, new JsonSerializerOptions { WriteIndented = true }));
     }
-    protected override void OnFormClosed(FormClosedEventArgs e)
+    bool resourcesDisposed;
+    void ReleaseResources()
     {
-        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
-        base.OnFormClosed(e);
+        if(resourcesDisposed)return;resourcesDisposed=true;
+        fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
+        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }
+    protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
+    protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}
 }
 

@@ -2,7 +2,7 @@
 namespace LeoLauncher;
 static class BarcaMenus
 {
-    public static void Apply(ContextMenuStrip menu){var font=BarcaUi.Font(9.5f);menu.Renderer=new BarcaMenuRenderer();menu.Font=font;menu.BackColor=BarcaUi.Surface;menu.ForeColor=BarcaUi.Text;menu.ShowImageMargin=false;menu.ShowCheckMargin=false;menu.Padding=new Padding(5,7,5,5);menu.DropShadowEnabled=true;menu.AutoSize=false;menu.Opening+=(_,_)=>{foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(234,39);item.Padding=new Padding(13,0,28,0);}menu.Size=new Size(244,menu.Padding.Vertical+menu.Items.Cast<ToolStripItem>().Sum(i=>i.Height)+2);menu.PerformLayout();};menu.Disposed+=(_,_)=>font.Dispose();}
+    public static void Apply(ContextMenuStrip menu){var font=BarcaUi.Font(9.5f);menu.Renderer=new BarcaMenuRenderer();menu.Font=font;menu.BackColor=BarcaUi.Surface;menu.ForeColor=BarcaUi.Text;menu.ShowImageMargin=false;menu.ShowCheckMargin=false;menu.Padding=new Padding(5,7,5,5);menu.DropShadowEnabled=true;menu.AutoSize=false;menu.Opening+=(_,_)=>{foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(174,35);item.Padding=new Padding(10,0,23,0);}menu.Size=new Size(184,menu.Padding.Vertical+menu.Items.Cast<ToolStripItem>().Sum(i=>i.Height)+2);menu.PerformLayout();};menu.Disposed+=(_,_)=>font.Dispose();}
 }
 sealed class BarcaMenuRenderer:ToolStripProfessionalRenderer
 {

@@ -66,6 +66,7 @@ static class SettingsTests
         checks["scene_save_and_status_fit_inside_page"]=All(window).OfType<SceneSettings>().Single().Controls.Cast<Control>().All(c=>c.Parent!.ClientRectangle.Contains(c.Bounds));
         Capture("preview-settings-scenes.png");
         foreach(var check in CustomComboTests.Check(directory))checks[check.Key]=check.Value;
+        foreach(var check in MusicFixTests.Check(directory))checks[check.Key]=check.Value;
         return checks;
     }
 }

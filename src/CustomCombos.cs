@@ -131,7 +131,7 @@ sealed partial class PetForm
             if(store.Items.Count==0)root.DropDownItems.Add(new ToolStripMenuItem(store.Error??"暂无自定义组合"){Enabled=false});
             root.DropDownItems.Add(new ToolStripSeparator());root.DropDownItems.Add("＋ 新建自定义…",null,(_,_)=>EditCombo());
             var edit=new ToolStripMenuItem("编辑 / 删除");foreach(var combo in store.Items){string id=combo.Id;edit.DropDownItems.Add(combo.Name,null,(_,_)=>EditCombo(id));}edit.Enabled=store.Items.Count>0;root.DropDownItems.Add(edit);
-            root.DropDown.Renderer=new BarcaMenuRenderer();root.DropDown.BackColor=BarcaUi.Surface;root.DropDown.ForeColor=BarcaUi.Text;root.DropDown.Font=menu.Font;if(root.DropDown is ToolStripDropDownMenu drop){drop.ShowImageMargin=false;drop.ShowCheckMargin=false;}foreach(ToolStripItem item in root.DropDownItems){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(260,35);}edit.DropDown.Renderer=new BarcaMenuRenderer();edit.DropDown.BackColor=BarcaUi.Surface;edit.DropDown.ForeColor=BarcaUi.Text;edit.DropDown.Font=menu.Font;
+            root.DropDown.Renderer=new BarcaMenuRenderer();root.DropDown.BackColor=BarcaUi.Surface;root.DropDown.ForeColor=BarcaUi.Text;root.DropDown.Font=menu.Font;if(root.DropDown is ToolStripDropDownMenu drop){drop.ShowImageMargin=false;drop.ShowCheckMargin=false;}foreach(ToolStripItem item in root.DropDownItems){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(220,35);}edit.DropDown.Renderer=new BarcaMenuRenderer();edit.DropDown.BackColor=BarcaUi.Surface;edit.DropDown.ForeColor=BarcaUi.Text;edit.DropDown.Font=menu.Font;
         };
     }
 }
