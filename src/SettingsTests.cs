@@ -8,6 +8,10 @@ static class SettingsTests
     public static Dictionary<string, bool> Check(string directory)
     {
         var checks = new Dictionary<string, bool>();
+        var area=new Rectangle(-1600,0,1600,900);var layout=new WindowPosition(new Rectangle(1500,650,420,400),new Rectangle(0,0,1920,1080),"removed-monitor",false);
+        var restored=WindowPositions.Restore(layout,area,new Size(700,500));
+        checks["window_position_restores_inside_changed_monitor"]=area.Contains(restored)&&restored.Left<0;
+        checks["window_right_bottom_alignment_survives_resolution_change"]=WindowPositions.Restore(new(new Rectangle(1500,680,420,400),new(0,0,1920,1080),"",false),new(0,0,1280,720),new(420,400)).Location==new Point(860,320);
         var defaults = LeoHotkeys.Values(new Preferences());
         checks["old_preferences_keep_default_hotkeys"] = LeoHotkeys.Values(JsonSerializer.Deserialize<Preferences>("{}")!).SequenceEqual(defaults);
         bool rejected = false;

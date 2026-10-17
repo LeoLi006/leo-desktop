@@ -436,6 +436,7 @@ sealed partial class PetForm : Form
         hit.DragEnter += (_, e) => e.Effect = e.Data?.GetData(DataFormats.FileDrop) is string[] paths && FileDropActions.ValidPaths(paths).Length > 0 ? DragDropEffects.Copy : DragDropEffects.None;
         hit.DragDrop += (_, e) => { if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths) { launcher.Hide(); FileDropActions.Open(paths, launcher.FileApplications); } };
         launcher.PetBounds = () => Bounds;
+        if(!preview)WindowPositions.PetBounds=()=>Bounds;
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
         var menu = new ContextMenuStrip();
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
@@ -477,11 +478,11 @@ sealed partial class PetForm : Form
     {
         launcher.Hide(); foot.CollapseSearch();
         if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction), clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
-        if (!chat.Visible) chat.Location = PopupPlacement.Place(Bounds, chat.Size, Screen.FromControl(this).WorkingArea);
+        if (!chat.Visible) WindowPositions.Prepare(chat,"chat",Bounds,previewMode);
         chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; chat.Show(); chat.Activate();
     }
     void ShowVoice(){ShowChat();chat!.ToggleVoiceInput();}
-    void ShowTodos(QuickIntent? intent=null){launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)todoWindow.Location=PopupPlacement.Place(Bounds,todoWindow.Size,Screen.FromControl(this).WorkingArea);todoWindow.Show();todoWindow.Activate();if(intent!=null)todoWindow.Apply(intent);}
+    void ShowTodos(QuickIntent? intent=null){launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);todoWindow.Show();todoWindow.Activate();if(intent!=null)todoWindow.Apply(intent);}
     void PollFullscreen()
     {
         bool hide = prefs.HideInFullscreen && FullscreenMonitor.IsFullscreenOn(Screen.FromControl(this));
@@ -603,6 +604,7 @@ sealed partial class PetForm : Form
         launcher.Hide();
         if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture);
         if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
+        if(!settingsWindow.Visible)WindowPositions.Prepare(settingsWindow,"settings",Bounds,previewMode);
         settingsWindow.Show();settingsWindow.Activate();
     }
     public void SavePreview(string path)

@@ -106,7 +106,7 @@ sealed class LauncherForm : Form
             if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks);
             var area = Screen.FromControl(this).WorkingArea;
             football.StartPosition = FormStartPosition.Manual;
-            football.Location = PopupPlacement.Place(PetBounds?.Invoke() ?? Bounds, football.Size, area);
+            if(!football.Visible)WindowPositions.Prepare(football,"football",PetBounds?.Invoke() ?? Bounds,preview);
             Hide();
             football.Show(); football.Activate();
         };
@@ -317,7 +317,7 @@ sealed class LauncherForm : Form
     }
     public bool VerifyMusicEntry(){if(!Visible)Show();var footballIcon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");var musicIcon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");musicIcon.PerformClick();Application.DoEvents();bool ok=musicIcon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public MusicForm MusicWithoutOpening(){if(music==null||music.IsDisposed)music=new MusicForm(preview);return music;}
-    public MusicForm OpenMusicFromAssistant(string query=""){if(music==null||music.IsDisposed)music=new MusicForm(preview);if(!music.Visible)music.Location=PopupPlacement.Place(Bounds,music.Size,Screen.FromControl(this).WorkingArea);music.OpenQuery(query);return music;}
+    public MusicForm OpenMusicFromAssistant(string query=""){if(music==null||music.IsDisposed)music=new MusicForm(preview);if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);return music;}
     public void OpenFootballFromAssistant(){var button=Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
     public string PinClipboardText(string text){if(clipboard==null)throw new InvalidOperationException("剪贴板尚未就绪");if(string.IsNullOrWhiteSpace(text)||text.Length>100000)throw new ArgumentException("文字为空或过长");var item=new ClipItem("text",text,text.Replace('\n',' ')[..Math.Min(100,text.Length)],DateTimeOffset.Now);clipboard.History.Add(item);if(!clipboard.History.Pin(item,true))throw new InvalidOperationException("剪贴板收藏已达上限");if(clipboard.History.Error!=null)throw new IOException(clipboard.History.Error);return "已收藏这段文字到剪贴板。";}
     public void OpenClipboardFromAssistant()=>Launch(ClipboardTool.Entry);
