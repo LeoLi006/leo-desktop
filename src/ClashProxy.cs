@@ -110,7 +110,7 @@ static class ClashProxy
     static void PrepareSilentStart()
     {
         if(!File.Exists(ConfigPath))return;
-        string original=File.ReadAllText(ConfigPath),updated=SilentStartConfig(original);
+        string original=File.ReadAllText(ConfigPath),updated=ClashShortcut.PrepareAvailable(SilentStartConfig(original));
         if(original!=updated)ConfigMigration.Write(ConfigPath,updated);
     }
     public static object InspectDetails()
@@ -165,49 +165,55 @@ static class ClashProxy
     }
     public static ProxyStatus SetEnabled(bool desired) { lock (changeGate) return Change(desired); }
     public static ProxyStatus Toggle() { lock (changeGate) { var before = ReadStatus(); return Change(!before.Running || before.Enabled != true); } }
+    static bool ListenerReady()
+    {
+        try{
+            var endpoint=ReadEndpoint(File.ReadAllText(ConfigPath));string host=endpoint.Host is "0.0.0.0" or "::"?"127.0.0.1":endpoint.Host;
+            using var client=new System.Net.Sockets.TcpClient();var connect=client.ConnectAsync(host,endpoint.Port);
+            return connect.Wait(180)&&client.Connected;
+        }catch{return false;}
+    }
     static ProxyStatus Change(bool desired)
     {
-        var before = ReadStatus();
-        if (!before.Running)
-        {
-            if (!desired) return new(false, false, "Clash Verge 未运行，无需关闭代理");
-            string path = ClientPath() ?? throw new InvalidOperationException("未找到 Clash Verge，请先安装客户端");
+        var before=ReadStatus();bool cold=!before.Running;
+        if(cold){
+            if(!desired)return new(false,false,"Clash Verge 未运行，无需关闭代理");
+            string path=ClientPath()??throw new InvalidOperationException("未找到 Clash Verge，请在设置中指定客户端路径");
             PrepareSilentStart();
-            using var started = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden });
-            if (started == null) throw new IOException("Clash Verge 未能启动");
-            var wait = Stopwatch.StartNew();
-            while (wait.Elapsed < TimeSpan.FromSeconds(25))
-            {
-                Thread.Sleep(300); before = ReadStatus();
-                if (before.Running && before.Enabled == true) break;
-                try { if (before.Running && before.Enabled != null) break; }
-                catch (ElementNotAvailableException) { }
-            }
-        }
-        before = ReadStatus();
-        if (!before.Running || before.Enabled == null) throw new InvalidOperationException(before.Description);
-        if (before.Enabled == desired) return before;
-        return ToggleRunning(desired);
+            using var started=Process.Start(new ProcessStartInfo(path){UseShellExecute=true,WindowStyle=ProcessWindowStyle.Hidden});
+            if(started==null)throw new IOException("Clash Verge 未能启动");
+        }else if(before.Enabled==null)throw new InvalidOperationException(before.Description);
+        return ProxyRequest.Complete(desired,TimeSpan.FromSeconds(cold?45:10),ReadStatus,ListenerReady,TryApply,()=>Thread.Sleep(250));
     }
-    static ProxyStatus ToggleRunning(bool desired)
+    static bool TryApply(bool desired,ProxyStatus before)
     {
-        var watch = Stopwatch.StartNew();
-        var before = ReadStatus();
-        if (!before.Running || before.Enabled == null) throw new InvalidOperationException(before.Description);
-        PrepareSwitch();
-        AutomationElement? control=null;
-        while(watch.ElapsedMilliseconds<6000){try{control=FindSwitch();if(control!=null)break;}catch(ElementNotAvailableException){}Thread.Sleep(150);}
-        if(control==null)throw new InvalidOperationException("未找到 Clash 的系统代理开关。请确认客户端已就绪，再点击重试。");
-        var pattern = (TogglePattern)control.GetCurrentPattern(TogglePattern.Pattern);
-        if (watch.ElapsedMilliseconds > 6500) throw new InvalidOperationException("Clash Verge 响应超时，请稍后重试");
-        if (pattern.Current.ToggleState == ToggleState.Indeterminate || (pattern.Current.ToggleState == ToggleState.On) != before.Enabled)
-            throw new InvalidOperationException("Clash 与系统代理状态不一致，请先在 Clash 内重新设置系统代理");
-        pattern.Toggle();
-        for (int i = 0; i < 20; i++)
-        {
-            Thread.Sleep(150); var after = ReadStatus();
-            if (after.Enabled == desired) return after;
+        try{
+            // Retry navigation too: cold startup may not have created its WebView on the first poll.
+            if(File.Exists(ConfigPath)&&ClashShortcut.TrySend(File.ReadAllText(ConfigPath)))return true;
+            PrepareSwitch();var control=FindSwitch();
+            if(control==null||!control.TryGetCurrentPattern(TogglePattern.Pattern,out var current))return false;
+            var pattern=(TogglePattern)current;var state=pattern.Current.ToggleState;
+            if(state==ToggleState.Indeterminate)return false;
+            if((state==ToggleState.On)==desired)return true;
+            if((state==ToggleState.On)!=before.Enabled)return false;
+            pattern.Toggle();return true;
+        }catch(ElementNotAvailableException){return false;}catch(ElementNotEnabledException){return false;}
+    }
+}
+
+static class ProxyRequest
+{
+    internal static ProxyStatus Complete(bool desired,TimeSpan timeout,Func<ProxyStatus> read,Func<bool> listenerReady,Func<bool,ProxyStatus,bool> apply,Action pause)
+    {
+        var watch=Stopwatch.StartNew();bool requested=false;
+        while(watch.Elapsed<timeout){
+            var status=read();
+            if(status.Running){
+                if(status.Enabled==desired&&(!desired||listenerReady()))return status;
+                if(status.Enabled!=null&&status.Enabled!=desired&&!requested)requested=apply(desired,status);
+            }
+            pause();
         }
-        throw new InvalidOperationException("未确认系统代理切换结果，请在 Clash Verge 检查当前状态后再操作");
+        throw new InvalidOperationException("Clash 启动或代理切换超时，请稍后点击重试。");
     }
 }

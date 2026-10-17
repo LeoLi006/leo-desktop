@@ -25,6 +25,26 @@ static class ProxyFeatureTests
         string changed=ClashProxy.SilentStartConfig(other+"enable_silent_start: false\r\n");
         return new(){["native_silent_start_enabled"]=changed==other+"enable_silent_start: true\r\n",["silent_start_patch_is_idempotent"]=ClashProxy.SilentStartConfig(changed)==changed,["missing_setting_is_added_without_changing_other_settings"]=ClashProxy.SilentStartConfig(other)==changed,["empty_configuration_is_valid"]=ClashProxy.SilentStartConfig("")=="enable_silent_start: true\n"};
     }
+    public static Dictionary<string,bool> Startup()
+    {
+        var checks=new Dictionary<string,bool>();int stage=0,attempts=0,issued=0;
+        var result=ProxyRequest.Complete(true,TimeSpan.FromSeconds(2),()=>new(stage>=2,stage<2?null:stage>=7,"fixture"),()=>stage>=9,(wanted,before)=>{attempts++;if(stage<5)return false;issued++;return true;},()=>stage++);
+        checks["waits_for_process_controls_and_live_proxy_port"]=result.Enabled==true&&stage==9&&attempts>1&&issued==1;
+        stage=0;issued=0;
+        ProxyRequest.Complete(true,TimeSpan.FromSeconds(2),()=>new(true,true,"fixture"),()=>stage>=3,(_,_)=>{issued++;return true;},()=>stage++);
+        checks["already_enabled_during_startup_waits_for_port_without_toggling"]=stage==3&&issued==0;
+        issued=0;var off=ProxyRequest.Complete(false,TimeSpan.FromSeconds(2),()=>new(true,false,"fixture"),()=>false,(_,_)=>{issued++;return true;},()=>{});
+        checks["disabling_does_not_require_live_proxy_listener"]=off.Enabled==false&&issued==0;
+        bool timeout=false;try{ProxyRequest.Complete(true,TimeSpan.FromMilliseconds(5),()=>new(false,null,"fixture"),()=>false,(_,_)=>false,()=>Thread.Sleep(1));}catch(InvalidOperationException){timeout=true;}
+        checks["failed_startup_is_bounded_and_never_reports_success"]=timeout;
+        string config="enable_silent_start: true\nhotkeys:\n- other_action,Ctrl+F8\nproxy_host: 127.0.0.1\n";
+        string patched=ClashShortcut.Prepare(config,"Ctrl+Alt+Shift+F11");
+        checks["cold_start_shortcut_preserves_existing_actions"]=patched.Contains("- other_action,Ctrl+F8")&&patched.Contains("proxy_host: 127.0.0.1")&&ClashShortcut.Read(patched)=="Ctrl+Alt+Shift+F11";
+        checks["existing_proxy_shortcut_is_not_replaced"]=ClashShortcut.Prepare(patched,"Ctrl+F9")==patched;
+        checks["shortcut_parser_validates_chords"]=ClashShortcut.Parse("Ctrl+Alt+Shift+F11")==((uint)7,(byte)0x7A)&&ClashShortcut.Parse("F11")==null;
+
+        return checks;
+    }
     sealed class WindowWatch:IDisposable
     {
         [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
@@ -51,6 +71,24 @@ static class ProxyFeatureTests
                 var button=page.TryGetCurrentPattern(InvokePattern.Pattern,out _)?page:page.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.IsInvokePatternAvailableProperty,true));
                 if(button?.TryGetCurrentPattern(InvokePattern.Pattern,out var pattern)==true){((InvokePattern)pattern).Invoke();Thread.Sleep(150);}return;
             }
+    }
+    public static object ColdLive()
+    {
+        var before=ClashProxy.ReadStatus();bool closed=false,enabled=false,recovered=false;string? error=null;double elapsed=0;
+        try{
+            string client=ClashProxy.ClientPath()??throw new IOException("找不到 Clash 客户端");
+            if(before.Running){
+                ClashProxy.SetEnabled(false);Thread.Sleep(400);
+                foreach(var process in Process.GetProcessesByName("clash-verge"))using(process){
+                    if(!string.Equals(process.MainModule?.FileName,client,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("客户端路径不一致，取消重启验证");
+                    process.Kill();process.WaitForExit(5000);
+                }
+            }
+            closed=!ClashProxy.ReadStatus().Running;var watch=Stopwatch.StartNew();
+            enabled=ClashProxy.SetEnabled(true).Enabled==true;elapsed=watch.Elapsed.TotalSeconds;
+        }catch(Exception e){error=e.Message;}
+        finally{if(!enabled)try{recovered=ClashProxy.SetEnabled(before.Enabled??false).Enabled==(before.Enabled??false);}catch(Exception e){error=(error??"")+"；恢复失败："+e.Message;}}
+        return new{ok=closed&&enabled,started_from_stopped=closed,enabled,elapsed_seconds=elapsed,recovered,error,ui=ClashProxy.InspectDetails()};
     }
     public static object Live()
     {
