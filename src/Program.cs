@@ -441,7 +441,6 @@ sealed partial class PetForm : Form
         foot = new FootTools(p.PetSize, preview);
         foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;
-        foot.MusicRequested+=()=>{launcher.Hide();foot.CollapseSearch();launcher.OpenMusicFromAssistant();};
         foot.TodosRequested+=()=>ShowTodos();
         foot.VoiceRequested+=ShowVoice;
         hit = new HitSurface { Bounds = Bounds };

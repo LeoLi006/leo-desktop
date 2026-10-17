@@ -9,7 +9,7 @@ sealed class FootTools : Form
     float uiScale = 1f;
     Preferences modules=new();
     int CompactUnits=>94;
-    int UtilityUnits=>4+30*((modules.TerminalModule?1:0)+(modules.ClashModule?1:0)+(modules.MusicModule?1:0)+(modules.EdgeModule?1:0));
+    int UtilityUnits=>4+30*((modules.TerminalModule?1:0)+(modules.ClashModule?1:0)+(modules.EdgeModule?1:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
     public void ConfigureModules(Preferences p){modules=p;if(UtilityUnits==4)utilitiesOpen=false;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
@@ -25,9 +25,7 @@ sealed class FootTools : Form
     readonly Button searchButton = new GlyphButton("search");
     readonly GlyphButton proxyButton = new("proxy");
     readonly GlyphButton chatButton = new("chat");
-    readonly GlyphButton musicButton=new("music");
     readonly GlyphButton todoButton = new("todo");
-    public event Action? MusicRequested;
     public event Action? ChatRequested;
     public event Action? TodosRequested;
     public event Action? VoiceRequested;
@@ -39,7 +37,7 @@ sealed class FootTools : Form
     public void PreviewTyping(string text) { SetExpanded(true); search.Text = text; search.Focus(); }
     public void CollapseSearch(){SetExpanded(false);SetUtilities(false);}
     public void PreviewUtilities()=>SetUtilities(true);
-    public bool VerifyDisclosure(){CollapseSearch();bool hidden=Controls.OfType<Button>().Count(b=>b.Visible)==3&&chatButton.Visible&&todoButton.Visible&&!terminal.Visible&&!proxyButton.Visible&&!musicButton.Visible&&!searchButton.Visible;moreButton.PerformClick();bool opened=terminal.Visible&&proxyButton.Visible&&musicButton.Visible&&searchButton.Visible&&chatButton.Visible&&Height==S(58);moreButton.PerformClick();return hidden&&opened&&chatButton.Visible&&!terminal.Visible&&!searchButton.Visible&&Height==S(28);}
+    public bool VerifyDisclosure(){CollapseSearch();bool hidden=Controls.OfType<Button>().Count(b=>b.Visible)==3&&chatButton.Visible&&todoButton.Visible&&!terminal.Visible&&!proxyButton.Visible&&!searchButton.Visible;moreButton.PerformClick();bool opened=terminal.Visible&&proxyButton.Visible&&searchButton.Visible&&chatButton.Visible&&Height==S(58);moreButton.PerformClick();return hidden&&opened&&chatButton.Visible&&!terminal.Visible&&!searchButton.Visible&&Height==S(28);}
     public bool VerifyRepeatedRendering()
     {
         bool ok = true;
@@ -72,7 +70,7 @@ sealed class FootTools : Form
         terminal.FlatAppearance.BorderSize = 0;
         terminal.FlatAppearance.MouseOverBackColor = Appearance.Hover;
         var tip = new ToolTip(); tip.SetToolTip(terminal, "管理员终端");
-        moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / 音乐 / Edge");
+        moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / Edge");
         searchButton.SetBounds(33, 2, 28, 24); searchButton.FlatStyle = FlatStyle.Flat;
         searchButton.FlatAppearance.BorderSize = 0; searchButton.BackColor = Appearance.Background;
         searchButton.FlatAppearance.MouseOverBackColor = Appearance.Hover;
@@ -83,7 +81,6 @@ sealed class FootTools : Form
         chatButton.Click += (_, _) => ChatRequested?.Invoke(); tip.SetToolTip(chatButton, "问 Leo · 右键直接说话 · Ctrl+Alt+V");
         chatButton.MouseUp+=(_,e)=>{if(e.Button==MouseButtons.Right)VoiceRequested?.Invoke();};
         todoButton.AccessibleName="每日清单";todoButton.FlatStyle=FlatStyle.Flat;todoButton.FlatAppearance.BorderSize=0;todoButton.Click+=(_,_)=>TodosRequested?.Invoke();tip.SetToolTip(todoButton,"每日清单");
-        musicButton.AccessibleName="QQ音乐点歌";musicButton.Click+=(_,_)=>MusicRequested?.Invoke();tip.SetToolTip(musicButton,"QQ 音乐 · 快速点歌");
         proxyButton.AccessibleName = "Clash Verge 系统代理";
         proxyButton.FlatStyle = FlatStyle.Flat; proxyButton.FlatAppearance.BorderSize = 0;
         void RefreshProxy()
@@ -120,7 +117,7 @@ sealed class FootTools : Form
             try { Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
             catch (Exception error) { MessageBox.Show("无法打开 Edge：" + error.Message, "Leo"); }
         };
-        Controls.AddRange([moreButton,terminal, searchButton, proxyButton,musicButton, chatButton, todoButton, search]);
+        Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, search]);
         ApplyScale(petSize);
         Shown += (_, _) => { SetExpanded(false); RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
@@ -134,7 +131,7 @@ sealed class FootTools : Form
         Invalidate(true);
         if (value) { Activate(); search.Focus(); }
     }
-    void SetUtilities(bool value){if(value&&UtilityUnits==4){OperationFeedback.Show("尚未启用可选工具，请在设置 → 功能中选择。");value=false;}utilitiesOpen=value;if(value){expanded=false;search.Visible=false;}moreButton.ActiveState=value;LayoutTools();Invalidate(true);}
+    void SetUtilities(bool value){if(value&&UtilityUnits==4){OperationFeedback.Show("下拉区暂无工具，可在设置中开启终端、Clash 或 Edge。");value=false;}utilitiesOpen=value;if(value){expanded=false;search.Visible=false;}moreButton.ActiveState=value;LayoutTools();Invalidate(true);}
     public void ApplyScale(int petSize)
     {
         uiScale = Math.Clamp(petSize, 80, 230) / 130f;
@@ -146,7 +143,7 @@ sealed class FootTools : Form
         SuspendLayout();
         chatButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));moreButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
         chatButton.Visible=todoButton.Visible=moreButton.Visible=true;
-        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,modules.TerminalModule),((Button)proxyButton,modules.ClashModule),((Button)musicButton,modules.MusicModule),(searchButton,modules.EdgeModule)}){
+        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,modules.TerminalModule),((Button)proxyButton,modules.ClashModule),(searchButton,modules.EdgeModule)}){
             button.Visible=utilitiesOpen&&enabled;if(enabled){button.Bounds=new Rectangle(S(toolX),S(32),S(28),S(24));toolX+=30;}
         }
         search.Visible=expanded&&modules.EdgeModule;search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+3),S(36),S(154),S(21));
@@ -166,7 +163,7 @@ sealed class FootTools : Form
     {
         CollapseSearch();moreButton.PerformClick();bool before=!search.Visible;searchButton.PerformClick();bool opened=search.Visible&&Width==S(VisibleCompactUnits+168)&&Height==S(58);searchButton.PerformClick();bool closed=!search.Visible;CollapseSearch();return before&&opened&&closed;
     }
-    public bool VerifyButtonOrder()=>chatButton.Top==todoButton.Top&&todoButton.Top==moreButton.Top&&chatButton.Left<todoButton.Left&&todoButton.Left<moreButton.Left&&terminal.Top>chatButton.Top&&terminal.Left<proxyButton.Left&&proxyButton.Left<musicButton.Left&&musicButton.Left<searchButton.Left;
+    public bool VerifyButtonOrder()=>chatButton.Top==todoButton.Top&&todoButton.Top==moreButton.Top&&chatButton.Left<todoButton.Left&&todoButton.Left<moreButton.Left&&terminal.Top>chatButton.Top&&terminal.Left<proxyButton.Left&&proxyButton.Left<searchButton.Left;
     public static ProcessStartInfo TerminalStart()
     {
         string terminal = ModulePaths.Selected("terminal")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", "wt.exe");

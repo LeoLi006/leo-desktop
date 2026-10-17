@@ -115,6 +115,7 @@ sealed class LauncherForm : Form
             football.Show(); football.Activate();
         };
         Controls.Add(footballButton);
+        var musicButton=new GlyphButton("music"){Bounds=new Rectangle(102,7,28,24),AccessibleName="QQ音乐点歌",FlatStyle=FlatStyle.Flat,Visible=prefs.MusicModule};musicButton.FlatAppearance.BorderSize=0;musicButton.Click+=(_,_)=>OpenMusicFromAssistant();Controls.Add(musicButton);
         var size = new MsnSlider { Value = Math.Clamp(p.PetSize, 80, 230) };
         size.AutoSize = false; size.SetBounds(390, 6, 145, 28);
         size.AccessibleName = "Leo 大小";
@@ -330,7 +331,7 @@ sealed class LauncherForm : Form
         launchApplication(app);
         if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
     }
-    public bool VerifyMusicEntry(){OpenMusicFromAssistant();Application.DoEvents();bool ok=music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
+    public bool VerifyMusicEntry(){if(!Visible)Show();var icon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public void ReloadImportedConfiguration(){football?.Close();football=null;RefreshModules();Filter();}
     public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview);return music;}
     public MusicForm OpenMusicFromAssistant(string query=""){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview);if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);return music;}

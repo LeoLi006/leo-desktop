@@ -11,13 +11,17 @@ static class Feature41Tests
         using(var footer=new FootTools(130,true)){
             footer.Show();Application.DoEvents();var buttons=All(footer).OfType<Button>().ToArray();Button Button(string name)=>buttons.Single(b=>b.AccessibleName==name);
             c["footer_chat_todos_and_disclosure_are_always_on_first_row"]=buttons.Count(b=>b.Visible)==3&&Button("问 Leo").Top==Button("每日清单").Top&&Button("每日清单").Top==Button("展开更多工具").Top;
-            Button("展开更多工具").PerformClick();int requests=0;footer.MusicRequested+=()=>requests++;Button("QQ音乐点歌").PerformClick();
-            c["all_four_optional_modules_share_dropdown_row"]=new[]{"打开管理员终端","Clash Verge 系统代理","QQ音乐点歌","展开 Edge 搜索"}.All(n=>Button(n).Visible&&Button(n).Top>Button("问 Leo").Top)&&requests==1;
+            Button("展开更多工具").PerformClick();
+            c["terminal_clash_and_edge_share_dropdown_row"]=new[]{"打开管理员终端","Clash Verge 系统代理","展开 Edge 搜索"}.All(n=>Button(n).Visible&&Button(n).Top>Button("问 Leo").Top);
             c["expanded_tools_fit_with_no_clipped_icons"]=buttons.Where(b=>b.Visible).All(b=>footer.ClientRectangle.Contains(b.Bounds));
             Capture(footer,"preview-footer41.png",output);
             Button("展开 Edge 搜索").PerformClick();c["edge_input_fits_alongside_optional_row"]=All(footer).OfType<TextBox>().Single().Visible&&footer.ClientRectangle.Contains(All(footer).OfType<TextBox>().Single().Bounds);
             footer.ConfigureModules(new(){TerminalModule=false,ClashModule=false,MusicModule=false,EdgeModule=false});footer.PreviewUtilities();
             c["disabling_all_modules_keeps_three_main_buttons_without_empty_row"]=buttons.Count(b=>b.Visible)==3&&footer.Height==28;
+        }
+        var launcherPrefs=new Preferences();using(var launcher=new LauncherForm(launcherPrefs,()=>{},true,false)){
+            c["music_restored_beside_football_and_opens_panel"]=launcher.VerifyMusicEntry();
+            launcherPrefs.MusicModule=false;launcher.RefreshModules();c["disabled_music_hides_restored_header_icon"]=!All(launcher).OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌").Visible;
         }
         var original=ModulePaths.Snapshot();
         try{
