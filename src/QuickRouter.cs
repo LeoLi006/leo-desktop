@@ -4,9 +4,10 @@ enum QuickKind{Ai,LeoCommand,OpenApp,SearchApp,Clipboard,Web,Todos,AddTodo,Compl
 sealed record QuickIntent(QuickKind Kind,string Value="",string Team="",int DayOffset=0,string Argument="");
 static class QuickRouter
 {
-    public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&intent.Value is "music_step" or "music_playlist_name" or "scene_watch";}
+    public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&intent.Value is "music_step" or "music_playlist_name" or "scene_watch" or "combo_name";}
     public static string Team(string text)=>text.Contains("曼城")?"曼城":text.Contains("迈阿密")?"迈阿密国际":text.Contains("巴萨")||text.Contains("巴塞罗那")?"巴塞罗那":"";
     public static QuickIntent Route(string text){text=text.Trim().TrimEnd('。','！','？','?','!');string team=Team(text);
+        var combo=Regex.Match(text,@"^(?:执行自定义|运行组合|启动组合)[：:\s]*(.+)$");if(combo.Success)return new(QuickKind.LeoCommand,"combo_name",Argument:combo.Groups[1].Value.Trim());
         if(text is "准备看球" or "进入看球模式" or "开始看球")return new(QuickKind.LeoCommand,"scene_watch");
         if(text is "看看今天的清单" or "看看今天的清单计划" or "今天的计划" or "我有什么待办" or "今天有什么待办" or "我的待办有哪些" or "待办有哪些" or "清单有哪些" or "今天要做什么")return new(QuickKind.Todos);
         if(Regex.IsMatch(text,@"^(?:添加|打开|查看|搜索)?(?:我的|今天的|今日|每日)?(?:待办|清单|任务)(?:列表)?$"))return new(QuickKind.Todos);

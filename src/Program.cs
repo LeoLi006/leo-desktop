@@ -440,10 +440,9 @@ sealed partial class PetForm : Form
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
         var menu = new ContextMenuStrip();
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
-        menu.Items.Add("准备看球",null,async(_,_)=>await PrepareWatch());
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
-        WireMusicMenu(menu);
+        WireMusicMenu(menu);WireComboMenu(menu);
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
@@ -604,7 +603,7 @@ sealed partial class PetForm : Form
     void OpenSettings()
     {
         launcher.Hide();
-        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture);
+        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications);
         if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
         if(!settingsWindow.Visible)WindowPositions.Prepare(settingsWindow,"settings",Bounds,previewMode);
         settingsWindow.Show();settingsWindow.Activate();

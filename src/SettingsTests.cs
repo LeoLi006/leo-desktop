@@ -62,9 +62,10 @@ static class SettingsTests
         checks["scene_failure_retains_completed_steps"]=sceneRun.Completed==1;
         sceneRun.Execute(_=>{}).GetAwaiter().GetResult();checks["scene_retry_does_not_repeat_opened_website"]=websiteCalls==1&&musicCalls==2&&sceneRun.Completed==2;
         checks["watch_scene_routes_locally_and_keeps_casual_chat"]=QuickRouter.Route("准备看球").Value=="scene_watch"&&QuickRouter.Route("我准备看球的时候吃什么").Kind==QuickKind.Ai;
-        All(window).OfType<Button>().Single(b=>b.Text=="场景").PerformClick();Application.DoEvents();checks["watch_scene_can_be_configured_in_settings"]=All(window).OfType<SceneSettings>().Single().Visible;
+        All(window).OfType<Button>().Single(b=>b.Text=="自定义").PerformClick();Application.DoEvents();checks["watch_scene_can_be_configured_in_settings"]=All(window).OfType<SceneSettings>().Single().Visible;
         checks["scene_save_and_status_fit_inside_page"]=All(window).OfType<SceneSettings>().Single().Controls.Cast<Control>().All(c=>c.Parent!.ClientRectangle.Contains(c.Bounds));
         Capture("preview-settings-scenes.png");
+        foreach(var check in CustomComboTests.Check(directory))checks[check.Key]=check.Value;
         return checks;
     }
 }

@@ -13,7 +13,7 @@ sealed class LeoToast : Form
 {
     readonly Label message = new() { Bounds = new Rectangle(14, 11, 290, 49), ForeColor = BarcaUi.Text, Font = BarcaUi.Font(9), AutoEllipsis = true };
     readonly BarcaButton retry = new() { Text = "重试", Bounds = new Rectangle(235, 66, 66, 27), ForeColor = BarcaUi.Gold };
-    readonly System.Windows.Forms.Timer timer = new() { Interval = 4500 };
+    readonly System.Windows.Forms.Timer timer = new() { Interval = 1900 };
     readonly Func<Rectangle> anchor;
     LeoNotice? current;
     protected override bool ShowWithoutActivation => true;
@@ -21,7 +21,7 @@ sealed class LeoToast : Form
     {
         anchor = pet; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true; StartPosition = FormStartPosition.Manual; ClientSize = new Size(320, 103); BackColor = BarcaUi.Surface;
         Appearance.Round(this, 13); Controls.Add(message); Controls.Add(retry);
-        var close = new BarcaButton { Text = "×", Bounds = new Rectangle(12, 66, 30, 27) }; close.Click += (_, _) => Hide(); Controls.Add(close);
+        var close = new BarcaButton { Text = "×", Bounds = new Rectangle(237, 6, 22, 22) }; close.Click += (_, _) => Hide(); Controls.Add(close);
         retry.Click += async (_, _) => { var action = current?.Retry; if (action == null) return; retry.Enabled = false; try { await action(); } catch (Exception e) { Present(new(e.Message, true, action)); } finally { if (!IsDisposed) retry.Enabled = true; } };
         timer.Tick += (_, _) => { if (!Bounds.Contains(Cursor.Position)) { timer.Stop(); Hide(); } };
     }
@@ -29,9 +29,11 @@ sealed class LeoToast : Form
     {
         current = notice; message.Text = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
         message.ForeColor = notice.Error ? Color.LightSalmon : BarcaUi.Text;
+        ClientSize=new Size(270,notice.Error&&notice.Retry!=null?84:52);Appearance.Round(this,12);
+        message.SetBounds(11,8,220,notice.Error&&notice.Retry!=null?37:35);retry.SetBounds(194,51,64,25);
         retry.Text=notice.ActionLabel;retry.Visible = notice.Retry != null; retry.Enabled = true;
         var pet = anchor(); Location = PopupPlacement.Place(pet, Size, Screen.FromRectangle(pet).WorkingArea);
-        timer.Stop(); if (!notice.Busy) { timer.Interval = notice.Error ? 14000 : 4500; timer.Start(); }
+        timer.Stop(); timer.Interval = notice.Error ? 5000 : 1900; timer.Start();
         Show();
     }
     public bool PreviewHasRetry => retry.Visible;
