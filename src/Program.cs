@@ -173,6 +173,19 @@ static class Program
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
         if(args.Length==2&&args[0]=="--upgrade38-test"){var checks=Upgrade38Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
+        if(args.Length==2&&args[0]=="--startup-live-test"){
+            var result=Task.Run(async()=>{
+                bool coldMusic=System.Diagnostics.Process.GetProcessesByName("QQMusic").Length==0;
+                var before=ClashProxy.ReadStatus();
+                var song=new MusicSong("97773","0039MnYb0qxYhV","晴天","周杰伦");
+                bool music=false,proxy=false;string musicError="",proxyError="";
+                try{await QQNative.PlayAsync(song);for(int i=0;i<60;i++){await Task.Delay(250);if(QQNative.PlaybackTitle().Contains(song.Name)){music=true;break;}}}catch(Exception e){musicError=e.Message;}
+                try{proxy=ClashProxy.SetEnabled(true).Enabled==true;}catch(Exception e){proxyError=e.Message;}
+                finally{if(proxy&&before.Enabled!=true)ClashProxy.SetEnabled(false);}
+                return new{ok=music&&proxy,cold_music=coldMusic,cold_clash=!before.Running,music,proxy,musicError,proxyError,proxy_restored=ClashProxy.ReadStatus().Enabled==(before.Enabled==true)};
+            }).GetAwaiter().GetResult();
+            File.WriteAllText(args[1],JsonSerializer.Serialize(result,new JsonSerializerOptions{WriteIndented=true}));return;
+        }
         if(args.Length==2&&args[0]=="--qq-native-live38"){File.WriteAllText(args[1],JsonSerializer.Serialize(QQNativeLive38.Run(),new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--music-bootstrap"){var report=Task.Run(async()=>{var library=new MusicLibrary(Path.Combine(Store.Root,"leo-playlists.json"));var items=new List<object>();using var token=new CancellationTokenSource(TimeSpan.FromSeconds(85));foreach(var preset in new[]{(Name:"赛前热身",Id:"3429794094"),(Name:"路上随手听",Id:"3848007522")}){var data=await QQPlaylists.Fetch(preset.Id,token.Token);var existing=library.Items.FirstOrDefault(p=>p.Name==preset.Name);var saved=library.Import(data,localName:preset.Name,targetId:existing?.Id);items.Add(new{saved.Name,saved.QQName,saved.QQId,Count=saved.Songs.Count,saved.RemoteCount,saved.Synced});}return new{ok=true,playlists=items,model_requests=0,playback_requests=0};}).GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(report,new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--upgrade37-test"){var checks=Upgrade37Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
@@ -418,6 +431,7 @@ sealed partial class PetForm : Form
         hit.AllowDrop = true;
         hit.DragEnter += (_, e) => e.Effect = e.Data?.GetData(DataFormats.FileDrop) is string[] paths && FileDropActions.ValidPaths(paths).Length > 0 ? DragDropEffects.Copy : DragDropEffects.None;
         hit.DragDrop += (_, e) => { if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths) { launcher.Hide(); FileDropActions.Open(paths, launcher.FileApplications); } };
+        launcher.PetBounds = () => Bounds;
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
         var menu = new ContextMenuStrip();
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());

@@ -37,7 +37,7 @@ static class ClashProxy
         {
             var processes = Process.GetProcessesByName("clash-verge");
             bool running = processes.Length > 0; foreach (var process in processes) process.Dispose();
-            if (!running) return new(false, null, "请先启动 Clash Verge");
+            if (!running) return new(false, null, "Clash Verge 未运行 · 点击启动并开启系统代理");
             if (!File.Exists(ConfigPath)) return new(true, null, "未找到 Clash Verge Rev 配置");
             var endpoint = ReadEndpoint(File.ReadAllText(ConfigPath));
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
@@ -83,7 +83,69 @@ static class ClashProxy
         return candidates.Count == 1 ? candidates[0] : null;
     }
     public static bool InspectSwitch() => FindSwitch()?.TryGetCurrentPattern(TogglePattern.Pattern, out _) == true;
-    public static ProxyStatus Toggle()
+    static readonly object changeGate = new();
+    static bool ValidClient(string? path) => path != null && File.Exists(path) && Path.GetFileName(path).Equals("clash-verge.exe", StringComparison.OrdinalIgnoreCase);
+    public static string? ClientPath()
+    {
+        foreach (var hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 }) try
+        {
+            using var root = RegistryKey.OpenBaseKey(hive, view);
+            using var apps = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\clash-verge.exe");
+            if (apps?.GetValue("") is string direct && ValidClient(direct)) return direct;
+            using var uninstall = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+            if (uninstall == null) continue;
+            foreach (var name in uninstall.GetSubKeyNames())
+            {
+                using var item = uninstall.OpenSubKey(name);
+                if (!(item?.GetValue("DisplayName") as string ?? "").Contains("Clash Verge", StringComparison.OrdinalIgnoreCase)) continue;
+                if (item?.GetValue("InstallLocation") is string folder)
+                {
+                    var candidate = Path.Combine(folder.Trim('"'), "clash-verge.exe");
+                    if (ValidClient(candidate)) return candidate;
+                }
+                if (item?.GetValue("DisplayIcon") is string icon)
+                {
+                    var match = Regex.Match(icon, @"^\s*(?:""([^""]+\.exe)""|(.+?\.exe))(?:,\s*-?\d+)?\s*$", RegexOptions.IgnoreCase);
+                    var candidate = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                    if (match.Success && ValidClient(candidate)) return candidate;
+                }
+            }
+        } catch { }
+        foreach (var folder in new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) })
+        foreach (var suffix in new[] { @"Clash Verge\clash-verge.exe", @"Programs\Clash Verge\clash-verge.exe" })
+        {
+            var candidate = Path.Combine(folder, suffix);
+            if (ValidClient(candidate)) return candidate;
+        }
+        return null;
+    }
+    public static ProxyStatus SetEnabled(bool desired) { lock (changeGate) return Change(desired); }
+    public static ProxyStatus Toggle() { lock (changeGate) { var before = ReadStatus(); return Change(!before.Running || before.Enabled != true); } }
+    static ProxyStatus Change(bool desired)
+    {
+        var before = ReadStatus();
+        if (!before.Running)
+        {
+            if (!desired) return new(false, false, "Clash Verge 未运行，无需关闭代理");
+            string path = ClientPath() ?? throw new InvalidOperationException("未找到 Clash Verge，请先安装客户端");
+            using var started = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WindowStyle = ProcessWindowStyle.Hidden });
+            if (started == null) throw new IOException("Clash Verge 未能启动");
+            var wait = Stopwatch.StartNew();
+            while (wait.Elapsed < TimeSpan.FromSeconds(25))
+            {
+                Thread.Sleep(300); before = ReadStatus();
+                if (before.Running && before.Enabled == true) break;
+                try { if (before.Running && before.Enabled != null && InspectSwitch()) break; }
+                catch (ElementNotAvailableException) { }
+            }
+        }
+        before = ReadStatus();
+        if (!before.Running || before.Enabled == null) throw new InvalidOperationException(before.Description);
+        if (before.Enabled == desired) return before;
+        return ToggleRunning(desired);
+    }
+    static ProxyStatus ToggleRunning(bool desired)
     {
         var watch = Stopwatch.StartNew();
         var before = ReadStatus();
@@ -91,7 +153,6 @@ static class ClashProxy
         var control = FindSwitch() ?? throw new InvalidOperationException("未定位到系统代理开关，请先在 Clash Verge 打开首页后重试");
         var pattern = (TogglePattern)control.GetCurrentPattern(TogglePattern.Pattern);
         if (watch.ElapsedMilliseconds > 4000) throw new InvalidOperationException("Clash Verge 响应超时，请稍后重试");
-        bool desired = !before.Enabled.Value;
         if (pattern.Current.ToggleState == ToggleState.Indeterminate || (pattern.Current.ToggleState == ToggleState.On) != before.Enabled)
             throw new InvalidOperationException("Clash 与系统代理状态不一致，请先在 Clash 内重新设置系统代理");
         pattern.Toggle();

@@ -27,7 +27,8 @@ sealed class LauncherForm : Form
         if (!Visible) Show();
         var button = Controls.OfType<GlyphButton>().Single(x => x.AccessibleName == "足球赛程");
         button.PerformClick(); Application.DoEvents();
-        bool ok = football != null && football.Visible && football.Owner == null && !football.TopMost;
+        bool ok = football != null && football.Visible && football.Owner == null && !football.TopMost
+            && (PetBounds == null || !football.Bounds.IntersectsWith(PetBounds!()));
         football?.Close(); return ok;
     }
     string lastExternal = "", lastObservedIdentity = "", activationContext = "";
@@ -58,6 +59,7 @@ sealed class LauncherForm : Form
         Application.DoEvents();
         return args.Effect == DragDropEffects.Move && prefs.Favorites[0] == entries[1].Target && prefs.Favorites[1] == entries[0].Target;
     }
+    public Func<Rectangle>? PetBounds;
     public Func<bool>? PointerOverPet;
     public void ProcessDeactivation(bool pointerOverPet)
     {
@@ -103,7 +105,9 @@ sealed class LauncherForm : Form
         footballButton.Click += (_, _) => {
             if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks);
             var area = Screen.FromControl(this).WorkingArea;
-            football.Location = new Point(Math.Clamp(Left, area.Left, Math.Max(area.Left, area.Right - football.Width)), Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - football.Height)));
+            football.StartPosition = FormStartPosition.Manual;
+            football.Location = PopupPlacement.Place(PetBounds?.Invoke() ?? Bounds, football.Size, area);
+            Hide();
             football.Show(); football.Activate();
         };
         Controls.Add(footballButton);var musicButton=new GlyphButton("music"){Bounds=new Rectangle(102,7,28,24),AccessibleName="QQ音乐点歌",FlatStyle=FlatStyle.Flat};musicButton.FlatAppearance.BorderSize=0;musicButton.Click+=(_,_)=>OpenMusicFromAssistant();Controls.Add(musicButton);

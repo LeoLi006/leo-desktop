@@ -25,13 +25,14 @@ static class QuickTests
         checks["analysis_and_casual_chat_need_model"]=QuickRouter.Route("分析巴萨为什么输了").Kind==QuickKind.FootballAnalysis&&QuickRouter.Route("今天有点烦，聊聊").Kind==QuickKind.Ai;
         checks["club_mentions_do_not_hijack_conversation"]=new[]{"我喜欢巴萨和曼城","你觉得巴萨和曼城谁更强","巴萨球衣真好看","我今天看了曼城比赛很开心","巴萨下一场什么时候，然后帮我安排任务"}.All(t=>QuickRouter.Route(t).Kind==QuickKind.Ai);
         checks["today_plan_shortcut_routes_locally"]=QuickRouter.Route("看看今天的清单").Kind==QuickKind.Todos;
-        var startup=QQNative.StartupRequest(@"C:\QQMusic\QQMusic.exe",new MusicSong("97773","0039MnYb0qxYhV","晴天","周杰伦"));
-        checks["cold_music_start_carries_song_and_silent_flag"]=startup.Arguments==QQNative.PlayCommand(new MusicSong("97773","0039MnYb0qxYhV","晴天","周杰伦"))&&startup.WindowStyle==System.Diagnostics.ProcessWindowStyle.Hidden;
+        var startup=QQNative.StartupRequest(@"C:\QQMusic\QQMusic.exe");
+        checks["cold_music_starts_silently_before_native_dispatch"]=startup.Arguments=="/silent"&&startup.WindowStyle==System.Diagnostics.ProcessWindowStyle.Hidden;
         int calls=0,opened=0;var apps=new[]{new AppEntry("微信","fixture-wx"),new AppEntry("浏览器甲","fixture-a"),new AppEntry("浏览器乙","fixture-b")};
         using var daily=new TodoForm(true);
         using var window=new ChatForm(true,ChatTests.Settings(),()=>{calls++;return ChatTests.FixtureApi();},new AppTools(()=>apps,_=>opened++),onTodo:intent=>{daily.Show();daily.Apply(intent);});window.Show();Application.DoEvents();
         void Send(string text){var task=window.PreviewSendAsync(text);var watch=System.Diagnostics.Stopwatch.StartNew();while(!task.IsCompleted&&watch.ElapsedMilliseconds<15000){Application.DoEvents();Thread.Sleep(5);}task.GetAwaiter().GetResult();Application.DoEvents();}
         checks["settings_hidden_initially"]=window.PreviewOptionsHidden;
+        checks["chat_default_is_roomier_and_resizable"]=window.ClientSize.Width>=720&&window.ClientSize.Height>=600&&window.FormBorderStyle==FormBorderStyle.Sizable;
         Send("添加待办，买牛奶");checks["task_command_opens_local_list"]=daily.Visible&&daily.Owner==null&&!daily.TopMost&&daily.Count==1;
         Send("完成待办，买牛奶");checks["task_completed_without_model"]=daily.CompletedCount==1;
         Send("打开微信");checks["single_local_app_opens"]=opened==1;

@@ -106,7 +106,7 @@ sealed partial class ChatForm : BarcaWindow
         todoAction=onTodo;openClipboard=clipboardAction;planStore=planner;
         TopMost = false; ShowInTaskbar = true; Text = "Leo · AI 对话"; StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 610); MinimumSize = new Size(500, 430);
         Font=BarcaUi.Font(10);BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;ClientSize=new Size(620,440);MinimumSize=new Size(600,430);Text="问 Leo";
-        CanResize=true;FormBorderStyle=FormBorderStyle.Sizable;MaximizeBox=true;MinimizeBox=true;Text="Leo";ClientSize=new Size(570,440);MinimumSize=new Size(490,360);Padding=new Padding(1);
+        CanResize=true;FormBorderStyle=FormBorderStyle.Sizable;MaximizeBox=true;MinimizeBox=true;Text="Leo";ClientSize=new Size(720,600);MinimumSize=new Size(490,360);Padding=new Padding(1);
         var chrome=new Panel{Dock=DockStyle.Top,Height=55,Padding=new Padding(18,10,16,8)};
         chrome.Controls.Add(new Label{Text="LEO",Dock=DockStyle.Fill,Font=BarcaUi.Font(15,true),ForeColor=BarcaUi.Gold});
         settingsButton.Text="···";settingsButton.Width=36;settingsButton.Dock=DockStyle.Right;chrome.Controls.Add(settingsButton);
