@@ -10,8 +10,21 @@ static class Feature42Tests
         motion.Tick(2432,true,true);for(int t=2464;t<=3300;t+=32)motion.Tick(t,true,false);checks["brief_hover_latches_until_full_reveal"]=motion.Progress==0;
         for(int t=3200;t<=5500;t+=32)motion.Tick(t,true,false);float middle=motion.Progress;motion.Tick(5532,false,false);checks["undocking_reverses_tuck"]=middle>motion.Progress;
         using(var sprites=new DockSprites())using(var image=new Bitmap(720,350))using(var g=Graphics.FromImage(image)){
-            g.Clear(BarcaUi.Canvas);foreach(var (side,index) in new[]{(DockSide.Left,0),(DockSide.Right,1),(DockSide.Top,2),(DockSide.Bottom,3)}){var state=g.Save();g.TranslateTransform(12+index*175,200);var box=sprites.Draw(g,new Size(150,150),1,side,0);checks["head_only_sprite_within_"+side]=!new RectangleF(0,0,150,150).Contains(box)&&new RectangleF(0,0,150,150).IntersectsWith(box)&&box.Height<110;g.Restore(state);}
+            g.Clear(BarcaUi.Canvas);foreach(var (side,index) in new[]{(DockSide.Left,0),(DockSide.Right,1),(DockSide.Top,2),(DockSide.Bottom,3)}){var state=g.Save();g.TranslateTransform(12+index*175,200);var box=sprites.Draw(g,new Size(150,150),1,side,0);checks["head_only_sprite_within_"+side]=new RectangleF(0,0,150,150).Contains(box)&&box.Height<125;g.Restore(state);}
             for(int i=0;i<6;i++){var state=g.Save();g.TranslateTransform(i*120,0);sprites.Draw(g,new Size(115,150),i/5f,DockSide.Bottom,0);g.Restore(state);}image.Save(Path.Combine(output,"preview-edge-animation42.png"));
+        }
+        using(var sprites=new DockSprites()){
+            bool contained=true,separated=true;var sources=new List<Rectangle>();
+            foreach(var side in new[]{DockSide.Left,DockSide.Right,DockSide.Top,DockSide.Bottom}){
+                var source=sprites.Source(1,0,side);sources.Add(source);
+                foreach(int size in new[]{80,136,230})foreach(float progress in new[]{0f,.25f,.5f,.75f,1f}){
+                    var bounds=sprites.Destination(new Size(size,size*208/192),progress,side,source);
+                    contained&=new RectangleF(0,0,size,size*208/192).Contains(bounds);
+                }
+            }
+            for(int a=0;a<sources.Count;a++)for(int b=a+1;b<sources.Count;b++)separated&=!sources[a].IntersectsWith(sources[b]);
+            checks["all_four_complete_heads_stay_inside_at_every_scale_and_transition"]=contained;
+            checks["directional_artwork_cells_do_not_overlap"]=separated;
         }
         using(var pet=new PetForm(new Preferences(),true)){pet.Show();Application.DoEvents();foreach(var check in pet.VerifyDockPeeking(output))checks[check.Key]=check.Value;}
         checks["catalog_covers_big_five_and_97_clubs"]=ClubCatalog.All.Length>=97&&new[]{"英超","西甲","意甲","德甲","法甲"}.All(l=>ClubCatalog.All.Count(c=>c.LeagueName==l)>=15);
@@ -44,7 +57,7 @@ sealed partial class PetForm
         Location=new Point(area.Left,area.Top+Math.Max(20,(area.Height-Height)/2));dockMotion.Reset(0);
         for(int t=0;t<=2400;t+=32)AdvanceDock(t,far);
         checks["tucked_pet_hides_all_footer_buttons"]=dockMotion.Progress>=.999f&&!foot.Visible;
-        checks["tucked_hit_target_is_only_visible_head"]=hit.Height<Height*.65&&hit.Bounds.Left==Left;
+        checks["tucked_hit_target_is_only_visible_head"]=hit.Height<Height*.65&&hit.Bounds.Left>=Left&&hit.Bounds.Left<=Left+Width*.05;
         using(var image=new Bitmap(Width,Height)){DrawToBitmap(image,ClientRectangle);image.Save(Path.Combine(output,"preview-peeking-head42.png"));}
         var hover=new Point(hit.Left+hit.Width/2,hit.Top+hit.Height/2);for(int t=2432;t<=3500;t+=32)AdvanceDock(t,hover);
         checks["hover_restores_full_pet_hit_area_and_footer"]=dockMotion.Progress==0&&hit.Bounds==Bounds&&foot.Visible&&foot.Opacity>.99;
@@ -52,6 +65,14 @@ sealed partial class PetForm
         for(int t=0;t<=2400;t+=32)AdvanceDock(t,far);
         checks["bottom_peek_reaches_working_area_edge_without_taskbar_overlap"]=Bottom==area.Bottom&&hit.Bounds.Bottom<=area.Bottom&&!foot.Visible;
         RevealDock(true);checks["revealing_bottom_dock_restores_saved_anchor"]=Location==original&&hit.Bounds==Bounds;
+        using(var preview=new Bitmap(Width*4,Height))using(var graphics=Graphics.FromImage(preview)){
+            graphics.Clear(BarcaUi.Canvas);int column=0;
+            foreach(var side in new[]{DockSide.Left,DockSide.Right,DockSide.Top,DockSide.Bottom}){
+                dockSide=side;dockMotion.Reset(0);dockMotion.BeginTuck(0);for(int t=32;t<=1000;t+=32)dockMotion.Tick(t,true,false);
+                var state=graphics.Save();graphics.TranslateTransform(column++*Width,0);DrawPet(graphics,PetDrawingBounds(ClientSize));graphics.Restore(state);
+            }
+            preview.Save(Path.Combine(output,"preview-complete-heads44.png"));
+        }
         RevealDock(true);Location=new Point(area.Left+Width+40,area.Top+80);
         var target=new Point(area.Left,Top+30);
         hit.SimulateClick(new Point(10,10),()=>ApplyDrag(new Size(target.X-Left,target.Y-Top)));
