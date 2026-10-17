@@ -85,13 +85,16 @@ sealed class FootTools : Form
             proxyButton.ActiveState = state.Enabled;
             tip.SetToolTip(proxyButton, state.Description); proxyButton.Invalidate();
         }
-        proxyButton.Click += async (_, _) => {
+        async Task ChangeProxy(bool? target=null) {
             if (preview || proxyBusy) return;
             proxyBusy = true; proxyButton.Enabled = false; tip.SetToolTip(proxyButton, "正在切换 Clash 系统代理…");
-            try { await Task.Run(ClashProxy.Toggle); }
-            catch (Exception error) { if (!IsDisposed) MessageBox.Show(error.Message, "Leo · Clash 系统代理"); }
+            bool desired=target??(ClashProxy.ReadStatus().Enabled!=true);
+            OperationFeedback.Pending(desired?"正在开启系统代理…":"正在关闭系统代理…");
+            try { await Task.Run(()=>ClashProxy.SetEnabled(desired));OperationFeedback.Show(desired?"系统代理已开启":"系统代理已关闭"); }
+            catch (Exception error) { if (!IsDisposed) OperationFeedback.Error(error.Message,()=>ChangeProxy(desired)); }
             finally { if (!IsDisposed) { proxyBusy = false; proxyButton.Enabled = true; RefreshProxy(); } }
-        };
+        }
+        proxyButton.Click+=async(_,_)=>await ChangeProxy();
         proxyTimer.Tick += (_, _) => RefreshProxy();
         search.SetBounds(67, 6, 154, 21); search.PlaceholderText = "输入关键词，回车搜索";
         search.BorderStyle = BorderStyle.None; search.BackColor = Appearance.Background; search.ForeColor = Appearance.Ink;

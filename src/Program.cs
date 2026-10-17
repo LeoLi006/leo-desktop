@@ -436,7 +436,7 @@ sealed partial class PetForm : Form
         hit.DragEnter += (_, e) => e.Effect = e.Data?.GetData(DataFormats.FileDrop) is string[] paths && FileDropActions.ValidPaths(paths).Length > 0 ? DragDropEffects.Copy : DragDropEffects.None;
         hit.DragDrop += (_, e) => { if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths) { launcher.Hide(); FileDropActions.Open(paths, launcher.FileApplications); } };
         launcher.PetBounds = () => Bounds;
-        if(!preview)WindowPositions.PetBounds=()=>Bounds;
+        if(!preview){WindowPositions.PetBounds=()=>Bounds;OperationFeedback.Sink=PresentFeedback;}
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
         var menu = new ContextMenuStrip();
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
@@ -759,7 +759,7 @@ sealed partial class PetForm : Form
     }
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
-        settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        if(!previewMode)OperationFeedback.Sink=null;feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); fullscreenTimer.Dispose(); animation.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
         base.OnFormClosed(e);
     }
 }

@@ -51,6 +51,7 @@ static class SettingsTests
         checks["startup_command_quotes_executable"] = LeoStartup.Command(Application.ExecutablePath).StartsWith('"') && LeoStartup.Command(Application.ExecutablePath).EndsWith('"');
         using var pet = new PetForm(new Preferences(), true);
         checks["pet_context_menu_has_settings"] = pet.ContextMenuStrip!.Items.Cast<ToolStripItem>().Any(i => i.Text == "设置");
+        int retries=0;using(var toast=new LeoToast(()=>new Rectangle(800,600,130,140))){toast.Present(new("测试失败",true,()=>{retries++;toast.Present(new("重试成功"));return Task.CompletedTask;}));Application.DoEvents();checks["failure_toast_offers_retry_without_taskbar_window"]=toast.PreviewHasRetry&&!toast.ShowInTaskbar;All(toast).OfType<Button>().Single(b=>b.Text=="重试").PerformClick();Application.DoEvents();checks["feedback_retry_runs_once_and_clears_retry"]=retries==1&&!toast.PreviewHasRetry;}
         return checks;
     }
 }
