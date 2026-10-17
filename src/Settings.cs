@@ -93,7 +93,7 @@ sealed class HotkeyField : TextBox
 
 sealed class SettingsForm : BarcaWindow
 {
-    public SettingsForm(Preferences p, Action<Preferences, bool> apply, Action apiChanged, bool preview = false, Action<bool>? capture = null,Func<IEnumerable<AppEntry>>? applications=null,Func<string>? hotkeyStatus=null)
+    public SettingsForm(Preferences p, Action<Preferences, bool> apply, Action apiChanged, bool preview = false, Action<bool>? capture = null,Func<IEnumerable<AppEntry>>? applications=null,Func<string>? hotkeyStatus=null,Action? configImported=null)
     {
         Text = "Leo · 设置"; ClientSize = new Size(640, 660); StartPosition = FormStartPosition.CenterScreen; TopMost = false; ShowInTaskbar = true;
         var header = BarcaUi.Chrome(this, "LEO  /  设置", "把 Leo 调整成顺手的样子。Visca el Barça!");
@@ -122,6 +122,7 @@ sealed class SettingsForm : BarcaWindow
         var history = Check("记住最近使用的应用", 235, p.RememberHistory);
         var context = Check("结合前台应用与使用时段排序", 275, p.ContextAware);
         var clipboard = Check("保存剪贴板历史", 315, p.ClipboardHistory);
+        var migrate=new BarcaButton{Text="配置迁移与恢复…",Bounds=new Rectangle(8,362,225,34)};migrate.Click+=(_,_)=>{using var dialog=new ConfigMigrationForm(p,next=>apply(next,!preview&&LeoStartup.Enabled),configImported??(()=>{}),preview,applications);if(dialog.ShowDialog(this)==DialogResult.OK)Close();};general.Controls.Add(migrate);
         var fields = new[]{p.SearchHotkey,p.VoiceHotkey,p.LyricsHotkey}.Select(k => new HotkeyField(k)).ToArray();
         foreach(var field in fields){field.Enter+=(_,_)=>capture?.Invoke(true);field.Leave+=(_,_)=>capture?.Invoke(false);}
         Deactivate+=(_,_)=>capture?.Invoke(false);
@@ -164,6 +165,7 @@ sealed partial class PetForm
             try { LeoStartup.SetEnabled(startup); Store.Save(next); }
             catch { LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
+        prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
         foot.ConfigureModules(prefs);launcher.RefreshModules();
         prefs.PetSize = next.PetSize; prefs.RememberHistory = next.RememberHistory; prefs.ContextAware = next.ContextAware; prefs.HideInFullscreen = next.HideInFullscreen; prefs.ClipboardHistory = next.ClipboardHistory;

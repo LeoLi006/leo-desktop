@@ -8,10 +8,10 @@ sealed class FootTools : Form
     public const int Space = 64;
     float uiScale = 1f;
     Preferences modules=new();
-    int CompactUnits=>modules.EdgeModule?94:64;
-    int UtilityUnits=>4+30*(1+(modules.TerminalModule?1:0)+(modules.ClashModule?1:0));
+    int CompactUnits=>94;
+    int UtilityUnits=>4+30*((modules.TerminalModule?1:0)+(modules.ClashModule?1:0)+(modules.MusicModule?1:0)+(modules.EdgeModule?1:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
-    public void ConfigureModules(Preferences p){modules=p;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
+    public void ConfigureModules(Preferences p){modules=p;if(UtilityUnits==4)utilitiesOpen=false;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
     Font? scaledFont;
     int S(int value) => Math.Max(1, (int)Math.Round(value * uiScale));
@@ -25,7 +25,9 @@ sealed class FootTools : Form
     readonly Button searchButton = new GlyphButton("search");
     readonly GlyphButton proxyButton = new("proxy");
     readonly GlyphButton chatButton = new("chat");
+    readonly GlyphButton musicButton=new("music");
     readonly GlyphButton todoButton = new("todo");
+    public event Action? MusicRequested;
     public event Action? ChatRequested;
     public event Action? TodosRequested;
     public event Action? VoiceRequested;
@@ -37,7 +39,7 @@ sealed class FootTools : Form
     public void PreviewTyping(string text) { SetExpanded(true); search.Text = text; search.Focus(); }
     public void CollapseSearch(){SetExpanded(false);SetUtilities(false);}
     public void PreviewUtilities()=>SetUtilities(true);
-    public bool VerifyDisclosure(){CollapseSearch();bool hidden=Controls.OfType<Button>().Count(b=>b.Visible)==3&&!terminal.Visible&&!proxyButton.Visible&&!chatButton.Visible;moreButton.PerformClick();bool opened=terminal.Visible&&proxyButton.Visible&&chatButton.Visible&&Height==S(58);moreButton.PerformClick();return hidden&&opened&&!terminal.Visible&&!proxyButton.Visible&&!chatButton.Visible&&Height==S(28);}
+    public bool VerifyDisclosure(){CollapseSearch();bool hidden=Controls.OfType<Button>().Count(b=>b.Visible)==3&&chatButton.Visible&&todoButton.Visible&&!terminal.Visible&&!proxyButton.Visible&&!musicButton.Visible&&!searchButton.Visible;moreButton.PerformClick();bool opened=terminal.Visible&&proxyButton.Visible&&musicButton.Visible&&searchButton.Visible&&chatButton.Visible&&Height==S(58);moreButton.PerformClick();return hidden&&opened&&chatButton.Visible&&!terminal.Visible&&!searchButton.Visible&&Height==S(28);}
     public bool VerifyRepeatedRendering()
     {
         bool ok = true;
@@ -70,7 +72,7 @@ sealed class FootTools : Form
         terminal.FlatAppearance.BorderSize = 0;
         terminal.FlatAppearance.MouseOverBackColor = Appearance.Hover;
         var tip = new ToolTip(); tip.SetToolTip(terminal, "管理员终端");
-        moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"终端 · Clash · 聊天");
+        moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / 音乐 / Edge");
         searchButton.SetBounds(33, 2, 28, 24); searchButton.FlatStyle = FlatStyle.Flat;
         searchButton.FlatAppearance.BorderSize = 0; searchButton.BackColor = Appearance.Background;
         searchButton.FlatAppearance.MouseOverBackColor = Appearance.Hover;
@@ -81,6 +83,7 @@ sealed class FootTools : Form
         chatButton.Click += (_, _) => ChatRequested?.Invoke(); tip.SetToolTip(chatButton, "问 Leo · 右键直接说话 · Ctrl+Alt+V");
         chatButton.MouseUp+=(_,e)=>{if(e.Button==MouseButtons.Right)VoiceRequested?.Invoke();};
         todoButton.AccessibleName="每日清单";todoButton.FlatStyle=FlatStyle.Flat;todoButton.FlatAppearance.BorderSize=0;todoButton.Click+=(_,_)=>TodosRequested?.Invoke();tip.SetToolTip(todoButton,"每日清单");
+        musicButton.AccessibleName="QQ音乐点歌";musicButton.Click+=(_,_)=>MusicRequested?.Invoke();tip.SetToolTip(musicButton,"QQ 音乐 · 快速点歌");
         proxyButton.AccessibleName = "Clash Verge 系统代理";
         proxyButton.FlatStyle = FlatStyle.Flat; proxyButton.FlatAppearance.BorderSize = 0;
         void RefreshProxy()
@@ -117,7 +120,7 @@ sealed class FootTools : Form
             try { Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
             catch (Exception error) { MessageBox.Show("无法打开 Edge：" + error.Message, "Leo"); }
         };
-        Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, search]);
+        Controls.AddRange([moreButton,terminal, searchButton, proxyButton,musicButton, chatButton, todoButton, search]);
         ApplyScale(petSize);
         Shown += (_, _) => { SetExpanded(false); RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
@@ -125,13 +128,13 @@ sealed class FootTools : Form
     }
     void SetExpanded(bool value)
     {
-        value=value&&modules.EdgeModule;expanded = value;if(value)utilitiesOpen=false; search.Visible = value;
+        value=value&&modules.EdgeModule;expanded = value;if(value)utilitiesOpen=true; search.Visible = value;
         LayoutTools();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);
         Invalidate(true);
         if (value) { Activate(); search.Focus(); }
     }
-    void SetUtilities(bool value){utilitiesOpen=value;if(value){expanded=false;search.Visible=false;}moreButton.ActiveState=value;LayoutTools();Invalidate(true);}
+    void SetUtilities(bool value){if(value&&UtilityUnits==4){OperationFeedback.Show("尚未启用可选工具，请在设置 → 功能中选择。");value=false;}utilitiesOpen=value;if(value){expanded=false;search.Visible=false;}moreButton.ActiveState=value;LayoutTools();Invalidate(true);}
     public void ApplyScale(int petSize)
     {
         uiScale = Math.Clamp(petSize, 80, 230) / 130f;
@@ -141,14 +144,13 @@ sealed class FootTools : Form
     void LayoutTools()
     {
         SuspendLayout();
-        moreButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
-        todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));searchButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));
-        terminal.Bounds=new Rectangle(S(3),S(32),S(28),S(24));proxyButton.Bounds=new Rectangle(S(33),S(32),S(28),S(24));chatButton.Bounds=new Rectangle(S(63),S(32),S(28),S(24));
-        terminal.Visible=utilitiesOpen&&modules.TerminalModule;proxyButton.Visible=utilitiesOpen&&modules.ClashModule;chatButton.Visible=utilitiesOpen;
-        int toolX=3;foreach(var tool in new Button[]{terminal,proxyButton,chatButton}){bool enabled=tool==terminal?modules.TerminalModule:tool==proxyButton?modules.ClashModule:true;if(enabled){tool.Left=S(toolX);toolX+=30;}}
-        searchButton.Visible=modules.EdgeModule;search.Visible=expanded&&modules.EdgeModule;
-        search.AutoSize=false;search.Bounds=new Rectangle(S(CompactUnits+3),S(6),S(154),S(21));
-        ClientSize=new Size(S(expanded?CompactUnits+168:VisibleCompactUnits),S(utilitiesOpen?58:28));
+        chatButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));moreButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
+        chatButton.Visible=todoButton.Visible=moreButton.Visible=true;
+        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,modules.TerminalModule),((Button)proxyButton,modules.ClashModule),((Button)musicButton,modules.MusicModule),(searchButton,modules.EdgeModule)}){
+            button.Visible=utilitiesOpen&&enabled;if(enabled){button.Bounds=new Rectangle(S(toolX),S(32),S(28),S(24));toolX+=30;}
+        }
+        search.Visible=expanded&&modules.EdgeModule;search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+3),S(36),S(154),S(21));
+        ClientSize=new Size(S(expanded?VisibleCompactUnits+168:VisibleCompactUnits),S(utilitiesOpen?58:28));
         ResumeLayout();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);
         Invalidate(true);
@@ -162,27 +164,24 @@ sealed class FootTools : Form
     }
     public bool VerifySearchToggle()
     {
-        bool compact = Width == ScaledCompactWidth && !search.Visible;
-        searchButton.PerformClick();
-        bool opened = Width == S(262) && search.Visible;
-        searchButton.PerformClick();
-        return compact && opened && Width == ScaledCompactWidth && !search.Visible;
+        CollapseSearch();moreButton.PerformClick();bool before=!search.Visible;searchButton.PerformClick();bool opened=search.Visible&&Width==S(VisibleCompactUnits+168)&&Height==S(58);searchButton.PerformClick();bool closed=!search.Visible;CollapseSearch();return before&&opened&&closed;
     }
-    public bool VerifyButtonOrder()=>moreButton.Left<todoButton.Left&&todoButton.Left<searchButton.Left&&terminal.Left<proxyButton.Left&&proxyButton.Left<chatButton.Left&&terminal.Top>moreButton.Top;
+    public bool VerifyButtonOrder()=>chatButton.Top==todoButton.Top&&todoButton.Top==moreButton.Top&&chatButton.Left<todoButton.Left&&todoButton.Left<moreButton.Left&&terminal.Top>chatButton.Top&&terminal.Left<proxyButton.Left&&proxyButton.Left<musicButton.Left&&musicButton.Left<searchButton.Left;
     public static ProcessStartInfo TerminalStart()
     {
-        string terminal = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", "wt.exe");
+        string terminal = ModulePaths.Selected("terminal")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", "wt.exe");
         if (!File.Exists(terminal)) terminal = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
         return new ProcessStartInfo(terminal) { UseShellExecute = true, Verb = "runas", WorkingDirectory = Store.Root };
     }
     public static string SearchUrl(string text) => "https://www.bing.com/search?q=" + Uri.EscapeDataString(text.Trim());
     public static ProcessStartInfo EdgeStart(string text)=>EdgeUrlStart(SearchUrl(text));
+    public static void ValidateUrl(string url){if(!Uri.TryCreate(url,UriKind.Absolute,out var parsed)||parsed.Scheme is not ("http" or "https")||parsed.UserInfo.Length>0)throw new ArgumentException("请填写不带账号密码的 http 或 https 网址");}
     public static ProcessStartInfo EdgeUrlStart(string url)
     {
-        if(!Uri.TryCreate(url,UriKind.Absolute,out var parsed)||parsed.Scheme is not ("http" or "https"))throw new ArgumentException("请填写 http 或 https 网址");
+        ValidateUrl(url);
         var candidates = new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) }
             .Select(root => Path.Combine(root, "Microsoft", "Edge", "Application", "msedge.exe"));
-        var edge = candidates.FirstOrDefault(File.Exists);
+        var edge = ModulePaths.Selected("edge")??candidates.FirstOrDefault(File.Exists);
         var start = new ProcessStartInfo(edge ?? "microsoft-edge:" + url) { UseShellExecute = true };
         if (edge != null) start.ArgumentList.Add(url);
         return start;

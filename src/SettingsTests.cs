@@ -79,6 +79,7 @@ static class SettingsTests
         foreach(var check in CustomComboTests.Check(directory))checks[check.Key]=check.Value;
         foreach(var check in MusicFixTests.Check(directory))checks[check.Key]=check.Value;
         foreach(var check in Feature40Tests.Check(directory))checks[check.Key]=check.Value;
+        foreach(var check in Feature41Tests.Check(directory))checks[check.Key]=check.Value;
         return checks;
     }
 }

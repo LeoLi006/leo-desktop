@@ -40,7 +40,7 @@ sealed class ComboStore
             if (step == null || step.Value == null || step.Label == null || step.Value.Length > 2048 || step.Label.Length > 150) throw new ArgumentException("组合步骤无效");
             switch (step.Kind)
             {
-                case "url": _=FootTools.EdgeUrlStart(step.Value); break;
+                case "url": FootTools.ValidateUrl(step.Value); break;
                 case "app": if (string.IsNullOrWhiteSpace(step.Value)) throw new ArgumentException("请选择应用"); break;
                 case "watch": if (!int.TryParse(step.Value,out int index) || index is < -1 or >3) throw new ArgumentException("请选择观赛入口"); break;
                 case "qq_client": case "proxy_on": case "proxy_off": case "todos": case "football": case "chat": break;

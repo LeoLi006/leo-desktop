@@ -46,7 +46,7 @@ static class Feature40Tests
         string sse="data: {\"choices\":[{\"delta\":{\"content\":\"好\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n";
         using(var ticket=new ApiUsageLedger(null).Begin(0)){using var stream=new MemoryStream(Encoding.UTF8.GetBytes(sse));ChatApi.ReadSseAsync(stream,false,_=>{},CancellationToken.None,false,ticket.Usage).GetAwaiter().GetResult();checks["stream_usage_chunk_after_finish_is_not_lost"]=ticket.Reported&&ticket.Input==11&&ticket.Output==2;}
         var prefs=new Preferences{TerminalModule=false,ClashModule=false,MusicModule=false,EdgeModule=false};
-        using(var footer=new FootTools(130,true)){footer.ConfigureModules(prefs);footer.Show();footer.PreviewUtilities();Application.DoEvents();checks["disabled_footer_modules_hide_icons_and_close_gaps"]=!All(footer).Any(c=>c.Visible&&c.AccessibleName is "打开管理员终端" or "Clash Verge 系统代理" or "展开 Edge 搜索")&&footer.Width==64;}
+        using(var footer=new FootTools(130,true)){footer.ConfigureModules(prefs);footer.Show();footer.PreviewUtilities();Application.DoEvents();checks["disabled_footer_modules_hide_icons_and_close_gaps"]=!All(footer).Any(c=>c.Visible&&c.AccessibleName is "打开管理员终端" or "Clash Verge 系统代理" or "展开 Edge 搜索")&&footer.Width==94;}
         checks["disabled_music_does_not_register_lyrics_hotkey"]=LeoHotkeys.Values(prefs)[2]==Keys.None;
         bool gated=false;try{Modules.Require(prefs,Modules.ForAction("music_play"));}catch(InvalidOperationException){gated=true;}checks["disabled_module_blocks_tool_action"]=gated;
         var catalog=Enumerable.Range(0,14).Select(i=>new AppEntry("测试应用"+i,"fixture-app-"+i)).ToList();AppEntry? launched=null;

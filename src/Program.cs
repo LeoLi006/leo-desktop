@@ -10,6 +10,7 @@ record AppEntry(string Name, string Target, string Hint = "应用", string ExePa
 
 sealed class Preferences
 {
+    public Dictionary<string,string> ModuleExecutables {get;set;}=new();
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
     public int PetSize { get; set; } = 130;
@@ -424,7 +425,7 @@ sealed partial class PetForm : Form
     bool hiddenForFullscreen;
     public PetForm(Preferences p, bool preview = false, bool demo = false)
     {
-        prefs = p; previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        prefs = p; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -440,6 +441,7 @@ sealed partial class PetForm : Form
         foot = new FootTools(p.PetSize, preview);
         foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;
+        foot.MusicRequested+=()=>{launcher.Hide();foot.CollapseSearch();launcher.OpenMusicFromAssistant();};
         foot.TodosRequested+=()=>ShowTodos();
         foot.VoiceRequested+=ShowVoice;
         hit = new HitSurface { Bounds = Bounds };
@@ -617,7 +619,7 @@ sealed partial class PetForm : Form
     void OpenSettings()
     {
         launcher.Hide();
-        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications,ShortcutStatus);
+        if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications,ShortcutStatus,()=>{todoStore.ReloadImported();launcher.ReloadImportedConfiguration();todoWindow?.View.Render();});
         if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
         if(!settingsWindow.Visible)WindowPositions.Prepare(settingsWindow,"settings",Bounds,previewMode);
         settingsWindow.Show();settingsWindow.Activate();
@@ -766,7 +768,7 @@ sealed partial class PetForm : Form
         checks["chat_bubble_opens_native_chat_window"] = chat?.Visible == true;
         checks["chat_is_independent_non_topmost_window"] = chat != null && chat.Owner == null && !chat.TopMost;
         checks["football_button_opens_independent_panel"] = launcher.VerifyFootballEntry();
-        checks["music_button_beside_football_opens_independent_panel"]=launcher.VerifyMusicEntry();
+        checks["music_entry_opens_independent_panel"]=launcher.VerifyMusicEntry();
         ShowTodos();checks["daily_list_has_independent_non_topmost_window"]=todoWindow!=null&&todoWindow.Visible&&todoWindow.Owner==null&&!todoWindow.TopMost;checks["daily_list_keeps_requested_initial_position"]=todoWindow!=null&&todoWindow.StartPosition==FormStartPosition.Manual&&todoWindow.Location==PopupPlacement.Place(Bounds,todoWindow.Size,Screen.FromControl(this).WorkingArea);todoWindow?.Close();
         var voiceMessage=Message.Create(Handle,0x312,(IntPtr)2,IntPtr.Zero);WndProc(ref voiceMessage);checks["voice_shortcut_opens_chat_directly"]=chat?.Visible==true&&chat.PreviewState=="示例模式，不启用麦克风";
         chat?.Close();

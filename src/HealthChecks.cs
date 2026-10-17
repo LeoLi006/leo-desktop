@@ -40,16 +40,19 @@ sealed class ModulesView:Panel
 {
     readonly Dictionary<string,CheckBox> fields=new();
     public readonly CheckBox Docking;
+    Dictionary<string,string> selectedPaths;
     public ModulesView(Preferences p)
     {
+        selectedPaths=new(p.ModuleExecutables);
         Dock=DockStyle.Fill;
         Controls.Add(new Label{Text="按需开启 · 图标、菜单与后台检查同步变化",Bounds=new Rectangle(8,10,550,30),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});
         int y=55;
         foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口")}){
             var field=new CheckBox{Text=title,Checked=Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=69;
         }
-        Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,340,540,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
+        Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,340,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
+        var paths=new BarcaButton{Text="软件路径…",Bounds=new Rectangle(365,340,180,32)};paths.Click+=(_,_)=>{using var dialog=new ModulePathsForm(selectedPaths);if(dialog.ShowDialog(FindForm())==DialogResult.OK)selectedPaths=dialog.Paths;};Controls.Add(paths);
         Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,380,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
     }
-    public void Apply(Preferences next){next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.EdgeDocking=Docking.Checked;}
+    public void Apply(Preferences next){next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
 }

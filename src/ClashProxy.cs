@@ -87,6 +87,7 @@ static class ClashProxy
     static bool ValidClient(string? path) => path != null && File.Exists(path) && Path.GetFileName(path).Equals("clash-verge.exe", StringComparison.OrdinalIgnoreCase);
     public static string? ClientPath()
     {
+        var selected=ModulePaths.Selected("clash");if(selected!=null)return selected;
         foreach (var hive in new[] { RegistryHive.CurrentUser, RegistryHive.LocalMachine })
         foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 }) try
         {
