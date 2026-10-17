@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Windows.Automation;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 namespace LeoLauncher;
 
@@ -71,16 +72,54 @@ static class ClashProxy
                 {
                     var labels = window.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text))
                         .Cast<AutomationElement>().Where(x => IsProxyLabel(x.Current.Name)).ToArray();
-                    if (labels.Length == 0) continue;
+
                     var toggles = window.FindAll(TreeScope.Descendants, new PropertyCondition(AutomationElement.IsTogglePatternAvailableProperty, true));
                     foreach (AutomationElement toggle in toggles)
-                        if (toggle.Current.IsEnabled && string.IsNullOrWhiteSpace(toggle.Current.Name) && labels.Any(label => IsAligned(Bounds(label), Bounds(toggle))))
+                        if (toggle.Current.IsEnabled && (IsProxyLabel(toggle.Current.Name) || string.IsNullOrWhiteSpace(toggle.Current.Name) && labels.Any(label => IsAligned(Bounds(label), Bounds(toggle)))))
                             candidates.Add(toggle);
                 }
             }
         }
         // Never guess when a layout change produces multiple matching switches.
         return candidates.Count == 1 ? candidates[0] : null;
+    }
+    public static bool IsHomeLabel(string name)=>Regex.Replace(name,@"\s","").ToLowerInvariant() is "首页" or "主页" or "home";
+    sealed class ProxyWindowSession:IDisposable
+    {
+        [DllImport("user32.dll")]static extern bool ShowWindowAsync(IntPtr window,int command);
+        [DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll")]static extern bool IsIconic(IntPtr window);
+        IntPtr handle;bool visible,minimized;
+        public ProxyWindowSession(){try{Open();}catch{Dispose();throw;}}
+        void Open()
+        {
+            foreach(var process in Process.GetProcessesByName("clash-verge"))using(process){
+                foreach(AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children,new PropertyCondition(AutomationElement.ProcessIdProperty,process.Id))){
+                    var home=window.FindAll(TreeScope.Descendants,Condition.TrueCondition).Cast<AutomationElement>().FirstOrDefault(e=>IsHomeLabel(e.Current.Name));
+                    if(home==null)continue;
+                    handle=(IntPtr)window.Current.NativeWindowHandle;visible=IsWindowVisible(handle);minimized=IsIconic(handle);
+                    if(window.Current.IsOffscreen){ShowWindowAsync(handle,9);Thread.Sleep(200);}
+                    if(FindSwitch()==null){
+                        var button=home.TryGetCurrentPattern(InvokePattern.Pattern,out _)?home:home.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.IsInvokePatternAvailableProperty,true));
+                        if(button?.TryGetCurrentPattern(InvokePattern.Pattern,out var invoke)==true)((InvokePattern)invoke).Invoke();
+                        else if(home.TryGetCurrentPattern(SelectionItemPattern.Pattern,out var selection))((SelectionItemPattern)selection).Select();
+                    }
+                    return;
+                }
+            }
+        }
+        public void Dispose(){if(handle==IntPtr.Zero)return;if(!visible)ShowWindowAsync(handle,0);else if(minimized)ShowWindowAsync(handle,7);}
+    }
+    public static object InspectDetails()
+    {
+        var reports=new List<object>();
+        foreach(var process in Process.GetProcessesByName("clash-verge"))using(process){
+            foreach(AutomationElement window in AutomationElement.RootElement.FindAll(TreeScope.Children,new PropertyCondition(AutomationElement.ProcessIdProperty,process.Id))){
+                var all=window.FindAll(TreeScope.Descendants,Condition.TrueCondition).Cast<AutomationElement>().ToArray();
+                reports.Add(new{offscreen=window.Current.IsOffscreen,control_count=all.Length,proxy_label_count=all.Count(e=>IsProxyLabel(e.Current.Name)),toggle_count=all.Count(e=>e.TryGetCurrentPattern(TogglePattern.Pattern,out _))});
+            }
+        }
+        return reports;
     }
     public static bool InspectSwitch() => FindSwitch()?.TryGetCurrentPattern(TogglePattern.Pattern, out _) == true;
     static readonly object changeGate = new();
@@ -137,7 +176,7 @@ static class ClashProxy
             {
                 Thread.Sleep(300); before = ReadStatus();
                 if (before.Running && before.Enabled == true) break;
-                try { if (before.Running && before.Enabled != null && InspectSwitch()) break; }
+                try { if (before.Running && before.Enabled != null) break; }
                 catch (ElementNotAvailableException) { }
             }
         }
@@ -151,9 +190,12 @@ static class ClashProxy
         var watch = Stopwatch.StartNew();
         var before = ReadStatus();
         if (!before.Running || before.Enabled == null) throw new InvalidOperationException(before.Description);
-        var control = FindSwitch() ?? throw new InvalidOperationException("未定位到系统代理开关，请先在 Clash Verge 打开首页后重试");
+        using var session=new ProxyWindowSession();
+        AutomationElement? control=null;
+        while(watch.ElapsedMilliseconds<6000){try{control=FindSwitch();if(control!=null)break;}catch(ElementNotAvailableException){}Thread.Sleep(150);}
+        if(control==null)throw new InvalidOperationException("未找到 Clash 的系统代理开关。请确认客户端已就绪，再点击重试。");
         var pattern = (TogglePattern)control.GetCurrentPattern(TogglePattern.Pattern);
-        if (watch.ElapsedMilliseconds > 4000) throw new InvalidOperationException("Clash Verge 响应超时，请稍后重试");
+        if (watch.ElapsedMilliseconds > 6500) throw new InvalidOperationException("Clash Verge 响应超时，请稍后重试");
         if (pattern.Current.ToggleState == ToggleState.Indeterminate || (pattern.Current.ToggleState == ToggleState.On) != before.Enabled)
             throw new InvalidOperationException("Clash 与系统代理状态不一致，请先在 Clash 内重新设置系统代理");
         pattern.Toggle();

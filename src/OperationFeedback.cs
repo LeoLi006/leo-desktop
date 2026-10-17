@@ -12,17 +12,18 @@ static class OperationFeedback
 
 sealed class LeoToast : Form
 {
-    readonly Label message = new() { Bounds = new Rectangle(14, 11, 290, 49), ForeColor = BarcaUi.Text, Font = BarcaUi.Font(9), AutoEllipsis = true };
+    readonly Label message = new() { Bounds = new Rectangle(14, 11, 290, 49), ForeColor = BarcaUi.Text, Font = BarcaUi.Font(9), AutoEllipsis = false };
     readonly BarcaButton retry = new() { Text = "重试", Bounds = new Rectangle(235, 66, 66, 27), ForeColor = BarcaUi.Gold };
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1900 };
     readonly Func<Rectangle> anchor;
+    readonly BarcaButton close=new(){Text="×"};
     LeoNotice? current;
     protected override bool ShowWithoutActivation => true;
     public LeoToast(Func<Rectangle> pet)
     {
         anchor = pet; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true; StartPosition = FormStartPosition.Manual; ClientSize = new Size(320, 103); BackColor = BarcaUi.Surface;
         DoubleBuffered=true; Appearance.Round(this, 13); Controls.Add(message); Controls.Add(retry);
-        var close = new BarcaButton { Text = "×", Bounds = new Rectangle(237, 6, 22, 22) }; close.Click += (_, _) => Hide(); Controls.Add(close);
+        close.SetBounds(237,6,22,22); close.Click += (_, _) => Hide(); Controls.Add(close);
         retry.Click += async (_, _) => { var action = current?.Retry; if (action == null) return; retry.Enabled = false; try { await action(); } catch (Exception e) { Present(new(e.Message, true, action)); } finally { if (!IsDisposed) retry.Enabled = true; } };
         timer.Tick += (_, _) => { if (!Bounds.Contains(Cursor.Position)) { timer.Stop(); Hide(); } };
     }
@@ -30,11 +31,14 @@ sealed class LeoToast : Form
     {
         current = notice; message.Text = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
         message.ForeColor = notice.Error ? Color.LightSalmon : BarcaUi.Text;
-        ClientSize=new Size(270,notice.Retry!=null?84:52);Appearance.Round(this,12);
-        message.SetBounds(15,14,216,notice.Retry!=null?32:31);retry.SetBounds(194,51,64,25);
+        int width=message.Text.Length>90?320:270;
+        int textWidth=width-54;
+        int textHeight=Math.Max(25,TextRenderer.MeasureText(message.Text,message.Font,new Size(textWidth,int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl).Height+6);
+        ClientSize=new Size(width,Math.Max(52,14+textHeight+(notice.Retry!=null?39:10)));Appearance.Round(this,12);
+        message.SetBounds(15,14,textWidth,textHeight);close.SetBounds(width-31,6,22,22);retry.SetBounds(width-76,Height-33,64,25);
         retry.Text=notice.ActionLabel;retry.Visible = notice.Retry != null; retry.Enabled = true;
         var pet = anchor(); Location = PopupPlacement.Place(pet, Size, Screen.FromRectangle(pet).WorkingArea);
-        timer.Stop(); timer.Interval = notice.Error ? 5000 : notice.Retry!=null?4500:1900; timer.Start();
+        timer.Stop(); timer.Interval = notice.Error ? Math.Clamp(notice.Text.Length*80,5000,12000) : notice.Retry!=null?4500:1900; timer.Start();
         Show();
     }
     protected override void OnPaint(PaintEventArgs e)
@@ -45,6 +49,7 @@ sealed class LeoToast : Form
         using var stripe=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(12,3,Width-24,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,12,3,Width-24,4);
     }
     public bool PreviewHasRetry => retry.Visible;
+    internal bool PreviewTextFits=>message.Height>=message.GetPreferredSize(new Size(message.Width,0)).Height&&message.Bottom<(retry.Visible?retry.Top:ClientSize.Height)&&!message.Bounds.IntersectsWith(close.Bounds)&&ClientRectangle.Contains(retry.Visible?retry.Bounds:message.Bounds);
     public void Follow() { if(Visible){var pet=anchor();Location=PopupPlacement.Place(pet,Size,Screen.FromRectangle(pet).WorkingArea);} }
     protected override void Dispose(bool disposing) { if (disposing) timer.Dispose(); base.Dispose(disposing); }
 }
