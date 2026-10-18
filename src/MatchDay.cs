@@ -29,11 +29,13 @@ sealed partial class PetForm
     MatchDayChoice? matchDayChoice;long matchDayLoaded=-60000;int matchDayFollowing=-1;string? matchDayAsset,matchDayTeam;
     void UpdateMatchDay()
     {
+        // Older saved Barcelona selections now mean the ordinary default outfit.
+        if(prefs.MatchDayKit=="83"){prefs.MatchDayKit="auto";prefs.MatchDayOutfits=false;if(!previewMode)Store.Save(prefs);}
         if(!prefs.FootballModule||!prefs.MatchDayOutfits){if(matchDayTeam!=null){matchDayTeam=matchDayAsset=null;matchDayLoaded=-60000;Invalidate();}return;}
         if(prefs.MatchDayKit!="auto"){var club=ClubCatalog.Find(prefs.MatchDayKit);SetMatchDay(club?.Id);return;}
         if(clock.ElapsedMilliseconds-matchDayLoaded>60000||matchDayFollowing!=FootballFollowing.Current.Version){matchDayLoaded=clock.ElapsedMilliseconds;matchDayFollowing=FootballFollowing.Current.Version;matchDayChoice=MatchDay.Choose(LeoSummary.CachedMatches(),FootballFollowing.Current.Ids,DateTimeOffset.Now);SetMatchDay(matchDayChoice?.Club.Id);}
     }
-    void SetMatchDay(string? id){if(matchDayTeam==id)return;matchDayTeam=id;matchDayAsset=id==null?null:MatchDay.Asset(id);Invalidate();}
+    void SetMatchDay(string? id){if(id=="83")id=null;if(matchDayTeam==id)return;matchDayTeam=id;matchDayAsset=id==null?null:MatchDay.Asset(id);Invalidate();}
     bool DrawMatchDay(Graphics graphics,RectangleF destination)
     {
         if(!prefs.FootballModule||!prefs.MatchDayOutfits||matchDayTeam==null)return false;
@@ -43,6 +45,6 @@ sealed partial class PetForm
     }
     void WireMatchDayMenu(ContextMenuStrip menu)
     {
-        var outfits=new ToolStripMenuItem("比赛日装扮");menu.Items.Insert(2,outfits);menu.Opening+=(_,_)=>{outfits.Visible=prefs.FootballModule;outfits.DropDownItems.Clear();foreach(var (id,name) in new[]{("auto","自动跟随关注比赛"),("83","巴萨"),("382","曼城"),("20232","迈阿密国际"),("202","阿根廷"),("164","西班牙"),("off","关闭装扮")}){var option=new ToolStripMenuItem(name){Checked=id=="off"?!prefs.MatchDayOutfits:prefs.MatchDayOutfits&&prefs.MatchDayKit==id};option.Click+=(_,_)=>{prefs.MatchDayOutfits=id!="off";if(id!="off")prefs.MatchDayKit=id;matchDayLoaded=-60000;if(!previewMode)Store.Save(prefs);UpdateMatchDay();};outfits.DropDownItems.Add(option);}};
+        var outfits=new ToolStripMenuItem("比赛日装扮");menu.Items.Insert(2,outfits);menu.Opening+=(_,_)=>{outfits.Visible=prefs.FootballModule;outfits.DropDownItems.Clear();foreach(var (id,name) in new[]{("auto","自动跟随关注比赛"),("382","曼城"),("20232","迈阿密国际"),("202","阿根廷"),("164","西班牙"),("off","关闭装扮")}){var option=new ToolStripMenuItem(name){Checked=id=="off"?!prefs.MatchDayOutfits:prefs.MatchDayOutfits&&prefs.MatchDayKit==id};option.Click+=(_,_)=>{prefs.MatchDayOutfits=id!="off";if(id!="off")prefs.MatchDayKit=id;matchDayLoaded=-60000;if(!previewMode)Store.Save(prefs);UpdateMatchDay();};outfits.DropDownItems.Add(option);}};
     }
 }
