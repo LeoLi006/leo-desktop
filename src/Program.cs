@@ -195,6 +195,7 @@ static class Program
             Pump(window.PreviewSendAsync("曼城排第几"));bool table=window.PreviewTableRows>0;string first=window.PreviewState;Pump(window.PreviewSendAsync("巴萨下一场什么时候"));bool matches=window.PreviewMatchCards>0;
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
+        if(args.Length==2&&args[0]=="--skin-animation-test"){try{var checks=SkinAnimationTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--upgrade46-test"){try{var checks=Upgrade46Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--recovery45-test"){var checks=new Dictionary<string,bool>();Upgrade45Tests.Recovery(checks,Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0}));return;}
         if(args.Length==2&&args[0]=="--upgrade45-test"){var checks=Upgrade45Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
@@ -548,7 +549,7 @@ sealed partial class PetForm : Form
         int desired = dragging ? row : thinking ? 8 : row != 0 && row != 8 && clock.ElapsedMilliseconds <= rowUntil ? row : 0;
         if (desired != row) { row = desired; frame = 0; }
         animation.Interval = dragging && dragTransition.IsPending ? 40 : row == 8 ? 420 : row is 11 or 12 ? 180 : 140;
-        if (!(dragging && dragTransition.IsPending)) frame = (frame + 1) % (row is 1 or 2 ? 8 : row is 3 or 11 or 12 ? 4 : 6);
+        if (!(dragging && dragTransition.IsPending)) frame = (frame + 1) % (row is 1 or 2 ? 8 : row is 3 or 11 or 12 ? 4 : row==4?5:6);
         Invalidate();
     }
     static int DragRow(Size movement) => Math.Abs(movement.Height) > Math.Abs(movement.Width) ? movement.Height < 0 ? 11 : 12 : movement.Width >= 0 ? 1 : 2;
@@ -613,9 +614,7 @@ sealed partial class PetForm : Form
     void DrawPet(Graphics graphics, RectangleF destination)
     {
         if(DrawDragPickup(graphics,destination)||DrawDockPet(graphics,destination))return;
-        if(row==0&&DrawMatchDay(graphics,destination)){DrawCompanionBadges(graphics,destination);return;}
-        bool vertical = row is 11 or 12;
-        graphics.DrawImage(vertical ? verticalAtlas : atlas, destination, new Rectangle(frame * 192, (vertical ? row - 11 : row) * 208, 192, 208), GraphicsUnit.Pixel);
+        DrawAnimationFrame(graphics,destination);
         DrawCompanionBadges(graphics,destination);
     }
     static RectangleF PetDrawingBounds(Size size)
@@ -814,7 +813,7 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
-        companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();matchDaySprites?.Dispose();
+        companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();

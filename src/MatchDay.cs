@@ -26,18 +26,18 @@ sealed class MatchDaySprites:IDisposable
 }
 sealed partial class PetForm
 {
-    MatchDaySprites? matchDaySprites;MatchDayChoice? matchDayChoice;long matchDayLoaded=-60000;int matchDayFollowing=-1;string? matchDayAsset,matchDayTeam;
+    MatchDayChoice? matchDayChoice;long matchDayLoaded=-60000;int matchDayFollowing=-1;string? matchDayAsset,matchDayTeam;
     void UpdateMatchDay()
     {
-        if(!prefs.FootballModule||!prefs.MatchDayOutfits||focus.Active(DateTimeOffset.Now)){if(matchDayTeam!=null){matchDayTeam=matchDayAsset=null;matchDayLoaded=-60000;Invalidate();}return;}
+        if(!prefs.FootballModule||!prefs.MatchDayOutfits){if(matchDayTeam!=null){matchDayTeam=matchDayAsset=null;matchDayLoaded=-60000;Invalidate();}return;}
         if(prefs.MatchDayKit!="auto"){var club=ClubCatalog.Find(prefs.MatchDayKit);SetMatchDay(club?.Id);return;}
         if(clock.ElapsedMilliseconds-matchDayLoaded>60000||matchDayFollowing!=FootballFollowing.Current.Version){matchDayLoaded=clock.ElapsedMilliseconds;matchDayFollowing=FootballFollowing.Current.Version;matchDayChoice=MatchDay.Choose(LeoSummary.CachedMatches(),FootballFollowing.Current.Ids,DateTimeOffset.Now);SetMatchDay(matchDayChoice?.Club.Id);}
     }
     void SetMatchDay(string? id){if(matchDayTeam==id)return;matchDayTeam=id;matchDayAsset=id==null?null:MatchDay.Asset(id);Invalidate();}
     bool DrawMatchDay(Graphics graphics,RectangleF destination)
     {
-        if(!prefs.FootballModule||!prefs.MatchDayOutfits||focus.Active(DateTimeOffset.Now)||matchDayTeam==null)return false;
-        if(matchDayAsset!=null){try{(matchDaySprites??=new()).Draw(graphics,destination,matchDayAsset,clock.ElapsedMilliseconds);return true;}catch{matchDayAsset=null;}}
+        if(!prefs.FootballModule||!prefs.MatchDayOutfits||matchDayTeam==null)return false;
+        if(CurrentSkin()!=null){DrawAnimationFrame(graphics,destination);return true;}
         // Other followed teams retain Leo's existing artwork with their authentic badge.
         return false;
     }

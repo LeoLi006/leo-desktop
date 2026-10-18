@@ -5,8 +5,7 @@ sealed partial class PetForm
     Size lastDragMovement;Bitmap? dragPickup;long pickupStarted;
     void DrawNormalPet(Graphics graphics,RectangleF target,float opacity)
     {
-        bool vertical=row is 11 or 12;using var attributes=new ImageAttributes();attributes.SetColorMatrix(new ColorMatrix{Matrix33=opacity});
-        graphics.DrawImage(vertical?verticalAtlas:atlas,Rectangle.Round(target),frame*192,(vertical?row-11:row)*208,192,208,GraphicsUnit.Pixel,attributes);
+        DrawAnimationFrame(graphics,target,opacity);
     }
     void BeginDragPickup()
     {
