@@ -169,7 +169,7 @@ sealed partial class PetForm
             try { LeoStartup.SetEnabled(startup); Store.Save(next); }
             catch { LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
-        prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.MatchDayOutfits=next.MatchDayOutfits;prefs.MatchDayKit=next.MatchDayKit;ClipboardPrivacy.Notify();matchDayLoaded=-60000;
+        prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
         Modules.SetFootball(prefs.FootballModule);foot.ConfigureModules(prefs);launcher.RefreshModules();

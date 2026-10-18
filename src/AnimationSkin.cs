@@ -25,8 +25,8 @@ sealed partial class PetForm
     readonly HashSet<string> failedSkins=new();
     AnimationSkin? CurrentSkin()
     {
-        var name=AnimationSkin.Name(matchDayTeam);
-        if(!prefs.FootballModule||!prefs.MatchDayOutfits||name==null||failedSkins.Contains(name))return null;
+        var name=AnimationSkin.Name(SkinSelection.Id(prefs));
+        if(name==null||failedSkins.Contains(name))return null;
         if(animationSkins.TryGetValue(name,out var skin))return skin;
         try{skin=new(name);animationSkins.Add(name,skin);return skin;}
         catch(IOException){failedSkins.Add(name);return null;}

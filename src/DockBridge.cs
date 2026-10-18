@@ -6,7 +6,7 @@ sealed class DockBridge:IDisposable
 {
     public const float End=.42f;
     public const int Count=9;
-    readonly Bitmap sheet,idle;readonly string? kit;
+    readonly Bitmap sheet,idle,mirroredSheet;readonly string? kit;
     readonly Rectangle[] sources=new Rectangle[32];
     readonly Rectangle idleSource;
     public DockBridge(string path,Bitmap main,string? kit=null)
@@ -16,6 +16,7 @@ sealed class DockBridge:IDisposable
         idleSource=Visible(idle,new Rectangle(Point.Empty,idle.Size));
         var parts=Parts(sheet);if(parts.Length!=32)throw new IOException("起步动画必须包含四个方向各八帧");
         Array.Copy(parts,sources,32);
+        mirroredSheet=(Bitmap)sheet.Clone();mirroredSheet.RotateFlip(RotateFlipType.RotateNoneFlipX);
     }
     static Rectangle[] Parts(Bitmap image)
     {
@@ -41,12 +42,26 @@ sealed class DockBridge:IDisposable
         return Rectangle.FromLTRB(left,top,right+1,bottom+1);
     }
     public static int Frame(float progress)=>Math.Clamp((int)(progress/End*Count),0,Count-1);
+    (Bitmap Image,Rectangle Source) Art(int frame,DockSide side)
+    {
+        if(frame==0)return(idle,idleSource);
+        int direction=side==DockSide.Right?0:Math.Clamp((int)side,1,4)-1;var source=sources[direction*8+frame-1];
+        return side==DockSide.Right?(mirroredSheet,new Rectangle(sheet.Width-source.Right,source.Top,source.Width,source.Height)):(sheet,source);
+    }
+    internal bool RightGazeMatchesLeftMirror()
+    {
+        for(int frame=1;frame<Count;frame++){
+            var left=Art(frame,DockSide.Left);var right=Art(frame,DockSide.Right);
+            using var expected=left.Image.Clone(left.Source,PixelFormat.Format32bppArgb);expected.RotateFlip(RotateFlipType.RotateNoneFlipX);
+            using var actual=right.Image.Clone(right.Source,PixelFormat.Format32bppArgb);if(SkinAnimationTests.Hash(expected)!=SkinAnimationTests.Hash(actual))return false;
+        }return true;
+    }
     public RectangleF Draw(Graphics g,Size size,float progress,DockSide side,DockSprites dock)
     {
         int frame=Frame(progress);float t=Math.Clamp(progress/End,0,1);t=t*t*(3-2*t);
-        var source=frame==0?idleSource:sources[(Math.Clamp((int)side,1,4)-1)*8+frame-1];
-        var first=sources[(Math.Clamp((int)side,1,4)-1)*8];
-        var last=sources[(Math.Clamp((int)side,1,4)-1)*8+7];
+        var art=Art(frame,side);var source=art.Source;int direction=side==DockSide.Right?0:Math.Clamp((int)side,1,4)-1;
+        var first=sources[direction*8];
+        var last=sources[direction*8+7];
         var end=dock.Destination(size,End,side,dock.Source(PetForm.DockProgress(End,side),0,side));
         // Match original standing scale at entry, then arrive at the first tuck pose scale.
         float startScale=Math.Min(size.Width/(float)idle.Width,size.Height/(float)idle.Height);
@@ -60,8 +75,8 @@ sealed class DockBridge:IDisposable
         var target=new RectangleF(cx-w/2,bottom-h,w,h);
         // Keep ears inside the window, including the top-edge bending poses.
         target.X=Math.Clamp(target.X,0,Math.Max(0,size.Width-target.Width));target.Y=Math.Clamp(target.Y,0,Math.Max(0,size.Height-target.Height));
-        if(kit!=null)KitPalette.Draw(g,frame==0?idle:sheet,target,source,kit);
-        else g.DrawImage(frame==0?idle:sheet,target,source,GraphicsUnit.Pixel);return target;
+        if(kit!=null)KitPalette.Draw(g,art.Image,target,source,kit);
+        else g.DrawImage(art.Image,target,source,GraphicsUnit.Pixel);return target;
     }
-    public void Dispose(){sheet.Dispose();idle.Dispose();}
+    public void Dispose(){sheet.Dispose();idle.Dispose();mirroredSheet.Dispose();}
 }

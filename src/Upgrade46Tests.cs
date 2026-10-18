@@ -35,10 +35,8 @@ static class Upgrade46Tests
         checks["country_mentions_do_not_hijack_nonfootball_analysis"]=QuickRouter.Route("分析一下中国的经济发展").Kind==QuickKind.Ai&&QuickRouter.Route("法国为什么这么大").Kind==QuickKind.Ai&&QuickRouter.Route("分析西班牙国家队的战术").Kind==QuickKind.FootballAnalysis;
         checks["national_competition_caches_are_separate"]=TeamData.CachePath(Club.For("阿根廷"))!=TeamData.CachePath(Club.For("阿根廷") with{League="conmebol.america"})&&NationalCompetitions.For(Club.For("中国")).Any(c=>c.Id=="afc.asian.cup");
         var fixture=new FootballMatch("game",now.AddHours(3),"fifa.friendly","202","Argentina","205","Brazil","pre","Scheduled","VS",true);
-        checks["matchday_uses_only_followed_valid_today_matches"]=MatchDay.Choose([fixture],["202"],now)?.Club.Id=="202"&&MatchDay.Choose([fixture],[],now)==null&&MatchDay.Choose([fixture with{Status="Postponed"}],["202"],now)==null&&MatchDay.Choose([fixture with{Kickoff=now.AddDays(1)}],["202"],now)==null;
         checks["national_heavyweight_games_are_focus_matches"]=FootballFeed.IsFocus(fixture)&&FootballFeed.Name("Men's International Friendly")=="国际友谊赛";
-        checks["live_match_has_priority_over_later_match"]=MatchDay.Choose([fixture,fixture with{Id="live",State="in",Kickoff=now.AddMinutes(-20)}],["202"],now)?.Match.Id=="live";
-        RenderAssets(checks,output);inbox.Add("明天下午三点取快递","reminder",task.Id,"reminder-preview");inbox.Add("QQ音乐已接收点歌","operation");inbox.Add("示例：客户端未就绪，可稍后重试","error",action:()=>Task.CompletedTask);
+        inbox.Add("明天下午三点取快递","reminder",task.Id,"reminder-preview");inbox.Add("QQ音乐已接收点歌","operation");inbox.Add("示例：客户端未就绪，可稍后重试","error",action:()=>Task.CompletedTask);
         using(var window=new NoticeInboxForm(inbox,_=>{}))Snapshot(window,Path.Combine(output,"notifications46.png"));focus.Start(25,true,DateTimeOffset.Now);using(var window=new FocusForm(focus,()=>{}))Snapshot(window,Path.Combine(output,"focus46.png"));using(var window=new ClipboardPrivacyForm(new Preferences(),()=>{},true))Snapshot(window,Path.Combine(output,"clipboard-privacy46.png"));using(var window=new UpdateForm(true))Snapshot(window,Path.Combine(output,"updates46.png"));
         var follows=new FootballFollowing(null);follows.Replace(["83","382","20232","202","164","658"]);using(var window=new FollowingManager(follows)){Snapshot(window,Path.Combine(output,"national-following46.png"));window.Show();Application.DoEvents();var country=Descendants(window).OfType<BarcaButton>().Single(b=>b.Text=="国家队");country.PerformClick();Application.DoEvents();checks["country_filter_is_visible_and_selectable"]=country.Selected&&Descendants(window).OfType<FollowChoice>().Count()==55;Snapshot(window,Path.Combine(output,"national-only46.png"));}
         using(var window=new BarcaWindow{ClientSize=new(900,700)}){var team=new TeamView("阿根廷",true,()=>{});window.Controls.Add(team);window.Show();Application.DoEvents();var combo=Descendants(window).OfType<ComboBox>().Single();combo.SelectedIndex=1;Application.DoEvents();checks["national_detail_switches_competition_in_same_window"]=combo.Text=="美洲杯"&&team.FindForm()==window;Snapshot(window,Path.Combine(output,"national-detail46.png"));}
@@ -46,12 +44,6 @@ static class Upgrade46Tests
         Pump(Updates(checks,run));return checks;
     }
     static bool NationalFollowing(string run){var follows=new FootballFollowing(Path.Combine(run,"following.json"));follows.Replace(["83","202","658"]);var reopened=new FootballFollowing(Path.Combine(run,"following.json"));var m=new FootballMatch("n",now,"fifa.world","202","Argentina","205","Brazil","pre","Scheduled","VS",true);return reopened.Ids.SequenceEqual(new[]{"83","202","658"})&&FootballFeed.FollowTags(m,reopened.Names).SequenceEqual(new[]{"阿根廷"});}
-    static void RenderAssets(Dictionary<string,bool> checks,string output)
-    {
-        using var sprites=new MatchDaySprites();using var preview=new Bitmap(900,285);using var g=Graphics.FromImage(preview);g.Clear(BarcaUi.Canvas);bool transparent=true;int x=0;using var font=BarcaUi.Font(12,true);
-        foreach(var (id,name) in new[]{("382","曼城"),("20232","迈阿密国际"),("202","阿根廷"),("164","西班牙")}){string asset=MatchDay.Asset(id)!;var value=sprites.Get(asset);transparent&=value.Image.GetPixel(0,0).A<8&&value.Source.Width>0&&value.Source.Height>0;sprites.Draw(g,new RectangleF(x+22,8,180,220),asset,0);TextRenderer.DrawText(g,name,font,new Rectangle(x,245,225,30),BarcaUi.Gold,TextFormatFlags.HorizontalCenter);x+=225;}
-        preview.Save(Path.Combine(output,"matchday-kits46.png"));checks["all_four_generated_kits_have_alpha_and_render_without_clipping"]=transparent;
-    }
     internal static IEnumerable<Control> Descendants(Control root){foreach(Control c in root.Controls){yield return c;foreach(var child in Descendants(c))yield return child;}}
     static void Snapshot(Form form,string file){form.Show();Application.DoEvents();using var bitmap=new Bitmap(form.Width,form.Height);form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(file);form.Hide();}
     static void Pump(Task task){var watch=System.Diagnostics.Stopwatch.StartNew();while(!task.IsCompleted&&watch.ElapsedMilliseconds<15000){Application.DoEvents();Thread.Sleep(5);}if(!task.IsCompleted)throw new TimeoutException("focused check timed out");task.GetAwaiter().GetResult();}
@@ -77,7 +69,6 @@ sealed partial class PetForm
     internal Dictionary<string,bool> VerifyCompanion46()
     {
         var checks=new Dictionary<string,bool>();notices.Add("示例提醒","reminder");int before=launcherOpens;hit.SimulateClick(new Point(Width-10,10));checks["unread_dot_opens_inbox_without_toggling_launcher"]=noticeWindow?.Visible==true&&launcherOpens==before;noticeWindow?.Close();
-        focus.Start(25,true,DateTimeOffset.Now);row=3;Animate();checks["focus_keeps_idle_quiet_and_does_not_disable_chat"]=row==0&&animation.Interval==1000;ShowChat();checks["focus_keeps_idle_quiet_and_does_not_disable_chat"]&=chat?.Visible==true;chat?.Close();focus.Stop();
-        var national=Club.For("阿根廷");prefs.MatchDayKit=national.Id;UpdateMatchDay();checks["manual_matchday_kit_is_drawn_only_when_module_enabled"]=matchDayAsset=="argentina-v1.png";prefs.FootballModule=false;UpdateMatchDay();using var image=new Bitmap(Width,Height);using var g=Graphics.FromImage(image);checks["manual_matchday_kit_is_drawn_only_when_module_enabled"]&=!DrawMatchDay(g,PetDrawingBounds(ClientSize));prefs.FootballModule=true;return checks;
+        focus.Start(25,true,DateTimeOffset.Now);row=3;Animate();checks["focus_keeps_idle_quiet_and_does_not_disable_chat"]=row==0&&animation.Interval==1000;ShowChat();checks["focus_keeps_idle_quiet_and_does_not_disable_chat"]&=chat?.Visible==true;chat?.Close();focus.Stop();return checks;
     }
 }

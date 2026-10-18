@@ -66,6 +66,17 @@ sealed class DockSprites:IDisposable
             var image=new Bitmap(box.Width,box.Height,PixelFormat.Format32bppArgb);var target=image.LockBits(new Rectangle(Point.Empty,image.Size),ImageLockMode.WriteOnly,PixelFormat.Format32bppArgb);
             Marshal.Copy(buffer,0,target.Scan0,buffer.Length);image.UnlockBits(target);frames[i]=image;
         }
+        // Use one consistent inward-looking sequence for both horizontal edges.
+        // Mirror the character before kit projection so sponsor lettering stays readable.
+        for(int i=0;i<FramesPerDirection;i++){
+            var mirrored=(Bitmap)frames[i].Clone();mirrored.RotateFlip(RotateFlipType.RotateNoneFlipX);
+            frames[FramesPerDirection+i].Dispose();frames[FramesPerDirection+i]=mirrored;
+            sources[FramesPerDirection+i]=new Rectangle(sources[FramesPerDirection+i].Location,mirrored.Size);
+        }
+    }
+    internal bool RightGazeMatchesLeftMirror()
+    {
+        for(int i=0;i<FramesPerDirection;i++){using var expected=(Bitmap)frames[i].Clone();expected.RotateFlip(RotateFlipType.RotateNoneFlipX);if(SkinAnimationTests.Hash(expected)!=SkinAnimationTests.Hash(frames[FramesPerDirection+i]))return false;}return true;
     }
     public static int FrameIndex(float progress)=>Math.Clamp((int)(Math.Clamp(progress,0,1)*FramesPerDirection),0,FramesPerDirection-1);
     int Index(float progress,DockSide side)=>Math.Clamp((int)side-1,0,3)*FramesPerDirection+FrameIndex(progress);

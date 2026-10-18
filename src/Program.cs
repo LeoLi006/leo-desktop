@@ -25,8 +25,12 @@ sealed class Preferences
     public int ClipboardExpireDays{get;set;}=7;
     public bool ClipboardBlockSecrets{get;set;}=true;
     public List<string> ClipboardBlockedApps{get;set;}=["1Password","Bitwarden","KeePass","KeePassXC","LastPass","Dashlane"];
-    public bool MatchDayOutfits{get;set;}=true;
-    public string MatchDayKit{get;set;}="auto";
+    public string? SkinId{get;set;}
+    // Read old saved settings once, then omit these retired fields.
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MatchDayOutfits{get;set;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? MatchDayKit{get;set;}
     public Dictionary<string, string[]> Aliases { get; set; } = new();
     public bool HideInFullscreen { get; set; } = true;
     public bool EdgeDocking { get; set; } = true;
@@ -481,7 +485,7 @@ sealed partial class PetForm : Form
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
-        WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireMatchDayMenu(menu);
+        WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };

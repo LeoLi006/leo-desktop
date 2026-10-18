@@ -38,7 +38,7 @@ sealed partial class PetForm
         using var preview=new Bitmap(6*Width,5*Height);using var g=Graphics.FromImage(preview);g.Clear(Color.FromArgb(24,24,24));
         int line=0;bool reproduced=false;
         foreach(var id in new[]{"83","382","20232","202","164"}){
-            prefs.MatchDayKit=id;prefs.MatchDayOutfits=true;UpdateMatchDay();RevealDock(true);
+            prefs.SkinId=id;UpdateSkin();RevealDock(true);
             using(var before=new Bitmap(Width,Height))using(var drawing=Graphics.FromImage(before)){
                 drawing.Clear(Color.Magenta);drawing.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;DrawPet(drawing,PetDrawingBounds(ClientSize));reproduced|=PetTransparencyTests.PinkLeak(before)>0;
             }

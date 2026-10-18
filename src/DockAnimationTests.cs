@@ -6,6 +6,7 @@ static class DockAnimationTests
     {
         Directory.CreateDirectory(output);var checks=new Dictionary<string,bool>();
         using var sprites=new DockSprites();using var contact=new Bitmap(768,560);using var graphics=Graphics.FromImage(contact);graphics.Clear(BarcaUi.Canvas);
+        checks["every_right_tuck_frame_has_the_mirrored_inward_gaze"]=sprites.RightGazeMatchesLeftMirror();
         int row=0;
         foreach(var side in new[]{DockSide.Left,DockSide.Right,DockSide.Top,DockSide.Bottom}){
             var sources=new HashSet<Rectangle>();bool intact=true;var rendered=new HashSet<string>();
@@ -29,6 +30,7 @@ static class DockAnimationTests
         using(var bridge=new DockBridge(Path.Combine(Store.Root,"assets","edge-bridge-v1.png"),main))
         using(var transition=new Bitmap(15*110,4*125))
         using(var drawing=Graphics.FromImage(transition)){
+            checks["every_right_entry_frame_has_the_mirrored_inward_gaze"]=bridge.RightGazeMatchesLeftMirror();
             drawing.Clear(BarcaUi.Canvas);int line=0;
             foreach(var side in new[]{DockSide.Left,DockSide.Right,DockSide.Top,DockSide.Bottom}){
                 var unique=new HashSet<string>();bool intact=true;

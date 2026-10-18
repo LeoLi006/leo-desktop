@@ -66,12 +66,11 @@ sealed partial class PetForm
     void WireCompanionMenu(ContextMenuStrip menu)
     {
         var inbox=new ToolStripMenuItem("通知收纳盒");inbox.Click+=(_,_)=>ShowNotices();var concentrate=new ToolStripMenuItem("临时专注");concentrate.Click+=(_,_)=>{RevealDock(true);if(focusWindow==null||focusWindow.IsDisposed)focusWindow=new FocusForm(focus,()=>{Invalidate();CheckReminders();});if(!focusWindow.Visible)WindowPositions.Prepare(focusWindow,"focus",Bounds,previewMode);focusWindow.Show();focusWindow.Activate();};menu.Items.Insert(0,inbox);menu.Items.Insert(1,concentrate);menu.Opening+=(_,_)=>{inbox.Text="通知收纳盒"+(notices.Unread>0?" · "+notices.Unread:"");concentrate.Text=focus.Active(DateTimeOffset.Now)?"专注中 · "+focus.Remaining(DateTimeOffset.Now):"临时专注";};
-        notices.Changed+=()=>{if(!IsDisposed)Invalidate();};companionTimer.Tick+=(_,_)=>{try{if(focus.Complete(DateTimeOffset.Now)){if(QuietHours.Load().Contains(DateTime.Now))notices.Add("这段专注完成了，休息一下吧。","focus");else PresentFeedback(new("这段专注完成了，休息一下吧。"));CheckReminders();}if(focus.Active(DateTimeOffset.Now))Invalidate();UpdateMatchDay();}catch(Exception e){companionTimer.Stop();PresentFeedback(new("专注或比赛日状态未能保存："+e.Message,true));}};if(!previewMode)companionTimer.Start();
+        notices.Changed+=()=>{if(!IsDisposed)Invalidate();};companionTimer.Tick+=(_,_)=>{try{if(focus.Complete(DateTimeOffset.Now)){if(QuietHours.Load().Contains(DateTime.Now))notices.Add("这段专注完成了，休息一下吧。","focus");else PresentFeedback(new("这段专注完成了，休息一下吧。"));CheckReminders();}if(focus.Active(DateTimeOffset.Now))Invalidate();}catch(Exception e){companionTimer.Stop();PresentFeedback(new("专注状态未能保存："+e.Message,true));}};if(!previewMode)companionTimer.Start();
     }
     void ShowNotices(){RevealDock(true);launcher.Hide();if(noticeWindow==null||noticeWindow.IsDisposed)noticeWindow=new(notices,id=>{var task=todoStore.Items.FirstOrDefault(t=>t.Id==id);if(task==null)throw new InvalidOperationException("这条事项已经删除。");OpenReminderTask(task);});if(!noticeWindow.Visible)WindowPositions.Prepare(noticeWindow,"notifications",Bounds,previewMode);noticeWindow.Show();noticeWindow.Activate();}
     void DrawCompanionBadges(Graphics g,RectangleF bounds)
     {
-        if(matchDayTeam!=null&&matchDayAsset==null&&prefs.FootballModule&&prefs.MatchDayOutfits&&!focus.Active(DateTimeOffset.Now))BarcaUi.DrawBadge(g,matchDayTeam,new Rectangle((int)bounds.Right-18,(int)(bounds.Top+bounds.Height*.64f),16,16));
         if(notices.Unread>0){using var dot=new SolidBrush(BarcaUi.Gold);g.FillEllipse(dot,bounds.Right-16,bounds.Top+4,10,10);}
     }
 }
