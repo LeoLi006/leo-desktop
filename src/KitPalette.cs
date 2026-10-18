@@ -10,7 +10,8 @@ static class KitPalette
     public static void Draw(Graphics g,Bitmap image,RectangleF target,RectangleF source,string name,float opacity=1)
     {
         var bounds=Rectangle.Round(target);if(bounds.Width<=0||bounds.Height<=0)return;var texture=KitTexture.Load(name);
-        using var surface=new Bitmap(bounds.Width,bounds.Height,PixelFormat.Format32bppArgb);
+        // Project on the native animation cell before the only final-size resample.
+        using var surface=new Bitmap(Math.Max(1,(int)Math.Round(source.Width)),Math.Max(1,(int)Math.Round(source.Height)),PixelFormat.Format32bppArgb);
         using(var drawing=Graphics.FromImage(surface)){drawing.InterpolationMode=InterpolationMode.HighQualityBicubic;drawing.DrawImage(image,new Rectangle(Point.Empty,surface.Size),source,GraphicsUnit.Pixel);}
         var bits=surface.LockBits(new Rectangle(Point.Empty,surface.Size),ImageLockMode.ReadWrite,PixelFormat.Format32bppArgb);
         try{
@@ -31,18 +32,19 @@ static class KitPalette
             for(int y=0;y<surface.Height;y++)for(int x=0;x<surface.Width;x++){int n=y*stride+x*4;if(pixels[n+3]>128&&pixels[n+2]>190&&pixels[n+1]>170&&pixels[n]>120){woolY+=y;woolCount++;}}
             bool upside=woolCount>0&&woolY/(float)woolCount>(top+bottom)/2f;
             int jerseyHeight=Math.Max(1,bottom-top+1),jerseyWidth=Math.Max(1,right-left+1);
-            int pad=Math.Max(1,jerseyWidth/12);
+            int pad=Math.Max(1,jerseyWidth/12);var detail=texture.Detail(jerseyWidth+pad*2,jerseyHeight);
             for(int y=0;y<surface.Height;y++)for(int x=0;x<surface.Width;x++){
                 int n=y*stride+x*4;if(pixels[n+3]==0)continue;var original=Color.FromArgb(pixels[n+3],pixels[n+2],pixels[n+1],pixels[n]);var p=original;
                 bool fabric=hasJersey&&KitTexture.Fabric(original),horizontal=x>=left-pad&&x<=right+pad;
                 if(fabric&&horizontal&&y>=top&&y<=bottom){
                     float u=(x-left+pad)/(float)(jerseyWidth+pad*2),v=(y-top)/(float)jerseyHeight;if(upside){u=1-u;v=1-v;}
-                    p=KitTexture.Shade(texture.Sample(u,v),original);
+                    p=KitTexture.Shade(detail.Sample(u,v),original);
                 }else if(fabric&&horizontal&&(upside?y<top&&y>=top-jerseyHeight*.38f:y>bottom&&y<=bottom+jerseyHeight*.38f))p=KitTexture.Shorts(original,name);
                 pixels[n]=p.B;pixels[n+1]=p.G;pixels[n+2]=p.R;pixels[n+3]=(byte)(p.A*opacity);
             }
             Marshal.Copy(pixels,0,bits.Scan0,pixels.Length);
         }finally{surface.UnlockBits(bits);}
-        g.DrawImageUnscaled(surface,bounds.Location);
+        var saved=g.Save();g.InterpolationMode=InterpolationMode.HighQualityBicubic;
+        g.DrawImage(surface,bounds,0,0,surface.Width,surface.Height,GraphicsUnit.Pixel);g.Restore(saved);
     }
 }

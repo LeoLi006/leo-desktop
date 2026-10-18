@@ -58,7 +58,7 @@ sealed partial class PetForm
         for(int t=0;t<=2400;t+=32)AdvanceDock(t,far);
         checks["tucked_pet_hides_all_footer_buttons"]=dockMotion.Progress>=.999f&&!foot.Visible;
         checks["tucked_hit_target_is_only_visible_head"]=hit.Height<Height*.65&&hit.Bounds.Left>=Left&&hit.Bounds.Left<=Left+Width*.05;
-        using(var image=new Bitmap(Width,Height)){DrawToBitmap(image,ClientRectangle);image.Save(Path.Combine(output,"preview-peeking-head42.png"));}
+        using(var image=RenderPetSurface()){image.Save(Path.Combine(output,"preview-peeking-head42.png"));}
         var hover=new Point(hit.Left+hit.Width/2,hit.Top+hit.Height/2);for(int t=2432;t<=3700;t+=32)AdvanceDock(t,hover);
         checks["hover_restores_full_pet_hit_area_and_footer"]=dockMotion.Progress==0&&hit.Bounds==Bounds&&foot.Visible&&foot.Opacity>.99;
         RevealDock(true);Location=new Point(area.Left+(area.Width-Width)/2,area.Bottom-Height-foot.ReservedSpace);var original=Location;dockMotion.Reset(0);

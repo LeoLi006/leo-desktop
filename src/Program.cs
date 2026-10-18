@@ -458,8 +458,8 @@ sealed partial class PetForm : Form
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
         AutoScaleMode = AutoScaleMode.None;
         SetStyle(ControlStyles.ResizeRedraw, true);
-        BackColor = Color.Magenta; TransparencyKey = Color.Magenta;
-        DoubleBuffered = true; StartPosition = FormStartPosition.Manual;
+        BackColor = Color.Black;
+        DoubleBuffered = false; StartPosition = FormStartPosition.Manual;
         var size = Math.Clamp(p.PetSize, 80, 230);
         ClientSize = new Size(size, size * 208 / 192);
         var screen = Screen.PrimaryScreen!.WorkingArea;
@@ -605,17 +605,24 @@ sealed partial class PetForm : Form
         var margin = Math.Max(0, ((foot?.ScaledCompactWidth ?? FootTools.CompactWidth) - Width) / 2);
         return new(Math.Clamp(point.X, area.Left + margin, Math.Max(area.Left + margin, area.Right - Width - margin)), Math.Clamp(point.Y, area.Top, Math.Max(area.Top, area.Bottom - Height - (foot?.ReservedSpace ?? FootTools.Space))));
     }
+    protected override CreateParams CreateParams {get{var value=base.CreateParams;value.ExStyle|=LayeredPet.Style;return value;}}
+    internal int LayeredFrames{get;private set;}
+    protected override void OnPaintBackground(PaintEventArgs e){}
     protected override void OnPaint(PaintEventArgs e)
     {
-        if(resourcesDisposed)return;
-        using var surface=new Bitmap(ClientSize.Width,ClientSize.Height,System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        if(resourcesDisposed||ClientSize.Width<1||ClientSize.Height<1)return;
+        using var surface=RenderPetSurface();
+        LayeredPet.Present(Handle,Location,surface);LayeredFrames++;
+    }
+    internal Bitmap RenderPetSurface()
+    {
+        var surface=new Bitmap(ClientSize.Width,ClientSize.Height,System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using(var drawing=Graphics.FromImage(surface)){
             drawing.InterpolationMode=InterpolationMode.HighQualityBicubic;
             DrawPet(drawing,PetDrawingBounds(ClientSize));
         }
         PetTransparency.ResolveCoverage(surface);
-        // No interpolation after coverage is resolved: it would recreate partial alpha.
-        e.Graphics.DrawImageUnscaled(surface,Point.Empty);
+        return surface;
     }
     void DrawPet(Graphics graphics, RectangleF destination)
     {
