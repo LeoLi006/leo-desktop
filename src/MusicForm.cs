@@ -30,8 +30,8 @@ sealed partial class MusicForm:BarcaWindow
         Button("播放/暂停",90,async()=>{if(preview)return;state.Text=await QQPlayback.ToggleAsync();OperationFeedback.Show(state.Text);});
         Button("歌词",57,async()=>{if(!preview)state.Text=await QQNative.ToggleLyrics();});
         Button("打开QQ音乐",112,()=>{if(!preview)QQMusic.OpenClient();return Task.CompletedTask;});
-        var searchStatus=new Panel{Dock=DockStyle.Bottom,Height=36};state.Dock=DockStyle.Fill;searchStatus.Controls.Add(state);searchStatus.Controls.Add(retrySearch);Controls.Add(searchStatus);retrySearch.Click+=async(_,_)=>await SearchAsync(input.Text);
-        top.Controls.Add(controls);Controls.Add(songs);Controls.Add(top);Controls.Add(chrome);
+        var searchStatus=new Panel{Dock=DockStyle.Bottom,Height=36};state.Dock=DockStyle.Fill;searchStatus.Controls.Add(state);searchStatus.Controls.Add(retrySearch);retrySearch.Click+=async(_,_)=>await SearchAsync(input.Text);
+        top.Controls.Add(controls);Controls.Add(songs);Controls.Add(searchStatus);Controls.Add(top);Controls.Add(chrome);
         MaximizeBox=false;MinimumSize=MaximumSize=Size;Home();state.Text="快速点一首 · QQ音乐未运行时会自动启动";Shown+=(_,_)=>input.Focus();
     }
     public async Task SearchAsync(string query)
@@ -65,6 +65,7 @@ sealed partial class MusicForm:BarcaWindow
     public void Home()=>Display(history.Items.ToArray(),"最近点歌");
     public MusicSong[] Candidates=>latest;
     internal bool SearchRetryVisible=>retrySearch.Visible;
+    internal bool SearchStatusFits=>songs.Bottom<=retrySearch.Parent!.Top;
     public async Task<bool> TryPlayCandidate(string id){var song=latest.Concat(history.Items).FirstOrDefault(s=>s.Id==id);if(song==null)return false;if(!await Play(song))return false;queue=latest.Any(s=>s.Id==id)?latest:history.Items.ToArray();queueIndex=Array.FindIndex(queue,s=>s.Id==id);return true;}
     public async Task<string> Step(int direction){if(direction is not(-1 or 1))throw new ArgumentException("请选择上一首或下一首");if(queue.Length==0)throw new ArgumentException("还没有点过歌曲，请先搜索并选择一首歌");int next=(queueIndex+direction+queue.Length)%queue.Length;if(!await Play(queue[next]))throw new IOException(state.Text);queueIndex=next;return "已发送"+(direction>0?"下一首":"上一首")+"："+queue[next].Name;}
     public void OpenQuery(string query){input.Text=query;if(!Visible)Show();Activate();if(query.Length>0)_=SearchAsync(query);}

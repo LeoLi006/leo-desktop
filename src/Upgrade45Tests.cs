@@ -22,18 +22,18 @@ static class Upgrade45Tests
         checks["football_module_action_gate"]=!Modules.Enabled(new Preferences{FootballModule=false},Modules.ForAction("football_open")!)&&Modules.ForAction("match_add")=="football";
         using(var form=new FirstRunForm(new Preferences()))Snapshot(form,Path.Combine(output,"first-run45.png"));using(var setup=new InstallForm())Snapshot(setup,Path.Combine(output,"installer45.png"));
         using(var settings=new SettingsForm(new Preferences(),(_,_)=>{},()=>{},true)){settings.Show();Application.DoEvents();var tab=Descendants(settings).OfType<BarcaButton>().First(b=>b.Text=="功能");tab.PerformClick();Application.DoEvents();Snapshot(settings,Path.Combine(output,"modules45.png"));tab=Descendants(settings).OfType<BarcaButton>().First(b=>b.Text=="运行检查");tab.PerformClick();Application.DoEvents();Snapshot(settings,Path.Combine(output,"health45.png"));}
-        Installer(checks,output);Recovery(checks);return checks;
+        Installer(checks,output);Recovery(checks,output);return checks;
     }
     sealed class FailingConnection:System.Net.Http.HttpMessageHandler
     {
         protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request,CancellationToken token)=>Task.FromException<System.Net.Http.HttpResponseMessage>(new System.Net.Http.HttpRequestException("simulated offline"));
     }
-    static void Recovery(Dictionary<string,bool> checks)
+    internal static void Recovery(Dictionary<string,bool> checks,string output)
     {
         void Pump(Task task){var watch=System.Diagnostics.Stopwatch.StartNew();while(!task.IsCompleted&&watch.ElapsedMilliseconds<8000){Application.DoEvents();Thread.Sleep(5);}if(!task.IsCompleted)throw new TimeoutException("recovery test");task.GetAwaiter().GetResult();}
         int searches=0;using(var music=new MusicForm(true,(_,_)=>{searches++;if(searches==2)throw new System.Net.Http.HttpRequestException("offline");return Task.FromResult(new[]{new MusicSong("123","songmid","本地样例","歌手","")});})){
-            music.Show();Application.DoEvents();Pump(music.SearchAsync("test"));Pump(music.SearchAsync("test"));checks["music_failure_keeps_results_and_offers_retry"]=music.Candidates.Length==1&&music.SearchRetryVisible;Pump(music.SearchAsync("test"));checks["music_retry_recovers_independently"]=music.Candidates.Length==1&&!music.SearchRetryVisible;music.Hide();}
-        int attempts=0;using var chat=new ChatForm(true,ChatTests.Settings(),()=>++attempts==1?new ChatApi(new FailingConnection()):ChatTests.FixtureApi());chat.Show();Application.DoEvents();Pump(chat.PreviewSendAsync("你好啊"));checks["chat_failure_releases_composer_and_offers_retry"]=chat.ReplyRetryAvailable;chat.PreviewRetryReply();var timer=System.Diagnostics.Stopwatch.StartNew();while(!chat.PreviewReplyComplete&&timer.ElapsedMilliseconds<8000){Application.DoEvents();Thread.Sleep(5);}checks["chat_retry_streams_successfully_after_failure"]=chat.PreviewReplyComplete&&attempts==2;
+            music.Show();Application.DoEvents();Pump(music.SearchAsync("test"));Pump(music.SearchAsync("test"));checks["music_failure_keeps_results_and_offers_retry"]=music.Candidates.Length==1&&music.SearchRetryVisible&&music.SearchStatusFits;Snapshot(music,Path.Combine(output,"music-retry45.png"));music.Show();Pump(music.SearchAsync("test"));checks["music_retry_recovers_independently"]=music.Candidates.Length==1&&!music.SearchRetryVisible;music.Hide();}
+        int attempts=0;using var chat=new ChatForm(true,ChatTests.Settings(),()=>++attempts==1?new ChatApi(new FailingConnection()):ChatTests.FixtureApi());chat.Show();Application.DoEvents();Pump(chat.PreviewSendAsync("你好啊"));checks["chat_failure_releases_composer_and_offers_retry"]=chat.ReplyRetryAvailable;Snapshot(chat,Path.Combine(output,"chat-retry45.png"));chat.Show();chat.PreviewRetryReply();var timer=System.Diagnostics.Stopwatch.StartNew();while(!chat.PreviewReplyComplete&&timer.ElapsedMilliseconds<8000){Application.DoEvents();Thread.Sleep(5);}checks["chat_retry_streams_successfully_after_failure"]=chat.PreviewReplyComplete&&attempts==2;
     }
     static IEnumerable<Control> Descendants(Control control){foreach(Control child in control.Controls){yield return child;foreach(var inner in Descendants(child))yield return inner;}}
     static void Snapshot(Form window,string file){window.Show();Application.DoEvents();using var image=new Bitmap(window.Width,window.Height);window.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(file);window.Hide();}
