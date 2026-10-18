@@ -117,7 +117,7 @@ sealed partial class PetForm
         if(!immediate)return;
         var shift=dockShift;dockShift=Point.Empty;movingDock=true;try{Location=new Point(Left-shift.X,Top-shift.Y);}finally{movingDock=false;}
         dockAwaitExit=false;dockMotion.Reset(clock.ElapsedMilliseconds);SyncDockHit();Invalidate();
-        if(!hiddenForFullscreen&&IsHandleCreated){PositionFoot();foot.Opacity=1;if(!foot.Visible)foot.Show(this);}
+        if(!hiddenForFullscreen&&IsHandleCreated){PositionFoot();foot.Opacity=UiTheme.WindowOpacity;if(!foot.Visible)foot.Show(this);}
     }
     void OnDockLocationChanged()
     {
@@ -148,7 +148,7 @@ sealed partial class PetForm
         if(shiftY!=dockShift.Y){movingDock=true;try{Location=new Point(Left,Top+shiftY-dockShift.Y);dockShift=new Point(0,shiftY);}finally{movingDock=false;}}
         if(dockMotion.Progress>.001f){if(foot.Visible){foot.CollapseSearch();foot.Hide();}hoverCard?.Hide();feedback?.Hide();dockFootShownAt=0;}
         else if(!foot.Visible){foot.Opacity=0;PositionFoot();foot.Show(this);dockFootShownAt=now;}
-        if(foot.Visible){foot.Opacity=dockFootShownAt==0?1:Math.Clamp((now-dockFootShownAt)/180d,0,1);}
+        if(foot.Visible){foot.Opacity=UiTheme.WindowOpacity*(dockFootShownAt==0?1:Math.Clamp((now-dockFootShownAt)/180d,0,1));}
         SyncDockHit();if(dragPickup!=null)Invalidate();if(before!=dockMotion.Progress||dockMotion.Progress>.995f)Invalidate();
     }
     internal static float DockProgress(float progress,DockSide side)

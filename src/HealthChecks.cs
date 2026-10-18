@@ -43,20 +43,21 @@ sealed class ModulesView:Panel
     readonly Dictionary<string,CheckBox> fields=new();
     public readonly CheckBox Docking;
     Dictionary<string,string> selectedPaths;
-    public ModulesView(Preferences p)
+    public ModulesView(Preferences p,bool preview=false)
     {
         selectedPaths=new(p.ModuleExecutables);
-        Dock=DockStyle.Fill;AutoScroll=true;AutoScrollMinSize=new Size(0,420);
+        Dock=DockStyle.Fill;AutoScroll=true;AutoScrollMinSize=new Size(0,535);
         Controls.Add(new Label{Text="按需开启 · 图标、菜单与后台检查同步变化",Bounds=new Rectangle(8,10,550,30),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});
         int y=50;
-        foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口"),("football","足球","赛程、球队关注、积分榜和赛程后台更新")}){
+        foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口"),("football","足球","赛程、球队关注、积分榜和赛程后台更新"),("media","统一媒体控制","PotPlayer与Windows媒体会话的播放、暂停和切换")}){
             var field=new CheckBox{Text=title,Checked=Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=58;
         }
-        Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,350,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
-        var paths=new BarcaButton{Text="软件路径…",Bounds=new Rectangle(365,350,180,32)};paths.Click+=(_,_)=>EditPaths(FindForm());Controls.Add(paths);
-        Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,390,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
+        Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,410,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
+        var extensions=new BarcaButton{Text="管理扩展模块…",Bounds=new Rectangle(10,455,230,32)};extensions.Click+=(_,_)=>{using var manager=new ExtensionManager(p,preview);manager.ShowDialog(FindForm());};Controls.Add(extensions);
+        var paths=new BarcaButton{Text="软件路径…",Bounds=new Rectangle(365,410,180,32)};paths.Click+=(_,_)=>EditPaths(FindForm());Controls.Add(paths);
+        Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,503,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
     }
     public bool EditPaths(IWin32Window? owner){using var dialog=new ModulePathsForm(selectedPaths);if(dialog.ShowDialog(owner)!=DialogResult.OK)return false;selectedPaths=dialog.Paths;return true;}
     public Dictionary<string,string> Paths=>selectedPaths.ToDictionary();
-    public void Apply(Preferences next){next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.FootballModule=fields["football"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
+    public void Apply(Preferences next){next.MediaModule=fields["media"].Checked;next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.FootballModule=fields["football"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
 }

@@ -2,6 +2,9 @@ using System.Diagnostics;
 namespace LeoLauncher;
 sealed partial class MusicForm:BarcaWindow
 {
+    internal Action? MediaRequested;
+    BarcaButton? mediaControlButton;
+    internal void ConfigureMedia(bool enabled){if(mediaControlButton!=null)mediaControlButton.Visible=enabled;}
     readonly bool preview;
     readonly TextBox input=new();
     readonly FlowLayoutPanel songs=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(18,8,14,8)};
@@ -18,13 +21,14 @@ sealed partial class MusicForm:BarcaWindow
         preview=previewMode;searchProvider=searcher;history=new(preview?null:Path.Combine(Store.Root,"leo-music.json"));
         Text="Leo · 快速点歌";ClientSize=new Size(620,490);TopMost=false;ShowInTaskbar=true;
         var chrome=BarcaUi.Chrome(this,"LEO  /  点一首","搜歌名或歌手，点完即走。歌单请在QQ音乐中操作。");
-        var top=new Panel{Dock=DockStyle.Top,Height=104,Padding=new Padding(18,8,18,0)};
+        var top=new Panel{Dock=DockStyle.Top,Height=136,Padding=new Padding(18,8,18,0)};
         var field=new RoundedSurface{Dock=DockStyle.Top,Height=45,Padding=new Padding(13,12,7,8),BackColor=BarcaUi.Raised};
         input.Dock=DockStyle.Fill;input.Font=BarcaUi.Font(11);input.BorderStyle=BorderStyle.None;input.BackColor=BarcaUi.Raised;input.ForeColor=BarcaUi.Text;input.MaxLength=120;input.PlaceholderText="歌名 / 歌手，回车搜索";
         var search=new BarcaButton{Text="搜索",Dock=DockStyle.Right,Width=66};field.Controls.Add(input);field.Controls.Add(search);top.Controls.Add(field);
         search.Click+=async(_,_)=>await SearchAsync(input.Text);input.KeyDown+=async(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;await SearchAsync(input.Text);}};
-        var controls=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=40,WrapContents=false};
-        void Button(string text,int width,Func<Task> action){var button=new BarcaButton{Text=text,Size=new Size(width,30),Font=BarcaUi.Font(8.5f)};button.Click+=async(_,_)=>{try{await action();}catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error(e.Message);}}};controls.Controls.Add(button);}
+        var controls=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=70,WrapContents=true};
+        void Button(string text,int width,Func<Task> action){var button=new BarcaButton{Text=text,Size=new Size(width,30),Font=BarcaUi.Font(8.5f)};button.Click+=async(_,_)=>{try{await action();}catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error(e.Message);}}};if(text=="媒体控制")mediaControlButton=button;controls.Controls.Add(button);}
+        Button("媒体控制",90,()=>{MediaRequested?.Invoke();return Task.CompletedTask;});
         Button("最近点歌",87,()=>{Home();return Task.CompletedTask;});
         Button("上一首",70,async()=>{state.Text=await Step(-1);});Button("下一首",70,async()=>{state.Text=await Step(1);});
         Button("播放/暂停",90,async()=>{if(preview)return;state.Text=await QQPlayback.ToggleAsync();OperationFeedback.Show(state.Text);});

@@ -167,7 +167,7 @@ sealed partial class ChatForm : BarcaWindow
         bodyHost.SizeChanged+=(_,_)=>{foreach(Control c in results.Controls)c.Width=ResultWidth;};
         Shown += (_, _) => input.Focus();
     }
-    async Task ReceiveVoiceAsync(string text,bool confident){if(pending!=null)return;input.AppendText((input.TextLength>0?" ":"")+text);if((directVoice||autoSend.Checked||QuickRouter.IsLocalMusic(text)&&string.Equals(input.Text.Trim(),text.Trim(),StringComparison.Ordinal))&&confident){directVoice=false;voice.StopListening();await SendAsync();}else state.Text=confident?"已识别，可编辑后发送":"识别不确定，已填入草稿，请校对后发送";}
+    async Task ReceiveVoiceAsync(string text,bool confident){if(pending!=null)return;input.AppendText((input.TextLength>0?" ":"")+text);if((directVoice||autoSend.Checked||QuickRouter.IsLocalMusic(text)&&string.Equals(input.Text.Trim(),text.Trim(),StringComparison.Ordinal))&&confident){directVoice=false;voice.StopListening();if(appTools!=null)appTools.Source="voice";try{await SendAsync();}finally{if(appTools!=null)appTools.Source="chat";}}else state.Text=confident?"已识别，可编辑后发送":"识别不确定，已填入草稿，请校对后发送";}
     public Task PreviewRecognizedAsync(string text,bool confident)=>ReceiveVoiceAsync(text,confident);
     public void ReloadConfiguration(){if(preview)return;settings=ChatSettings.Load();remember.Checked=settings.RememberConversation;useTools.Checked=settings.EnableAppTools;autoSpeak.Checked=settings.VoiceAutoSpeak;autoSend.Checked=settings.VoiceAutoSend;}
     void UpdateState() => state.Text = "按“说话”输入，快捷键可在 Leo 设置中调整";
@@ -188,6 +188,8 @@ sealed partial class ChatForm : BarcaWindow
         string prompt = input.Text.Trim();retryReply.Visible=false;
         if (prompt.Length > 100_000) { state.Text = "本条消息过长，请缩短后发送"; return; }
         var intent=QuickRouter.Route(prompt);
+        if(appTools?.HasLeo==true&&appTools.RecognizesExtension?.Invoke(prompt)==true)intent=new(QuickKind.LeoCommand,"command_text",Argument:prompt);
+        else if(appTools?.HasLeo==true&&intent.Kind==QuickKind.Ai&&NaturalTodo.Parse(prompt,DateTime.Now,DateOnly.FromDateTime(DateTime.Today)) is {} draft&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"比赛|赛程|天气|新闻|比分|怎么样|如何|为什么"))intent=new(QuickKind.LeoCommand,"todo_natural",Argument:JsonSerializer.Serialize(draft));
         if(intent.Kind is not (QuickKind.Ai or QuickKind.FootballAnalysis)){input.Clear();await HandleQuickAsync(intent,prompt);return;}
         if(preview&&testApi==null){state.Text="示例模式不发送 AI 请求";return;}
         string key=settings.ReadKey();

@@ -28,8 +28,8 @@ sealed class ConfigMigration
         if(bundle.Format!="LeoConfig"||bundle.Version!=1)throw new ArgumentException("不支持这个配置文件版本。");
         var p=bundle.Preferences;
         if(p==null||p.PetSize is <80 or >230||p.Favorites==null||p.Favorites.Any(string.IsNullOrWhiteSpace)||p.Aliases==null||p.ModuleExecutables==null||p.Aliases.Any(x=>x.Value==null||x.Value.Any(a=>string.IsNullOrWhiteSpace(a)||a.Length>30)))throw new ArgumentException("外观、收藏或简称配置无效。");
-        if(p.ClipboardExpireDays is not(0 or 1 or 7 or 30)||p.ClipboardBlockedApps==null||p.ClipboardBlockedApps.Count>60)throw new ArgumentException("剪贴板保护规则无效。");ClipboardPrivacy.Apps(string.Join("\n",p.ClipboardBlockedApps));if(p.SkinId!=null&&!SkinSelection.Valid(p.SkinId)||p.MatchDayKit is not(null or "auto" or "83" or "382" or "20232" or "202" or "164"))throw new ArgumentException("皮肤配置无效。");
-        p.DisplayName=UiTheme.ValidateName(p.DisplayName);LeoHotkeys.Validate(LeoHotkeys.Values(p));
+        if(p.ClipboardExpireDays is not(0 or 1 or 7 or 30)||p.ClipboardBlockedApps==null||p.ClipboardBlockedApps.Count>60)throw new ArgumentException("剪贴板保护规则无效。");ClipboardPrivacy.Apps(string.Join("\n",p.ClipboardBlockedApps));bool missingCustom=p.SkinId!=null&&System.Text.RegularExpressions.Regex.IsMatch(p.SkinId,@"^custom:[a-f0-9]{32}$")&&SkinLibrary.Find(p.SkinId)==null;if(missingCustom)p.SkinId="83";if(p.SkinId!=null&&!SkinSelection.Valid(p.SkinId)||p.MatchDayKit is not(null or "auto" or "83" or "382" or "20232" or "202" or "164"))throw new ArgumentException("皮肤配置无效。");
+        if(p.SkinThemes==null||p.DisabledExtensions==null)throw new ArgumentException("主题或扩展配置不完整");if(p.SkinThemes.Count>128||p.DisabledExtensions.Count>256||p.SkinThemes.Any(x=>x.Value==null)||p.DisabledExtensions.Any(id=>id==null||!System.Text.RegularExpressions.Regex.IsMatch(id,@"^[a-z][a-z0-9-]{1,39}$")))throw new ArgumentException("主题或扩展配置无效");foreach(var theme in p.SkinThemes.Values)theme.Validate();p.DisplayName=UiTheme.ValidateName(p.DisplayName);LeoHotkeys.Validate(LeoHotkeys.Values(p));
         if(bundle.Combos==null||bundle.Combos.Count>24||bundle.Combos.Select(c=>c.Id).Distinct().Count()!=bundle.Combos.Count||bundle.Combos.Select(c=>c.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=bundle.Combos.Count)throw new ArgumentException("自定义组合配置无效。");
         foreach(var combo in bundle.Combos)ComboStore.Validate(combo);
         if(bundle.WatchLinks==null||bundle.WatchLinks.Length!=4)throw new ArgumentException("观赛网址配置无效。");
@@ -37,7 +37,7 @@ sealed class ConfigMigration
         if(bundle.Quiet==null||bundle.Quiet.Start is <0 or >=1440||bundle.Quiet.End is <0 or >=1440||bundle.Quiet.Start==bundle.Quiet.End||bundle.Budget==null||bundle.Budget.DailyLimit is <0 or >100000)throw new ArgumentException("提醒时段或 API 限额无效。");
         if(bundle.Tasks!=null){if(bundle.Tasks.Count>20000)throw new ArgumentException("清单数量过多。");TodoStore.ValidateSnapshot(JsonSerializer.Serialize(bundle.Tasks));if(bundle.Tasks.Any(t=>t.Repeat!=null&&t.Repeat.Frequency is not("daily" or "weekly")))throw new ArgumentException("清单中包含不支持的重复规则。");}
         if(bundle.FollowingIds!=null)FootballFollowing.Validate(bundle.FollowingIds);
-        var notes=new List<string>();var catalog=applications?.Invoke().ToArray()??[];var mapping=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        var notes=new List<string>();if(missingCustom)notes.Add("自定义球衣图片不在配置文件中，已恢复巴萨；请在主题编辑器重新导入球衣PNG。");var catalog=applications?.Invoke().ToArray()??[];var mapping=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
         if(bundle.Applications!=null&&catalog.Length>0)foreach(var hint in bundle.Applications){
             if(hint==null||string.IsNullOrWhiteSpace(hint.Target)||string.IsNullOrWhiteSpace(hint.Name)||hint.ExePath==null)throw new ArgumentException("应用迁移信息不完整。");
             if(catalog.Any(a=>a.Target.Equals(hint.Target,StringComparison.OrdinalIgnoreCase)))continue;

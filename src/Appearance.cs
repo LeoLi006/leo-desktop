@@ -14,18 +14,23 @@ static class Appearance
     public static Font Body(float size = 9.5f) => new("Microsoft YaHei UI", size, FontStyle.Regular);
     public static GraphicsPath Path(Rectangle bounds, int radius)
     {
-        var path = new GraphicsPath(); int d = radius * 2;
+        radius=Math.Clamp((int)Math.Round(radius*UiTheme.Options.CornerRadius/14d),0,Math.Min(bounds.Width,bounds.Height)/2);var path = new GraphicsPath();if(radius==0){path.AddRectangle(bounds);return path;}int d = radius * 2;
         path.AddArc(bounds.Left, bounds.Top, d, d, 180, 90);
         path.AddArc(bounds.Right - d, bounds.Top, d, d, 270, 90);
         path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
         path.AddArc(bounds.Left, bounds.Bottom - d, d, d, 90, 90);
         path.CloseFigure(); return path;
     }
-    public static void Round(Control control, int radius)
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control,RoundState> rounds=new();
+    internal static void RefreshRound(Control control){if(rounds.TryGetValue(control,out var state))state.Apply();}
+    sealed class RoundState
     {
-        void Apply() { if (control.Width < 2 || control.Height < 2) return; using var path = Path(control.ClientRectangle, Math.Min(radius, Math.Min(control.Width, control.Height) / 2)); var previous = control.Region; control.Region = new Region(path); previous?.Dispose(); }
-        Apply(); control.SizeChanged += (_, _) => Apply();
+        readonly Control control;public int Radius;
+        public RoundState(Control c){control=c;c.SizeChanged+=(_,_)=>Apply();}
+        public void Apply(){if(control.IsDisposed||control.Width<2||control.Height<2)return;using var path=Appearance.Path(control.ClientRectangle,Math.Min(Radius,Math.Min(control.Width,control.Height)/2));var old=control.Region;control.Region=new Region(path);old?.Dispose();}
     }
+    public static void Round(Control control,int radius){var state=rounds.GetValue(control,c=>new RoundState(c));state.Radius=radius;state.Apply();}
+
 }
 
 sealed class SoftPanel : Panel

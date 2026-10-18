@@ -4,9 +4,13 @@ enum QuickKind{Ai,LeoCommand,OpenApp,SearchApp,Clipboard,Web,Todos,AddTodo,Compl
 sealed record QuickIntent(QuickKind Kind,string Value="",string Team="",int DayOffset=0,string Argument="");
 static class QuickRouter
 {
-    public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&(intent.Value is "music_step" or "scene_watch" or "combo_name" or "music_pause"||intent.Value=="music_open"&&intent.Argument.Length>0);}
+    public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&(intent.Value.StartsWith("media_")||intent.Value is "music_step" or "scene_watch" or "combo_name" or "music_pause"||intent.Value=="music_open"&&intent.Argument.Length>0);}
     public static string Team(string text)=>ClubCatalog.Mention(text);
     public static QuickIntent Route(string text){text=text.Trim().TrimEnd('。','！','？','?','!');string team=Team(text);
+        if(text is "媒体控制" or "打开媒体控制" or "打开播放器控制")return new(QuickKind.LeoCommand,"media_open");
+        if(text is "停止播放" or "停止视频")return new(QuickKind.LeoCommand,"media_stop");
+        if(text is "暂停" or "暂停播放" or "暂停视频" or "暂停音乐")return new(QuickKind.LeoCommand,"media_pause");
+        if(text is "播放" or "开始播放" or "继续播放" or "继续视频")return new(QuickKind.LeoCommand,"media_play");
         if(text is "撤销上一步" or "撤销清单操作")return new(QuickKind.LeoCommand,"todo_undo");
         var combo=Regex.Match(text,@"^(?:执行自定义|运行组合|启动组合)[：:\s]*(.+)$");if(combo.Success)return new(QuickKind.LeoCommand,"combo_name",Argument:combo.Groups[1].Value.Trim());
         if(text is "准备看球" or "进入看球模式" or "开始看球")return new(QuickKind.LeoCommand,"scene_watch");
@@ -19,9 +23,9 @@ static class QuickRouter
         task=Regex.Match(text,@"^(?:完成|勾选完成)(?:待办|任务)[：:,，\s]*(.+)$");if(task.Success)return new(QuickKind.CompleteTodo,task.Groups[1].Value);
         if(text is "剪贴板" or "剪切板" or "打开剪贴板" or "打开剪切板" or "搜索剪贴板")return new(QuickKind.Clipboard);
         if(Regex.IsMatch(text,@"^(?:打开|播放|听)(?:我的)?歌单.*$"))return new(QuickKind.LeoCommand,"music_client");
-        if(text is "播放暂停" or "切换音乐播放状态")return new(QuickKind.LeoCommand,"music_pause");
-        if(text is "下一首" or "切歌" or "换一首" or "播放下一首" or "下一曲")return new(QuickKind.LeoCommand,"music_step",Argument:"1");
-        if(text is "上一首" or "播放上一首" or "上一曲")return new(QuickKind.LeoCommand,"music_step",Argument:"-1");
+        if(text is "播放暂停" or "切换音乐播放状态")return new(QuickKind.LeoCommand,"media_toggle");
+        if(text is "下一首" or "切歌" or "换一首" or "播放下一首" or "下一曲" or "下一项" or "下一集" or "下一个视频")return new(QuickKind.LeoCommand,"media_next");
+        if(text is "上一首" or "播放上一首" or "上一曲" or "上一项" or "上一集" or "上一个视频")return new(QuickKind.LeoCommand,"media_previous");
         var musicName=Regex.Match(text,@"^(?:请|帮我)?(?:听|播放)(?:一下)?(?:我的)?[：:\s“""「]*(.+?)[”""」]*$");if(musicName.Success&&text.Length<=36&&!Regex.IsMatch(text,"然后|并且|分析|为什么|如何|怎么样|再播放|^听说|^听起来|^听到|^听不"))return new(QuickKind.LeoCommand,"music_open",Argument:musicName.Groups[1].Value.Trim());
         if(text is "点歌" or "打开点歌" or "音乐面板")return new(QuickKind.LeoCommand,"music_open");
         if(text is "打开足球" or "打开足球窗口" or "足球界面")return new(QuickKind.LeoCommand,"football_open");

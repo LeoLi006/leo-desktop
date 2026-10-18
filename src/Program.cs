@@ -27,6 +27,9 @@ sealed class Preferences
     public List<string> ClipboardBlockedApps{get;set;}=["1Password","Bitwarden","KeePass","KeePassXC","LastPass","Dashlane"];
     public string? SkinId{get;set;}
     public string DisplayName{get;set;}="Leo";
+    public bool MediaModule{get;set;}=true;
+    public List<string> DisabledExtensions{get;set;}=[];
+    public Dictionary<string,ThemeOptions> SkinThemes{get;set;}=new();
     // Read old saved settings once, then omit these retired fields.
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public bool? MatchDayOutfits{get;set;}
@@ -201,6 +204,8 @@ static class Program
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
         if(args.Length==2&&args[0]=="--pet-transparency-test"){try{var checks=PetTransparencyTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
+        if(args.Length==2&&args[0]=="--media-read-test"){Platform51Tests.MediaProbe(args[1]);return;}
+        if(args.Length==2&&args[0]=="--platform51-test"){Platform51Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--theme-desktop-test"){try{var checks=ThemeDesktopTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--skin-animation-test"){try{var checks=SkinAnimationTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--upgrade46-test"){try{var checks=Upgrade46Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
@@ -451,6 +456,7 @@ sealed partial class PetForm : Form
     long rowUntil;
     int launcherOpens;
     Point previousDragPoint;
+    readonly ActionDispatcher commands;
     readonly DragTransition dragTransition = new();
     readonly System.Windows.Forms.Timer fullscreenTimer = new() { Interval = 750 };
     bool hiddenForFullscreen;
@@ -458,7 +464,7 @@ sealed partial class PetForm : Form
     {
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
-        prefs = p; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName);p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        prefs = p;p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -470,7 +476,8 @@ sealed partial class PetForm : Form
         ClientSize = new Size(size, size * 208 / 192);
         var screen = Screen.PrimaryScreen!.WorkingArea;
         Location = p.X == -1 && p.Y == -1 ? new Point(screen.Right - Width - 36, screen.Bottom - Height - 36) : Clamp(new Point(p.X, p.Y));
-        launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);
+        commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null);
+        launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);
         foot = new FootTools(p.PetSize, preview);
         foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;
@@ -527,7 +534,7 @@ sealed partial class PetForm : Form
     {
         RevealDock(true);
         launcher.Hide(); foot.CollapseSearch();
-        if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction), clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
+        if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction){RecognizesExtension=commands.RecognizesExtension,OriginDispatcher=(a,v,s,t)=>commands.ExecuteAsync(new(a,v,s),t)}, clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
         if (!chat.Visible) WindowPositions.Prepare(chat,"chat",Bounds,previewMode);
         chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; chat.Show(); chat.Activate();
     }
@@ -835,7 +842,8 @@ sealed partial class PetForm : Form
         companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
-        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        commands.Dispose();if(!previewMode)OwnedHelpers.Shutdown();
+        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }
     protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
     protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}

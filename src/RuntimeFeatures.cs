@@ -7,8 +7,8 @@ static class Modules
     public static void RequireFootball(){lock(footballGate)if(!footballEnabled)throw new InvalidOperationException("足球已停用，请在设置 → 功能中开启。");}
     public static CancellationTokenSource FootballRequest(CancellationToken caller){lock(footballGate){RequireFootball();return CancellationTokenSource.CreateLinkedTokenSource(caller,footballLife.Token);}}
 
-    public static string? ForAction(string action)=>action.StartsWith("football_")||action=="match_add"?"football":action.StartsWith("music_")?"music":action.StartsWith("proxy_")?"clash":action=="terminal_open"?"terminal":action is "web_search" or "watch_open"?"edge":null;
-    public static bool Enabled(Preferences p,string module)=>module switch{"terminal"=>p.TerminalModule,"clash"=>p.ClashModule,"music"=>p.MusicModule,"football"=>p.FootballModule,"edge"=>p.EdgeModule,_=>true};
+    public static string? ForAction(string action)=>ModuleCatalog.Owner(action)=="core"?null:ModuleCatalog.Owner(action);
+    public static bool Enabled(Preferences p,string module)=>module switch{"terminal"=>p.TerminalModule,"clash"=>p.ClashModule,"music"=>p.MusicModule,"football"=>p.FootballModule,"edge"=>p.EdgeModule,"media"=>p.MediaModule,_=>true};
     public static void Require(Preferences p,string? module){if(module!=null&&!Enabled(p,module))throw new InvalidOperationException("此功能已停用，请在设置 → 功能中开启。");}
 }
 

@@ -15,6 +15,12 @@ static class UiTheme
         new("20232","迈阿密国际","Freedom to dream",R(130,63,96),R(79,47,68),R(255,178,210)),
         new("382","曼城","Blue Moon",R(46,108,150),R(53,81,111),R(142,212,249))];
     static Palette active=Palettes[0];
+    public static ThemeOptions Options{get;private set;}=new();
+    static int revision;
+    internal static object ExportTokens(){var palette=active;var options=Options;string Hex(System.Drawing.Color c)=>"#"+c.R.ToString("X2")+c.G.ToString("X2")+c.B.ToString("X2");return new{skin=palette.Id,name=Name,accent=options.Accent??Hex(palette.Accent),background=Hex(MapCore(R(11,18,33),palette,options)),text=Hex(MapCore(R(237,242,250),palette,options)),radius=options.CornerRadius,opacity=options.Opacity};}
+    public static double WindowOpacity=>Options.Opacity/100d;
+    public static Palette PaletteFor(string id)=>Palettes.FirstOrDefault(p=>p.Id==(SkinLibrary.Find(id)?.BaseTheme??id))??Palettes[0];
+    public static System.Drawing.Color PreviewColor(string id,int r,int g,int b,ThemeOptions options)=>MapCore(R(r,g,b),PaletteFor(id),options);
     static readonly Dictionary<int,System.Drawing.Color> originals=new();
     static readonly ConditionalWeakTable<Control,Style> styles=new();
     static readonly ConditionalWeakTable<ToolStripItem,ItemStyle> items=new();
@@ -31,18 +37,22 @@ static class UiTheme
     public static System.Drawing.Color Color(int r,int g,int b){var raw=R(r,g,b);originals[raw.ToArgb()]=raw;return Map(raw);}
     public static System.Drawing.Color Color(int alpha,int r,int g,int b)=>System.Drawing.Color.FromArgb(alpha,Color(r,g,b));
     public static System.Drawing.Color Color(int alpha,System.Drawing.Color color)=>System.Drawing.Color.FromArgb(alpha,color);
-    static System.Drawing.Color Map(System.Drawing.Color raw)
+    static System.Drawing.Color Map(System.Drawing.Color raw)=>MapCore(raw,active,Options);
+    static System.Drawing.Color MapCore(System.Drawing.Color raw,Palette palette,ThemeOptions options)
     {
-        if(active.Id=="83"||raw.A==0||raw==System.Drawing.Color.LightSalmon||raw==System.Drawing.Color.OrangeRed)return raw;
+        if(raw.A==0||raw==System.Drawing.Color.LightSalmon||raw==System.Drawing.Color.OrangeRed)return raw;
         var c=R(raw.R,raw.G,raw.B);System.Drawing.Color result;
         // Status green, warning/error red and neutral white stay legible and meaningful.
         if(c.G>c.R*1.15&&c.G>c.B*1.1||c.R>180&&c.G<140&&c.B<140)return raw;
-        if(c.R>190&&c.G>145&&c.B<155)result=active.Accent;
+        if(c.R>190&&c.G>145&&c.B<155&&options.Accent!=null)return System.Drawing.Color.FromArgb(raw.A,ColorTranslator.FromHtml(options.Accent));
+        if(c.R>190&&c.G>145&&c.B<155)result=palette.Accent;
+        else if(palette.Id=="83")result=raw;
         else if(c.R>210&&c.G>210&&c.B>210)result=R(239,244,249);
-        else if(c.R>100&&c.G>100&&c.B>100)result=Mix(R(150,161,178),active.Accent,.15);
-        else if(c.R>c.G*1.35&&c.R>55)result=Mix(R(11,16,24),active.Secondary,Math.Clamp(c.R/150d,.22,1));
-        else if(c.B>c.R*1.5&&c.B>95)result=Mix(R(11,16,24),active.Primary,Math.Clamp(c.B/132d,.3,1));
-        else {double level=Math.Clamp((c.R+c.G+c.B)/3d/90,.12,.78);result=Mix(R(10,14,21),active.Primary,level*.48);}
+        else if(c.R>100&&c.G>100&&c.B>100)result=Mix(R(150,161,178),palette.Accent,.15);
+        else if(c.R>c.G*1.35&&c.R>55)result=Mix(R(11,16,24),palette.Secondary,Math.Clamp(c.R/150d,.22,1));
+        else if(c.B>c.R*1.5&&c.B>95)result=Mix(R(11,16,24),palette.Primary,Math.Clamp(c.B/132d,.3,1));
+        else {double level=Math.Clamp((c.R+c.G+c.B)/3d/90,.12,.78);result=Mix(R(10,14,21),palette.Primary,level*.48);}
+        if(options.Brightness!=100&&(result.R+result.G+result.B)/3<140)result=R(Math.Min(255,result.R*options.Brightness/100),Math.Min(255,result.G*options.Brightness/100),Math.Min(255,result.B*options.Brightness/100));
         return System.Drawing.Color.FromArgb(raw.A,result);
     }
     static System.Drawing.Color Canonical(System.Drawing.Color value)
@@ -52,12 +62,12 @@ static class UiTheme
         return value;
     }
     public static void Start(){if(started)return;started=true;Application.Idle+=(_,_)=>{foreach(Form f in Application.OpenForms.Cast<Form>().ToArray())if(!seen.TryGetValue(f,out _)){seen.Add(f,new object());Attach(f);}};}
-    public static void Configure(string id,string? name)
+    public static void Configure(string id,string? name,ThemeOptions? appearance=null)
     {
-        var next=Palettes.FirstOrDefault(p=>p.Id==id)??Palettes[0];string valid;try{valid=ValidateName(name);}catch{valid="Leo";}
-        if(next==active&&valid==Name)return;
+        var next=PaletteFor(id);var options=appearance??new ThemeOptions();try{options.Validate();}catch(ArgumentException){options=new();}string valid;try{valid=ValidateName(name);}catch{valid="Leo";}
+        if(next==active&&valid==Name&&options==Options)return;
         // Capture controls under the old palette before changing tokens.
-        RefreshAll();active=next;Name=valid;RefreshAll();
+        RefreshAll();active=next;Name=valid;Options=options;revision++;RefreshAll();
     }
     internal static void RefreshAll(){foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())Attach(form);}
     internal static void Attach(Control control)
@@ -80,7 +90,7 @@ static class UiTheme
     static void Caption(Form form){if(!form.IsHandleCreated||form.FormBorderStyle==FormBorderStyle.None)return;try{foreach(var pair in new[]{(35,BarcaUi.Canvas),(36,BarcaUi.Text),(34,BarcaUi.Line)}){int value=pair.Item2.R|(pair.Item2.G<<8)|(pair.Item2.B<<16);DwmSetWindowAttribute(form.Handle,pair.Item1,ref value,4);}}catch(DllNotFoundException){}catch(EntryPointNotFoundException){}}
     sealed class Style
     {
-        readonly Control control;System.Drawing.Color back,fore;bool applying;string? text;string rendered="";string skin="",name="";
+        readonly Control control;System.Drawing.Color back,fore;bool applying;string? text;string rendered="";string skin="",name="";int version=-1;
         public Style(Control c){control=c;back=Canonical(c.BackColor);fore=Canonical(c.ForeColor);c.BackColorChanged+=(_,_)=>{if(!applying)back=Canonical(c.BackColor);};c.ForeColorChanged+=(_,_)=>{if(!applying)fore=Canonical(c.ForeColor);};c.ControlAdded+=(_,e)=>{if(e.Control!=null)Attach(e.Control);};c.HandleCreated+=(_,_)=>Apply();if(c is ComboBox combo&&combo.DrawMode==DrawMode.Normal)CompanionUi.ThemeCombo(combo);c.TextChanged+=(_,_)=>{if(!applying)CaptureText();};if(c is ToolStrip strip)strip.ItemAdded+=(_,e)=>ApplyItem(e.Item!);CaptureText();}
         void CaptureText(){if(control is TextBoxBase or ListControl)return;var current=control.Text;if(current==rendered)return;text=Branded(current)?current:null;}
         public void Apply(){if(control.IsDisposed)return;applying=true;try{
@@ -91,7 +101,7 @@ static class UiTheme
             if(text!=null){rendered=Rename(text);if(control.Text!=rendered)control.Text=rendered;}
             if(control.AccessibleName is string label&&Branded(label))control.AccessibleName=Rename(label);
             if(control is DateTimePicker date){date.CalendarMonthBackground=BarcaUi.Surface;date.CalendarForeColor=BarcaUi.Text;date.CalendarTitleBackColor=Appearance.Blue;date.CalendarTitleForeColor=BarcaUi.Text;date.CalendarTrailingForeColor=BarcaUi.Muted;}
-            if(skin!=Skin||name!=Name){if(control is Form window)Caption(window);skin=Skin;name=Name;control.Invalidate(true);}
+            if(skin!=Skin||name!=Name||version!=revision){version=revision;Appearance.RefreshRound(control);if(control is Form top&&top.TopLevel)top.Opacity=top is ThemeEditor?1:WindowOpacity;if(control is Form window)Caption(window);skin=Skin;name=Name;control.Invalidate(true);}
         }finally{applying=false;}}
     }
 }

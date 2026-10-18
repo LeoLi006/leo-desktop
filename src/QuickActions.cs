@@ -25,17 +25,18 @@ sealed partial class ChatForm
     {
         var request=new CancellationTokenSource(TimeSpan.FromSeconds(90));pending=request;send.Enabled=false;stop.Enabled=true;UpdateVoice();
         try{
+            var unified=CommandTranslation.From(intent,"chat");if(appTools?.HasLeo==true&&unified!=null&&intent.Kind is not(QuickKind.Football or QuickKind.SearchApp)){string message=await appTools.ExecuteLeoAsync(unified.Action,unified.Value,request.Token);ClearResults();ResultText(message);LocalDone(message);return;}
             switch(intent.Kind){
                 case QuickKind.LeoCommand:if(appTools==null)throw new InvalidOperationException("功能尚未就绪");ClearResults();var result=await appTools.ExecuteLeoAsync(intent.Value,intent.Argument,request.Token);ResultText(result);LocalDone(result);break;
-                case QuickKind.Todos:case QuickKind.AddTodo:case QuickKind.CompleteTodo:if(todoAction==null)throw new InvalidOperationException("请从 Leo 脚下清单图标打开每日清单");todoAction(intent);LocalDone("已在独立清单中处理");break;
+                case QuickKind.Todos:case QuickKind.AddTodo:case QuickKind.CompleteTodo:if(appTools?.HasLeo==true){var requestAction=CommandTranslation.From(intent,"chat")!;var completed=await appTools.ExecuteLeoAsync(requestAction.Action,requestAction.Value,request.Token);ClearResults();ResultText(completed);LocalDone(completed);break;}if(todoAction==null)throw new InvalidOperationException("请从 Leo 脚下清单图标打开每日清单");todoAction(intent);LocalDone("已在独立清单中处理");break;
                 case QuickKind.Clipboard:if(openClipboard==null)throw new InvalidOperationException("请从 Leo 入口打开剪贴板");openClipboard();ClearResults();ResultText("剪贴板已打开",true);LocalDone("已打开剪贴板");break;
                 case QuickKind.Web:if(appTools!=null)await appTools.ExecuteLeoAsync("web_search",intent.Value,request.Token);else if(!preview)throw new InvalidOperationException("网页搜索尚未就绪");ClearResults();ResultText("已在浏览器搜索",true);ResultText(intent.Value);LocalDone("已打开网页搜索");break;
                 case QuickKind.OpenApp:case QuickKind.SearchApp:
                     ClearResults();ResultText("应用",true);
                     if(intent.Value is "应用" or "软件"||string.IsNullOrWhiteSpace(intent.Value)){ResultText("输入或说：打开微信、打开浏览器。");break;}
                     if(appTools==null)throw new InvalidOperationException("本机应用索引尚未就绪");var apps=appTools.FindLocal(intent.Value);var exact=apps.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(intent.Value)).ToArray();
-                    if(intent.Kind==QuickKind.OpenApp&&(apps.Length==1||exact.Length==1)){var app=exact.Length==1?exact[0]:apps[0];appTools.OpenLocal(app);ResultText("已打开 "+app.Name);LocalDone("已打开"+app.Name);}
-                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,()=>{appTools.OpenLocal(app);LocalDone("已打开"+app.Name);});}break;
+                    if(intent.Kind==QuickKind.OpenApp&&(apps.Length==1||exact.Length==1)){var app=exact.Length==1?exact[0]:apps[0];string message=await appTools.OpenLocalAsync(app);ResultText(message);LocalDone(message);}
+                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,async()=>{try{LocalDone(await appTools.OpenLocalAsync(app));}catch(Exception e){if(!IsDisposed)state.Text=e.Message;}});}break;
                 case QuickKind.Football:Modules.RequireFootball();await ShowFootball(intent,request.Token);break;
             }
         }catch(OperationCanceledException){state.Text="已停止";}catch(Exception e){state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
@@ -43,7 +44,7 @@ sealed partial class ChatForm
     }
     async Task<(TeamData Data,Club Club,bool Stale)> TeamFacts(string name,CancellationToken token)
     {
-        Modules.RequireFootball();var club=Club.For(name);var data=TeamData.Load(club);bool stale=false;
+        Modules.RequireFootball();var club=Club.For(name);if(appTools?.HasLeo==true){using var reply=JsonDocument.Parse(await appTools.ExecuteLeoAsync("football_facts","view:"+name,token));return(reply.RootElement.GetProperty("data").Deserialize<TeamData>()??new(),club,reply.RootElement.GetProperty("stale").GetBoolean());}var data=TeamData.Load(club);bool stale=false;
         if(!preview&&(data.MatchesUpdated<DateTimeOffset.UtcNow.AddMinutes(-10)||data.TableUpdated<DateTimeOffset.UtcNow.AddMinutes(-10))){var result=await TeamData.Fetch(club,data,token);data=result.Data;stale=result.MatchesFailed||result.TableFailed;}
         return(data,club,stale);
     }
@@ -59,7 +60,7 @@ sealed partial class ChatForm
             else{bool recent=System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"近况|最近|上一场|昨天|前天|赛果|比分");IEnumerable<FootballMatch> matches=recent?fact.Data.Matches.Where(m=>m.State=="post").OrderByDescending(m=>m.Kickoff):fact.Data.Matches.Where(m=>m.State!="post"&&m.Kickoff>DateTimeOffset.UtcNow.AddHours(-3)).OrderBy(m=>m.Kickoff);if(System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"昨天|前天|明天|今天")){int offset=intent.Value.Contains("昨天")?-1:intent.Value.Contains("前天")?-2:intent.DayOffset;var date=DateTime.Today.AddDays(offset);matches=fact.Data.Matches.Where(m=>m.Kickoff.LocalDateTime.Date==date).OrderBy(m=>m.Kickoff);}ShowMatches(matches.Take(System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"下一场|上一场")?1:3));lastAnswer="已显示"+fact.Club.Name+"近期比赛。";}
             var time=ranking?fact.Data.TableUpdated:fact.Data.MatchesUpdated;ResultText("ESPN · "+(time==default?"暂无缓存":time.ToLocalTime().ToString("MM-dd HH:mm")+" 更新")+(fact.Stale?" · 更新失败，含旧数据":""));
         }else{
-            var cache=FootballFeed.LoadCache();bool stale=false;if(!preview&&(cache.SchemaVersion<2||cache.Updated<DateTimeOffset.UtcNow.AddMinutes(-10)))try{cache=await FootballFeed.FetchAsync(cache,token);}catch(HttpRequestException){stale=true;}
+            FootballCache cache;bool stale=false;if(appTools?.HasLeo==true){using var reply=JsonDocument.Parse(await appTools.ExecuteLeoAsync("football_facts","view:"+intent.Value,token));cache=reply.RootElement.GetProperty("cache").Deserialize<FootballCache>()??new();stale=reply.RootElement.GetProperty("stale").GetBoolean();}else{cache=FootballFeed.LoadCache();if(!preview&&(cache.SchemaVersion<2||cache.Updated<DateTimeOffset.UtcNow.AddMinutes(-10)))try{cache=await FootballFeed.FetchAsync(cache,token);}catch(HttpRequestException){stale=true;}}
             if(IsDisposed)return;bool overnight=intent.Value.Contains("今晚");var start=DateTimeOffset.Now.Date.AddDays(intent.DayOffset).AddHours(overnight?16:0);var end=start.AddHours(overnight?16:24);
             bool timed=intent.Value.Contains("今晚")||intent.Value.Contains("明天")||intent.Value.Contains("今天");
             var matches=cache.Matches.Where(m=>(FootballFeed.FollowTags(m,FootballForm.FollowingNames).Length>0||FootballFeed.IsFocus(m))&&(timed?m.Kickoff.LocalDateTime>=start&&m.Kickoff.LocalDateTime<end:m.Kickoff>=DateTimeOffset.UtcNow&&m.Kickoff<=DateTimeOffset.UtcNow.AddHours(48))).OrderBy(m=>m.Kickoff).Take(8).ToArray();

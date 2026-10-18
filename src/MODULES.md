@@ -1,0 +1,109 @@
+﻿# Leo 模块接口与独立进程协议
+
+适用 v0.51.0。入口：设置 → 功能 → 管理扩展模块。
+
+## 架构
+
+`ActionDispatcher` 接收带来源的 `ActionRequest`，通过 `ILeoModule` 查找能力、检查启用状态并执行；并发相同请求合并，递归调用拒绝。聊天模型工具、文字、语音、搜索和自定义组合复用此入口。
+
+内置能力通过统一模块适配器提供；外部能力可以是声明式动作或独立进程。安装和启动时不会自动执行扩展命令。内置模块随主程序发布，当前支持停用；外部模块可以独立安装、更新和移除。
+
+## 声明式模块
+
+导入一个UTF-8 JSON文件。字段大小写如下：
+
+```json
+{
+  "Format": "LeoModule/1",
+  "Id": "daily-plan",
+  "Name": "每日计划",
+  "Version": "1.0.0",
+  "Runtime": "actions",
+  "Commands": [
+    {
+      "Id": "today",
+      "Title": "查看今日计划",
+      "Phrases": ["查看今日计划"],
+      "Action": "todos_open",
+      "Value": ""
+    }
+  ]
+}
+```
+
+Id为2～40位小写字母、数字、连字符，首位必须是字母。每模块1～16个命令；命令Id为1～40位同类字符。名称不超过40字符，每条口令不超过60字符。Value为字符串，复杂参数以JSON字符串提供，最多4000字符。
+
+声明式Action只能是当前公开的动作。为避免递归，不允许声明式模块直接调用组合、再次分派文本或运行其他扩展。可以导出示例后修改。
+
+## 独立进程模块
+
+将`module.json`与自己的Windows程序放在ZIP根目录，其他依赖可按原相对目录放入ZIP：
+
+```text
+module.json
+worker.exe
+worker.dll             # 可选依赖
+worker.runtimeconfig.json
+```
+
+声明示例：
+
+```json
+{
+  "Format": "LeoModule/1",
+  "Id": "my-capability",
+  "Name": "我的新能力",
+  "Version": "1.0.0",
+  "Runtime": "stdio",
+  "Executable": "worker.exe",
+  "TimeoutSeconds": 15,
+  "Commands": [
+    {
+      "Id": "run",
+      "Title": "运行我的能力",
+      "Phrases": ["运行我的能力"],
+      "Action": "worker:run",
+      "Value": ""
+    }
+  ]
+}
+```
+
+Leo以当前用户权限启动包内程序，附加固定参数`--leo-module`，通过标准输入写入一行UTF-8 JSON，随后关闭标准输入。程序不得依赖当前桌面前台或把日志写入标准输出。
+
+请求示例（实际路径和requestId由Leo生成）：
+
+```json
+{"protocol":"LeoModule/1","requestId":"随机id","command":"run","value":"","dataDirectory":"模块专用本地数据目录","origin":"search","theme":{"skin":"83","name":"Leo","accent":"#E7C277","background":"#0B1221","text":"#EDF2FA","radius":14,"opacity":100}}
+```
+
+命令为`worker:`之后的名称。Value默认来自声明；`module_run`可以用JSON字符串`{"id":"ext:my-capability:run","value":"参数"}`覆盖本次参数。主题字段提供当前显示名、基础球队及配色，方便模块自行呈现相同外观。
+
+程序返回一行UTF-8 JSON，并正常退出：
+
+```json
+{"ok":true,"message":"已完成具体操作"}
+```
+
+失败时使用`ok:false`和具体原因。响应行最多64KB，message最多4000字符；非零退出、无响应、格式错误和超时均视为失败。默认超时15秒，可设置1～120秒；取消或超时结束扩展进程及其子进程。标准错误可以输出诊断日志，Leo只排空流，不上传。退出Leo会取消未完成动作并结束其持有的辅助进程；不将QQ音乐或PotPlayer登记为辅助进程。
+
+独立进程是协议边界，不是权限沙箱：程序具有当前用户权限。导入会展示运行类型和动作，执行只在用户触发后发生。不要把API Key等私人配置写进发布的模块包；模块自己的状态放在请求提供的数据目录，避免更新覆盖。
+
+## 更新、移除与文件范围
+
+- 同Id更新必须提高数字版本号，如1.0.0 → 1.1.0。
+- 运行或排队时不更新、不移除。ZIP先解压到临时目录，成功后替换模块目录；替换失败保留旧模块。
+- ZIP最多64MB，展开最多256MB、2000文件。拒绝越界路径、重复路径、链接及不支持的脚本文件。
+- 允许的文件类型：exe、dll、json、png、txt、md、dat、bin；可执行文件必须在根目录。
+- 程序目录：`modules/<id>`；状态目录：`module-data/<id>`。移除保留状态目录。
+- 不在主进程内加载第三方DLL；模块可以使用自身进程需要的DLL或运行时。
+- 模块自己的联网/API行为由其实现决定，Leo不自动把本机API Key交给扩展。
+
+## 调用
+
+- 搜索框：`:运行我的能力` 或 `:ext:my-capability:run`。
+- 聊天和语音：说出名字或已登记的口令。
+- 自定义组合：新增“统一指令”步骤。
+- 模型工具：先`module_list`读取可用动作，再用`module_run`传入返回的精确ext动作Id。列表不包含声明中的固定参数值。
+
+内置明确命令优先；扩展口令相互冲突时拒绝随机执行。当前协议只返回文本结果；需要复杂界面的模块可自行提供界面，并读取主题字段适配外观。

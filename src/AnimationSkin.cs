@@ -8,7 +8,7 @@ sealed class AnimationSkin:IDisposable
     public readonly string NameOfKit;
     public readonly DockSprites Dock;
     public readonly DockBridge Bridge;
-    public static string? Name(string? id)=>id switch{"382"=>"city","20232"=>"miami","202"=>"argentina","164"=>"spain",_=>null};
+    public static string? Name(string? id)=>id switch{"382"=>"city","20232"=>"miami","202"=>"argentina","164"=>"spain",_=>SkinLibrary.Find(id)?.Id};
     public AnimationSkin(string name)
     {
         NameOfKit=name;KitTexture.Load(name);string root=Path.Combine(Store.Root,"assets");
@@ -28,7 +28,7 @@ sealed partial class PetForm
         var name=AnimationSkin.Name(SkinSelection.Id(prefs));
         if(name==null||failedSkins.Contains(name))return null;
         if(animationSkins.TryGetValue(name,out var skin))return skin;
-        try{skin=new(name);animationSkins.Add(name,skin);return skin;}
+        try{if(animationSkins.Count>=8){var oldest=animationSkins.First();oldest.Value.Dispose();animationSkins.Remove(oldest.Key);}skin=new(name);animationSkins.Add(name,skin);return skin;}
         catch(IOException){failedSkins.Add(name);return null;}
         catch(ArgumentException){failedSkins.Add(name);return null;}
     }

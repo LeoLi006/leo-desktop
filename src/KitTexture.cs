@@ -8,14 +8,15 @@ sealed class KitTexture
     readonly Dictionary<Size,KitTexture> details=new();
     readonly Bitmap image;
     readonly byte[] pixels;readonly int width,height,stride;
-    KitTexture(string name):this(new Bitmap(Path.Combine(Store.Root,"assets","MatchDay","Kits",name+"-2024.png"))){}
+    KitTexture(string name):this(ReadTexture(name)){}
+    static Bitmap ReadTexture(string name){using var source=new Bitmap(name.StartsWith("custom:")?SkinLibrary.TexturePath(name):Path.Combine(Store.Root,"assets","MatchDay","Kits",name+"-2024.png"));var image=new Bitmap(source.Width,source.Height,PixelFormat.Format32bppArgb);using var g=Graphics.FromImage(image);g.DrawImageUnscaled(source,0,0);return image;}
     KitTexture(Bitmap prepared)
     {
         image=prepared;width=image.Width;height=image.Height;
         var bits=image.LockBits(new Rectangle(Point.Empty,image.Size),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
         try{stride=Math.Abs(bits.Stride);pixels=new byte[stride*height];Marshal.Copy(bits.Scan0,pixels,0,pixels.Length);}finally{image.UnlockBits(bits);}
     }
-    public static KitTexture Load(string name){if(!cache.TryGetValue(name,out var value)){value=new(name);cache.Add(name,value);}return value;}
+    public static KitTexture Load(string name){if(!cache.TryGetValue(name,out var value)){if(cache.Count>=12){var oldest=cache.First();foreach(var detail in oldest.Value.details.Values)detail.image.Dispose();oldest.Value.image.Dispose();cache.Remove(oldest.Key);}value=new(name);cache.Add(name,value);}return value;}
     public KitTexture Detail(int targetWidth,int targetHeight)
     {
         var size=new Size(Math.Max(4,targetWidth),Math.Max(4,targetHeight));

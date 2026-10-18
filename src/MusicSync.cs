@@ -5,6 +5,7 @@ sealed partial class PetForm
     async Task ToggleLyricsWithFeedback(){try{Modules.Require(prefs,"music");if(!previewMode)OperationFeedback.Show(await QQNative.ToggleLyrics());}catch(Exception e){if(!IsDisposed&&!Disposing)OperationFeedback.Error(e.Message);}}
     void WireMusicMenu(ContextMenuStrip menu)
     {
+        var media=new ToolStripMenuItem("媒体控制…");media.Click+=(_,_)=>ShowMedia();menu.Items.Insert(Math.Max(0,menu.Items.Count-1),media);menu.Opening+=(_,_)=>media.Visible=prefs.MediaModule;
         var root=new ToolStripMenuItem("音乐");
         void Item(string name,Func<Task> action){root.DropDownItems.Add(name,null,async(_,_)=>{try{Modules.Require(prefs,"music");if(!IsDisposed)await action();}catch(Exception e){if(!IsDisposed&&!Disposing)OperationFeedback.Error(e.Message);}});}
         Item("快速点歌…",()=>{launcher.OpenMusicFromAssistant();return Task.CompletedTask;});

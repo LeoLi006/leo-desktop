@@ -41,6 +41,8 @@ sealed class ComboStore
             switch (step.Kind)
             {
                 case "url": FootTools.ValidateUrl(step.Value); break;
+                case "command":if(string.IsNullOrWhiteSpace(step.Value)||step.Value.Length>200)throw new ArgumentException("请填写不超过200字的本地指令");break;
+                case "media_toggle":case "media_pause":case "media_next":case "media_previous":break;
                 case "app": if (string.IsNullOrWhiteSpace(step.Value)) throw new ArgumentException("请选择应用"); break;
                 case "watch": if (!int.TryParse(step.Value,out int index) || index is < -1 or >3) throw new ArgumentException("请选择观赛入口"); break;
                 case "qq_client": case "proxy_on": case "proxy_off": case "todos": case "football": case "chat": break;
@@ -100,20 +102,17 @@ sealed partial class PetForm
     }
     (string,Func<Task>) BuildComboStep(ComboStep step)
     {
-        Modules.Require(prefs,step.Kind is "proxy_on" or "proxy_off"?"clash":step.Kind is "url" or "watch"?"edge":step.Kind=="qq_client"?"music":null);
         string label=step.Label.Length>0?step.Label:step.Kind;
-        switch(step.Kind)
-        {
-            case "proxy_on":case "proxy_off":bool enabled=step.Kind=="proxy_on";return(label,async()=>{await ClientOperations.Proxy(enabled);});
-            case "url":var start=FootTools.EdgeUrlStart(step.Value);return(label,()=>{Process.Start(start);return Task.CompletedTask;});
-            case "watch":var links=new WatchLinkStore(Path.Combine(Store.Root,"leo-watch-links.json")).Items;int index=int.Parse(step.Value);var link=index<0?links.FirstOrDefault(l=>l.Url.Length>0):links.ElementAtOrDefault(index);if(link==null||link.Url.Length==0)throw new ArgumentException("请先在足球窗口填写观赛网址，或编辑组合改用网址操作");var watch=FootTools.EdgeUrlStart(link.Url);return(link.Name,()=>{Process.Start(watch);return Task.CompletedTask;});
-            case "app":var app=launcher.FileApplications.FirstOrDefault(a=>a.Target.Equals(step.Value,StringComparison.OrdinalIgnoreCase))??throw new ArgumentException("应用未找到或索引尚未就绪，请稍后重试或重新选择应用");return(app.Name,()=>{launcher.LaunchFromAssistant(app);return Task.CompletedTask;});
-            case "qq_client":return("打开QQ音乐",()=>{QQMusic.OpenClient();return Task.CompletedTask;});
-            case "todos":return("打开清单",()=>{ShowTodos();return Task.CompletedTask;});
-            case "football":return("打开足球",()=>{launcher.OpenFootballFromAssistant();return Task.CompletedTask;});
-            case "chat":return("打开聊天",()=>{ShowChat();return Task.CompletedTask;});
-            default:throw new ArgumentException("不支持的组合操作");
-        }
+        if(step.Kind=="command")return(label,async()=>{await commands.ExecuteTextAsync(step.Value,"combo");});
+        var request=ComboRequest(step);Modules.Require(prefs,Modules.ForAction(request.Action));return(label,async()=>{await commands.ExecuteAsync(request);});
+    }
+    ActionRequest ComboRequest(ComboStep step)
+    {
+        string action=step.Kind switch{"url"=>"web_open","app"=>"app_open","watch"=>"watch_open","qq_client"=>"music_client","todos"=>"todos_open","football"=>"football_open","chat"=>"chat_open",_=>step.Kind};string value=step.Value;
+        if(step.Kind=="app"){var app=launcher.FileApplications.FirstOrDefault(a=>a.Target.Equals(value,StringComparison.OrdinalIgnoreCase))??throw new ArgumentException("应用未找到或索引尚未就绪");value=AppTools.Id(app);}
+        if(step.Kind=="url")FootTools.ValidateUrl(value);
+        if(step.Kind=="watch"){var links=new WatchLinkStore(previewMode?null:Path.Combine(Store.Root,"leo-watch-links.json")).Items;int index=int.Parse(value);if(index<0)index=Array.FindIndex(links,l=>l.Url.Length>0);if(index<0||index>=links.Length||links[index].Url.Length==0)throw new ArgumentException("请先填写观赛网址");value=(index+1).ToString();}
+        return new(action,value,"combo");
     }
     void EditCombo(string? id=null,Rectangle? near=null)
     {
