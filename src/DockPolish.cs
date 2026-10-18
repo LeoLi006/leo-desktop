@@ -1,0 +1,31 @@
+using System.Drawing.Imaging;
+namespace LeoLauncher;
+sealed partial class PetForm
+{
+    Size lastDragMovement;Bitmap? dragPickup;long pickupStarted;
+    void DrawNormalPet(Graphics graphics,RectangleF target,float opacity)
+    {
+        bool vertical=row is 11 or 12;using var attributes=new ImageAttributes();attributes.SetColorMatrix(new ColorMatrix{Matrix33=opacity});
+        graphics.DrawImage(vertical?verticalAtlas:atlas,Rectangle.Round(target),frame*192,(vertical?row-11:row)*208,192,208,GraphicsUnit.Pixel,attributes);
+    }
+    void BeginDragPickup()
+    {
+        lastDragMovement=Size.Empty;if(dockMotion.Progress<=.001f)return;
+        var previous=dragPickup;dragPickup=null;previous?.Dispose();var snapshot=new Bitmap(Width,Height);using(var g=Graphics.FromImage(snapshot))DrawPet(g,PetDrawingBounds(ClientSize));dragPickup=snapshot;pickupStarted=clock.ElapsedMilliseconds;
+    }
+    bool DrawDragPickup(Graphics graphics,RectangleF target)
+    {
+        if(dragPickup==null)return false;float t=Math.Clamp((clock.ElapsedMilliseconds-pickupStarted)/160f,0,1);
+        if(t>=1){var expired=dragPickup;dragPickup=null;expired.Dispose();return false;}
+        DrawNormalPet(graphics,target,t);using var attributes=new ImageAttributes();attributes.SetColorMatrix(new ColorMatrix{Matrix33=1-t});
+        graphics.DrawImage(dragPickup,Rectangle.Round(target),0,0,dragPickup.Width,dragPickup.Height,GraphicsUnit.Pixel,attributes);return true;
+    }
+    internal Dictionary<string,bool> VerifyDockPolish()
+    {
+        var checks=new Dictionary<string,bool>();RevealDock(true);dockSide=DockSide.Left;dockMotion.BeginTuck(0);for(int t=32;t<=650;t+=32)dockMotion.Tick(t,true,false);
+        dockMotion.Reveal(650);dockMotion.Tick(682,true,true);float partial=dockMotion.Progress;BeginDragPickup();bool captured=dragPickup!=null;RevealDock(true);
+        using var image=new Bitmap(Width,Height);using var g=Graphics.FromImage(image);DrawPet(g,PetDrawingBounds(ClientSize));checks["unfolding_drag_captures_and_blends_current_pose"]=partial>0&&partial<1&&captured&&dragPickup!=null&&dockMotion.Progress==0;
+        pickupStarted=clock.ElapsedMilliseconds-170;DrawPet(g,PetDrawingBounds(ClientSize));checks["drag_pickup_expires_without_loop_or_disposed_image"]=dragPickup==null;
+        return checks;
+    }
+}

@@ -96,7 +96,8 @@ sealed class FootTools : Form
             proxyBusy = true; proxyButton.Enabled = false; tip.SetToolTip(proxyButton, "正在切换 Clash 系统代理…");
             bool desired=target??(ClashProxy.ReadStatus().Enabled!=true);
             OperationFeedback.Pending(desired?"正在开启系统代理…":"正在关闭系统代理…");
-            try { await Task.Run(()=>ClashProxy.SetEnabled(desired));OperationFeedback.Show(desired?"系统代理已开启":"系统代理已关闭"); }
+            try { await ClientOperations.Proxy(desired);OperationFeedback.Show(desired?"系统代理已开启":"系统代理已关闭"); }
+            catch(OperationCanceledException){}
             catch (Exception error) { if (!IsDisposed) OperationFeedback.Error(error.Message,()=>ChangeProxy(desired)); }
             finally { if (!IsDisposed) { proxyBusy = false; proxyButton.Enabled = true; RefreshProxy(); } }
         }

@@ -27,6 +27,7 @@ sealed class Preferences
     public bool TerminalModule { get; set; } = true;
     public bool ClashModule { get; set; } = true;
     public bool MusicModule { get; set; } = true;
+    public bool FootballModule { get; set; } = true;
     public bool EdgeModule { get; set; } = true;
 }
 
@@ -174,9 +175,13 @@ static class Program
         if(args.Length==1&&args[0]=="--enable-startup"){LeoStartup.SetEnabled(true);return;}
         Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         Application.EnableVisualStyles();
+        if(args.Length>0&&args[0]=="--dock-animation-test")Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         BarcaScrollTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--package-smoke-test"){try{var checks=PackageSmokeTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
+        if(args.Length==2&&args[0]=="--package-verify"){try{var release=LeoInstaller.Verify(AppContext.BaseDirectory);bool selfContained=new[]{typeof(object).Assembly.Location,typeof(Form).Assembly.Location}.All(p=>p.StartsWith(AppContext.BaseDirectory,StringComparison.OrdinalIgnoreCase));File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=selfContained,version=release.Version,files=release.Files.Count,self_contained=selfContained}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.Message}));Environment.ExitCode=1;}return;}
+        if(args.Length==1&&args[0]=="--install-wizard"){Application.Run(new InstallForm());return;}
         if(args.Length==2&&args[0]=="--ask-data-test")
         {
             int models=0;using var window=new ChatForm(false,new ChatSettings(),()=>{models++;throw new InvalidOperationException("不应请求模型");});window.Opacity=0;window.Show();Application.DoEvents();
@@ -184,12 +189,14 @@ static class Program
             Pump(window.PreviewSendAsync("曼城排第几"));bool table=window.PreviewTableRows>0;string first=window.PreviewState;Pump(window.PreviewSendAsync("巴萨下一场什么时候"));bool matches=window.PreviewMatchCards>0;
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
+        if(args.Length==2&&args[0]=="--upgrade45-test"){var checks=Upgrade45Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
+        if(args.Length==2&&args[0]=="--client-operations-test"){var checks=Task.Run(ClientOperationTests.Check).GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--proxy-cold-test"){var result=Task.Run(ProxyFeatureTests.ColdLive).GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(result,new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--proxy-startup-test"){var checks=ProxyFeatureTests.Startup();File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--proxy-silent-test"){var checks=ProxyFeatureTests.Silent();File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--proxy-feature-test"){var checks=ProxyFeatureTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--proxy-live-test"){var result=Task.Run(ProxyFeatureTests.Live).GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(result,new JsonSerializerOptions{WriteIndented=true}));return;}
-        if(args.Length==2&&args[0]=="--dock-animation-test"){var checks=DockAnimationTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
+        if(args.Length==2&&args[0]=="--dock-animation-test"){try{var checks=DockAnimationTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--upgrade38-test"){var checks=Upgrade38Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--qq-pause-send"){try{string result=QQPlayback.ToggleAsync().GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(new{sent=true,result}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{sent=false,error=e.Message}));Environment.ExitCode=1;}return;}
         if(args.Length==2&&args[0]=="--startup-live-test"){
@@ -383,7 +390,9 @@ static class Program
         if (!created) { MessageBox.Show("Leo 已在运行。请先右键旧版小羊并退出，再启动新版。", "Leo"); return; }
         try
         {
-            using var pet = new PetForm(isPreview ? new Preferences() : Store.Load(), isPreview, args.Length == 2 && args[0] == "--preview-demo");
+            var current=isPreview?new Preferences():Store.Load();
+            if(!isPreview&&!File.Exists(Store.FilePath)){using var welcome=new FirstRunForm(current);if(welcome.ShowDialog()!=DialogResult.OK)return;}
+            using var pet = new PetForm(current, isPreview, args.Length == 2 && args[0] == "--preview-demo");
             if (args.Length == 2 && args[0].StartsWith("--preview"))
             {
                 pet.Show();
@@ -431,6 +440,7 @@ sealed partial class PetForm : Form
     bool hiddenForFullscreen;
     public PetForm(Preferences p, bool preview = false, bool demo = false)
     {
+        if(!preview)Modules.SetFootball(p.FootballModule);
         prefs = p; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
@@ -466,7 +476,7 @@ sealed partial class PetForm : Form
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
         tray.DoubleClick += (_, _) => ShowLauncher();
         // Dock hover is handled by the animation timer so shrinking hit bounds cannot cancel tucking.
-        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { dockClickReveal=dockMotion.Progress>.001f; RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
+        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { dockClickReveal=dockMotion.Progress>.001f; BeginDragPickup();RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
         hit.MouseMove += (_, e) => {
             if (!hit.Capture || (Control.MouseButtons & MouseButtons.Left) == 0) return;
             var delta = new Size(Cursor.Position.X - mouseDown.X, Cursor.Position.Y - mouseDown.Y);
@@ -477,7 +487,7 @@ sealed partial class PetForm : Form
             bool revealOnly=dockClickReveal;dockClickReveal=false;
             hit.Capture = false;
             if (movedWhileLocked) return;
-            if (dragging) { if(prefs.EdgeDocking)Location=Clamp(EdgeDock.Snap(Bounds,Screen.FromControl(this).WorkingArea,foot.ReservedSpace)); prefs.X = Left; prefs.Y = Top; if(!previewMode)Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
+            if (dragging) { if(prefs.EdgeDocking){var area=Screen.FromControl(this).WorkingArea;dockSide=EdgeDock.ChooseSide(Bounds,area,foot.ReservedSpace,lastDragMovement);Location=Clamp(EdgeDock.Snap(Bounds,area,foot.ReservedSpace,movement:lastDragMovement));} prefs.X = Left; prefs.Y = Top; if(!previewMode)Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
             else if(!revealOnly) {
                 row = 3; rowUntil = clock.ElapsedMilliseconds + 800; frame = 0;
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
@@ -543,7 +553,7 @@ sealed partial class PetForm : Form
         {
             var point = origin + delta;
             var movement = new Size(point.X - previousDragPoint.X, point.Y - previousDragPoint.Y);
-            previousDragPoint = point;
+            previousDragPoint = point;if(movement.Width!=0||movement.Height!=0)lastDragMovement=movement;
             Location = Clamp(point);
             if (movement.Width != 0 || movement.Height != 0)
             {
@@ -584,13 +594,14 @@ sealed partial class PetForm : Form
     }
     protected override void OnPaint(PaintEventArgs e)
     {
+        if(resourcesDisposed)return;
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
         // Window sizing and DPI must never stretch the sprite independently on each axis.
         DrawPet(e.Graphics, PetDrawingBounds(ClientSize));
     }
     void DrawPet(Graphics graphics, RectangleF destination)
     {
-        if(DrawDockPet(graphics,destination))return;
+        if(DrawDragPickup(graphics,destination)||DrawDockPet(graphics,destination))return;
         bool vertical = row is 11 or 12;
         graphics.DrawImage(vertical ? verticalAtlas : atlas, destination, new Rectangle(frame * 192, (vertical ? row - 11 : row) * 208, 192, 208), GraphicsUnit.Pixel);
     }
@@ -790,7 +801,7 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
-        dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();
+        dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }

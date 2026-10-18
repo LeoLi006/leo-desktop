@@ -163,7 +163,7 @@ static class ClashProxy
         }
         return null;
     }
-    public static ProxyStatus SetEnabled(bool desired) { lock (changeGate) return Change(desired); }
+    public static ProxyStatus SetEnabled(bool desired,CancellationToken token=default,Action<string>? progress=null) { lock (changeGate) return Change(desired,token,progress); }
     public static ProxyStatus Toggle() { lock (changeGate) { var before = ReadStatus(); return Change(!before.Running || before.Enabled != true); } }
     static bool ListenerReady()
     {
@@ -173,17 +173,20 @@ static class ClashProxy
             return connect.Wait(180)&&client.Connected;
         }catch{return false;}
     }
-    static ProxyStatus Change(bool desired)
+    static ProxyStatus Change(bool desired,CancellationToken token=default,Action<string>? progress=null)
     {
+        token.ThrowIfCancellationRequested();
         var before=ReadStatus();bool cold=!before.Running;
         if(cold){
             if(!desired)return new(false,false,"Clash Verge 未运行，无需关闭代理");
             string path=ClientPath()??throw new InvalidOperationException("未找到 Clash Verge，请在设置中指定客户端路径");
+            progress?.Invoke("正在静默启动 Clash…");token.ThrowIfCancellationRequested();
             PrepareSilentStart();
             using var started=Process.Start(new ProcessStartInfo(path){UseShellExecute=true,WindowStyle=ProcessWindowStyle.Hidden});
             if(started==null)throw new IOException("Clash Verge 未能启动");
         }else if(before.Enabled==null)throw new InvalidOperationException(before.Description);
-        return ProxyRequest.Complete(desired,TimeSpan.FromSeconds(cold?45:10),ReadStatus,ListenerReady,TryApply,()=>Thread.Sleep(250));
+        progress?.Invoke("正在等待 Clash 就绪…");
+        return ProxyRequest.Complete(desired,TimeSpan.FromSeconds(cold?45:10),()=>{token.ThrowIfCancellationRequested();return ReadStatus();},ListenerReady,(target,state)=>{token.ThrowIfCancellationRequested();progress?.Invoke(target?"正在开启系统代理并确认状态…":"正在关闭系统代理并确认状态…");return TryApply(target,state);},()=>{if(token.WaitHandle.WaitOne(250))token.ThrowIfCancellationRequested();});
     }
     static bool TryApply(bool desired,ProxyStatus before)
     {

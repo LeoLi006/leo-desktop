@@ -22,24 +22,18 @@ static class QQNative
     public static byte[] Packet(string command){if(command.Length>4096)throw new ArgumentException("控制命令过长");var text=Encoding.Unicode.GetBytes(command);using var stream=new MemoryStream();using var writer=new BinaryWriter(stream);writer.Write(18+text.Length);writer.Write(0x514d4153);writer.Write((ushort)100);writer.Write(4);writer.Write(text.Length);writer.Write(text);return stream.ToArray();}
     public static ProcessStartInfo StartupRequest(string path)=>new(path){Arguments="/silent",UseShellExecute=true,WindowStyle=ProcessWindowStyle.Hidden};
     static readonly SemaphoreSlim playbackGate=new(1,1);
-    public static async Task PlayAsync(MusicSong song,CancellationToken token=default){
-        _=PlayCommand(song);
-        await playbackGate.WaitAsync(token);
-        try{
-            if(FindWindow(EndpointClass,EndpointTitle)==IntPtr.Zero){
-                string path=QQMusic.ClientPath()??throw new InvalidOperationException("未找到QQ音乐，请先安装客户端");
-                using var started=Process.Start(StartupRequest(path));
-                if(started==null)throw new IOException("QQ音乐未能启动，请稍后重试");
-                var watch=Stopwatch.StartNew();
-                while(FindWindow(EndpointClass,EndpointTitle)==IntPtr.Zero||FindWindow("QQMusic_Daemon_Wnd",null!)==IntPtr.Zero){
-                    if(watch.Elapsed>TimeSpan.FromSeconds(25))throw new TimeoutException("QQ音乐启动超时，请检查客户端是否需要登录或更新");
-                    await Task.Delay(250,token);
-                }
-                await Task.Delay(1000,token);
-            }
-            token.ThrowIfCancellationRequested();
-            await Task.Run(()=>Play(song),token);
-        }finally{playbackGate.Release();}
+    internal static bool Ready=>FindWindow(EndpointClass,EndpointTitle)!=IntPtr.Zero&&FindWindow("QQMusic_Daemon_Wnd",null!)!=IntPtr.Zero;
+    internal static async Task EnsureReadyAsync(CancellationToken token,Action<string>? progress)
+    {
+        bool started=false;
+        if(FindWindow(EndpointClass,EndpointTitle)==IntPtr.Zero){string path=QQMusic.ClientPath()??throw new InvalidOperationException("未找到QQ音乐，请先安装客户端");progress?.Invoke("正在静默启动 QQ音乐…");token.ThrowIfCancellationRequested();using var process=Process.Start(StartupRequest(path));if(process==null)throw new IOException("QQ音乐未能启动，请稍后重试");started=true;}
+        progress?.Invoke("正在等待 QQ音乐就绪…");var watch=Stopwatch.StartNew();while(!Ready){token.ThrowIfCancellationRequested();if(watch.Elapsed>TimeSpan.FromSeconds(25))throw new TimeoutException("QQ音乐启动超时，请检查客户端是否需要登录或更新");await Task.Delay(250,token);}
+        if(started)await Task.Delay(1000,token);
+    }
+    public static async Task PlayAsync(MusicSong song,CancellationToken token=default,Action<string>? progress=null)
+    {
+        _=PlayCommand(song);await playbackGate.WaitAsync(token);
+        try{await EnsureReadyAsync(token,progress);token.ThrowIfCancellationRequested();progress?.Invoke("正在点歌并确认客户端接收…");await Task.Run(()=>Play(song),token);}finally{playbackGate.Release();}
     }
     public static void Play(MusicSong song){string command=PlayCommand(song);var target=Endpoint();using var process=target.Process;var bytes=Packet(command);IntPtr ptr=Marshal.AllocHGlobal(bytes.Length);try{Marshal.Copy(bytes,0,ptr,bytes.Length);var data=new CopyData{Size=bytes.Length,Bytes=ptr};if(SendMessageTimeout(target.Hwnd,0x4a,IntPtr.Zero,ref data,3,2000,out _)==IntPtr.Zero)throw new IOException("QQ音乐暂未响应点歌，请稍后重试");}finally{Marshal.FreeHGlobal(ptr);}}
     public static string PlaybackTitle()=>Title(FindWindow("QQMusic_Daemon_Wnd",null!));

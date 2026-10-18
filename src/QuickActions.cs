@@ -36,14 +36,14 @@ sealed partial class ChatForm
                     if(appTools==null)throw new InvalidOperationException("本机应用索引尚未就绪");var apps=appTools.FindLocal(intent.Value);var exact=apps.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(intent.Value)).ToArray();
                     if(intent.Kind==QuickKind.OpenApp&&(apps.Length==1||exact.Length==1)){var app=exact.Length==1?exact[0]:apps[0];appTools.OpenLocal(app);ResultText("已打开 "+app.Name);LocalDone("已打开"+app.Name);}
                     else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,()=>{appTools.OpenLocal(app);LocalDone("已打开"+app.Name);});}break;
-                case QuickKind.Football:await ShowFootball(intent,request.Token);break;
+                case QuickKind.Football:Modules.RequireFootball();await ShowFootball(intent,request.Token);break;
             }
         }catch(OperationCanceledException){state.Text="已停止";}catch(Exception e){state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
         finally{pending=null;request.Dispose();if(!IsDisposed){send.Enabled=true;UpdateVoice();input.Focus();}}
     }
     async Task<(TeamData Data,Club Club,bool Stale)> TeamFacts(string name,CancellationToken token)
     {
-        var club=Club.For(name);var data=TeamData.Load(club);bool stale=false;
+        Modules.RequireFootball();var club=Club.For(name);var data=TeamData.Load(club);bool stale=false;
         if(!preview&&(data.MatchesUpdated<DateTimeOffset.UtcNow.AddMinutes(-10)||data.TableUpdated<DateTimeOffset.UtcNow.AddMinutes(-10))){var result=await TeamData.Fetch(club,data,token);data=result.Data;stale=result.MatchesFailed||result.TableFailed;}
         return(data,club,stale);
     }

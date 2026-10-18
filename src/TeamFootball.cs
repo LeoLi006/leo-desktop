@@ -38,10 +38,11 @@ sealed class TeamData
     }
     public static async Task<(TeamData Data,bool MatchesFailed,bool TableFailed)> Fetch(Club club,TeamData old,CancellationToken token)
     {
+        using var moduleRequest=Modules.FootballRequest(token);token=moduleRequest.Token;
         using var http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromSeconds(20)};
         async Task<string?> Get(string url){try{return await http.GetStringAsync(url,token);}catch(OperationCanceledException)when(token.IsCancellationRequested){throw;}catch{return null;}}
         var responses=await Task.WhenAll(Get(FootballFeed.Base+"all/teams/"+club.Id+"/schedule"),Get(FootballFeed.Base+"all/teams/"+club.Id+"/schedule?fixture=true"),Get("https://site.api.espn.com/apis/v2/sports/soccer/"+club.League+"/standings"));
-        var data=new TeamData{Matches=old.Matches,Rows=old.Rows,MatchesUpdated=old.MatchesUpdated,TableUpdated=old.TableUpdated,Season=old.Season};
+        token.ThrowIfCancellationRequested();var data=new TeamData{Matches=old.Matches,Rows=old.Rows,MatchesUpdated=old.MatchesUpdated,TableUpdated=old.TableUpdated,Season=old.Season};
         bool mf=true,tf=true;
         if(responses[0]!=null&&responses[1]!=null)try{
             var all=FootballFeed.Parse(responses[0]!).Concat(FootballFeed.Parse(responses[1]!)).Where(m=>m.HomeId==club.Id||m.AwayId==club.Id).DistinctBy(m=>m.Id).ToArray();

@@ -3,29 +3,31 @@ namespace LeoLauncher;
 sealed class HealthChecksView:Panel
 {
     readonly Label result=new(){AutoSize=true,MaximumSize=new Size(560,0),Font=BarcaUi.Font(9.5f),ForeColor=BarcaUi.Text,Location=new Point(10,10)};
-    public Action? StartupFixed;
+    public Action? StartupFixed,RepairPaths,RepairHotkeys;
+    readonly BarcaButton startup=new(){Text="启用 / 修复启动",Size=new Size(150,32)},paths=new(){Text="修复软件路径…",Size=new Size(150,32)},shortcuts=new(){Text="处理快捷键冲突…",Size=new Size(165,32)};
     readonly Preferences prefs;readonly bool preview;readonly Func<string>? hotkeys;
     readonly CancellationTokenSource lifetime=new();
     public HealthChecksView(Preferences current,bool demo,Func<string>? shortcutState)
     {
         prefs=current;preview=demo;hotkeys=shortcutState;Dock=DockStyle.Fill;
         var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true};scroll.Controls.Add(result);scroll.Resize+=(_,_)=>result.MaximumSize=new Size(Math.Max(120,scroll.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-20),0);
-        var tools=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=45};
-        var refresh=new BarcaButton{Text="重新检查",Size=new Size(110,32)};var startup=new BarcaButton{Text="修复开机启动",Size=new Size(140,32)};var api=new BarcaButton{Text="检测 API 连接",Size=new Size(145,32)};
-        tools.Controls.AddRange([refresh,startup,api]);Controls.Add(scroll);Controls.Add(tools);
+        var tools=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=86};
+        var refresh=new BarcaButton{Text="重新检查",Size=new Size(110,32)};var api=new BarcaButton{Text="检测 API 连接",Size=new Size(145,32)};
+        tools.Controls.AddRange([refresh,startup,api,paths,shortcuts]);paths.Click+=(_,_)=>{RepairPaths?.Invoke();Check();};shortcuts.Click+=(_,_)=>RepairHotkeys?.Invoke();Controls.Add(scroll);Controls.Add(tools);
         refresh.Click+=(_,_)=>Check();startup.Click+=(_,_)=>{try{if(!preview){LeoStartup.SetEnabled(true);StartupFixed?.Invoke();}Check();}catch{result.Text="开机启动写入失败，请检查启动文件夹权限。";}};
         api.Click+=async(_,_)=>{api.Enabled=false;try{if(preview){result.Text="示例模式，不联网。";return;}var settings=ChatSettings.Load();using var client=new ChatApi();var models=await client.ModelsAsync(settings,settings.ReadKey(),lifetime.Token);if(!IsDisposed)result.Text+="\n\n✓ API 连接成功，模型列表 "+models.Length+" 项。\n此检查不生成回复，不计入模型请求限额。";}catch(OperationCanceledException){}catch{if(!IsDisposed)result.Text+="\n\nAPI 检测失败，请检查接口、Key、权限和网络；未生成模型回复。";}finally{if(!IsDisposed)api.Enabled=true;}};
         VisibleChanged+=(_,_)=>{if(Visible)Check();};Check();
     }
     void Check()
     {
-        if(preview){result.Text="示例模式 · 不修改启动项，不启动外部软件，不联网。";return;}
+        if(preview){startup.Enabled=paths.Enabled=shortcuts.Enabled=false;result.Text="示例模式 · 不修改启动项，不启动外部软件，不联网。";return;}
+        startup.Enabled=!LeoStartup.Enabled;shortcuts.Enabled=hotkeys?.Invoke().Contains("被占用")==true;paths.Enabled=false;
         var lines=new List<string>();
         lines.Add((LeoStartup.Enabled?"✓":"○")+" 开机启动："+(LeoStartup.Enabled?"已启用":"未启用或被 Windows 停用"));
         try{string log=Path.Combine(Store.Root,"startup-last.log");if(File.Exists(log))lines.Add("  上次登录："+File.ReadLines(log).LastOrDefault());}catch{}
         lines.Add("快捷键："+(hotkeys?.Invoke()??"请在快捷键页检查配置"));
         lines.Add((LocalAsr.Installed?"✓":"○")+" 本地语音模型："+(LocalAsr.Installed?"完整":"缺少 SenseVoice 文件"));
-        void Module(string name,bool enabled,Func<bool> installed){if(!enabled){lines.Add("○ "+name+"：已停用");return;}try{lines.Add((installed()?"✓ ":"○ ")+name+"："+(installed()?"已找到":"未找到，请安装客户端"));}catch{lines.Add("○ "+name+"：暂时无法检查");}}
+        void Module(string name,bool enabled,Func<bool> installed){if(!enabled){lines.Add("○ "+name+"：已停用");return;}try{bool found=installed();if(!found)paths.Enabled=true;lines.Add((found?"✓ ":"○ ")+name+"："+(found?"已找到":"未找到，可手动选择软件路径"));}catch{paths.Enabled=true;lines.Add("○ "+name+"：路径检查失败，可手动选择");}}
         Module("QQ 音乐",prefs.MusicModule,()=>QQMusic.ClientPath()!=null);Module("Clash Verge",prefs.ClashModule,()=>ClashProxy.ClientPath()!=null);
         Module("终端",prefs.TerminalModule,()=>File.Exists(FootTools.TerminalStart().FileName));Module("Edge",prefs.EdgeModule,()=>FootTools.EdgeUrlStart("https://www.bing.com").FileName.EndsWith("msedge.exe",StringComparison.OrdinalIgnoreCase));
         try{string file=Path.Combine(Store.Root,".health-"+Guid.NewGuid().ToString("N")+".tmp");File.WriteAllText(file,"Leo");File.Delete(file);lines.Add("✓ 个人配置目录：可写");}catch{lines.Add("○ 个人配置目录：无法写入，设置可能无法保存");}
@@ -44,15 +46,17 @@ sealed class ModulesView:Panel
     public ModulesView(Preferences p)
     {
         selectedPaths=new(p.ModuleExecutables);
-        Dock=DockStyle.Fill;
+        Dock=DockStyle.Fill;AutoScroll=true;AutoScrollMinSize=new Size(0,420);
         Controls.Add(new Label{Text="按需开启 · 图标、菜单与后台检查同步变化",Bounds=new Rectangle(8,10,550,30),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});
-        int y=55;
-        foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口")}){
-            var field=new CheckBox{Text=title,Checked=Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=69;
+        int y=50;
+        foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口"),("football","足球","赛程、球队关注、积分榜和赛程后台更新")}){
+            var field=new CheckBox{Text=title,Checked=Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=58;
         }
-        Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,340,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
-        var paths=new BarcaButton{Text="软件路径…",Bounds=new Rectangle(365,340,180,32)};paths.Click+=(_,_)=>{using var dialog=new ModulePathsForm(selectedPaths);if(dialog.ShowDialog(FindForm())==DialogResult.OK)selectedPaths=dialog.Paths;};Controls.Add(paths);
-        Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,380,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
+        Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,350,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
+        var paths=new BarcaButton{Text="软件路径…",Bounds=new Rectangle(365,350,180,32)};paths.Click+=(_,_)=>EditPaths(FindForm());Controls.Add(paths);
+        Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,390,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
     }
-    public void Apply(Preferences next){next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
+    public bool EditPaths(IWin32Window? owner){using var dialog=new ModulePathsForm(selectedPaths);if(dialog.ShowDialog(owner)!=DialogResult.OK)return false;selectedPaths=dialog.Paths;return true;}
+    public Dictionary<string,string> Paths=>selectedPaths.ToDictionary();
+    public void Apply(Preferences next){next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.FootballModule=fields["football"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
 }

@@ -38,7 +38,7 @@ sealed class LeoToast : Form
         message.SetBounds(15,14,textWidth,textHeight);close.SetBounds(width-31,6,22,22);retry.SetBounds(width-76,Height-33,64,25);
         retry.Text=notice.ActionLabel;retry.Visible = notice.Retry != null; retry.Enabled = true;
         var pet = anchor(); Location = PopupPlacement.Place(pet, Size, Screen.FromRectangle(pet).WorkingArea);
-        timer.Stop(); timer.Interval = notice.Error ? Math.Clamp(notice.Text.Length*80,5000,12000) : notice.Retry!=null?4500:1900; timer.Start();
+        timer.Stop(); timer.Interval = notice.Error ? Math.Clamp(notice.Text.Length*80,5000,12000) : notice.Retry!=null?4500:1900; if(!notice.Busy)timer.Start();
         Show();
     }
     protected override void OnPaint(PaintEventArgs e)

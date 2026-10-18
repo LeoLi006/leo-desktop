@@ -28,6 +28,7 @@ static class DockAnimationTests
         checks["forward_and_reverse_visit_every_pose_in_order"]=sequence.SequenceEqual(new[]{0,1,2,3,4,5})&&sequence.Reverse().SequenceEqual(new[]{5,4,3,2,1,0});
         using var pet=new PetForm(new Preferences(),true);pet.Show();Application.DoEvents();
         foreach(var pair in pet.VerifyDockPeeking(output))checks[pair.Key]=pair.Value;
+        foreach(var pair in pet.VerifyDockPolish())checks[pair.Key]=pair.Value;
         return checks;
     }
 }

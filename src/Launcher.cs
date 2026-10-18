@@ -106,6 +106,7 @@ sealed class LauncherForm : Form
         var footballButton = new GlyphButton("football") { Bounds = new Rectangle(69, 7, 28, 24), AccessibleName = "足球赛程", FlatStyle = FlatStyle.Flat };
         footballButton.FlatAppearance.BorderSize = 0;
         footballButton.Click += (_, _) => {
+            if(!prefs.FootballModule)return;
             if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks);
             SetWatchVisibility(football);
             var area = Screen.FromControl(this).WorkingArea;
@@ -216,7 +217,8 @@ sealed class LauncherForm : Form
         lastExternal = match?.Name ?? active.Process;
         if (match != null && prefs.RememberHistory) memory.Record(match, previous, DateTimeOffset.UtcNow);
     }
-    public void RefreshModules(){foreach(var icon in Controls.OfType<GlyphButton>())if(icon.AccessibleName=="QQ音乐点歌")icon.Visible=prefs.MusicModule;
+    public void RefreshModules(){foreach(var icon in Controls.OfType<GlyphButton>())if(icon.AccessibleName=="足球赛程")icon.Visible=prefs.FootballModule;
+        if(!prefs.FootballModule){football?.Close();football=null;}foreach(var icon in Controls.OfType<GlyphButton>())if(icon.AccessibleName=="QQ音乐点歌")icon.Visible=prefs.MusicModule;
         if(!prefs.MusicModule){music?.Close();music=null;}
         if(football!=null)SetWatchVisibility(football);
     }
@@ -335,7 +337,7 @@ sealed class LauncherForm : Form
     public void ReloadImportedConfiguration(){FootballFollowing.Current.Reload();football?.Close();football=null;RefreshModules();Filter();}
     public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview);return music;}
     public MusicForm OpenMusicFromAssistant(string query=""){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview);if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);return music;}
-    public void OpenFootballFromAssistant(){var button=Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
+    public void OpenFootballFromAssistant(){Modules.Require(prefs,"football");var button=Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
     public string PinClipboardText(string text){if(clipboard==null)throw new InvalidOperationException("剪贴板尚未就绪");if(string.IsNullOrWhiteSpace(text)||text.Length>100000)throw new ArgumentException("文字为空或过长");var item=new ClipItem("text",text,text.Replace('\n',' ')[..Math.Min(100,text.Length)],DateTimeOffset.Now);clipboard.History.Add(item);if(!clipboard.History.Pin(item,true))throw new InvalidOperationException("剪贴板收藏已达上限");if(clipboard.History.Error!=null)throw new IOException(clipboard.History.Error);return "已收藏这段文字到剪贴板。";}
     public void OpenClipboardFromAssistant()=>Launch(ClipboardTool.Entry);
     void Launch(AppEntry app)

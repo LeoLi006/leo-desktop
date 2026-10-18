@@ -95,6 +95,7 @@ sealed partial class ChatForm : BarcaWindow
     ChatSettings settings;
     readonly List<ChatTurn> turns = new();
     CancellationTokenSource? pending;
+    readonly BarcaButton retryReply=new(){Text="重试",Dock=DockStyle.Right,Width=55,Visible=false};string retryPrompt="";bool retryHasTools;
     bool dirty;
     bool directVoice;
     public void ToggleVoiceInput(){if(WindowState==FormWindowState.Minimized)WindowState=FormWindowState.Normal;Show();Activate();microphone.PerformClick();}
@@ -122,7 +123,7 @@ sealed partial class ChatForm : BarcaWindow
         var bottom=new Panel{Dock=DockStyle.Bottom,Height=108,Padding=new Padding(16,7,16,15)};var composer=new RoundedSurface{Dock=DockStyle.Fill,BackColor=BarcaUi.Raised,Padding=new Padding(14,12,14,9)};
         input.Multiline=true;input.Dock=DockStyle.Fill;input.ScrollBars=ScrollBars.None;input.BorderStyle=BorderStyle.None;input.Font=BarcaUi.Font(11);input.BackColor=BarcaUi.Raised;input.ForeColor=BarcaUi.Text;input.PlaceholderText="想办什么，直接说或输入…";
         var actions=new Panel{Dock=DockStyle.Bottom,Height=34,Padding=new Padding(0,3,0,0)};send.Text="发送 ↗";send.Dock=DockStyle.Right;send.Width=78;microphone.Text="说话";microphone.Dock=DockStyle.Right;microphone.Width=88;stop.Text="停止";stop.Dock=DockStyle.Right;stop.Width=55;stop.Visible=false;
-        state.Dock=DockStyle.Fill;state.ForeColor=BarcaUi.Muted;state.Font=BarcaUi.Font(8.5f);state.AutoEllipsis=true;state.Padding=new Padding(0,8,7,0);actions.Controls.Add(state);actions.Controls.Add(stop);actions.Controls.Add(microphone);actions.Controls.Add(send);composer.Controls.Add(input);composer.Controls.Add(actions);bottom.Controls.Add(composer);
+        state.Dock=DockStyle.Fill;state.ForeColor=BarcaUi.Muted;state.Font=BarcaUi.Font(8.5f);state.AutoEllipsis=true;state.Padding=new Padding(0,8,7,0);actions.Controls.Add(state);actions.Controls.Add(retryReply);retryReply.Click+=async(_,_)=>{if(pending!=null||retryPrompt.Length==0)return;input.Text=retryPrompt;if(retryHasTools){retryReply.Visible=false;state.Text="部分操作可能已完成，请核对清单或软件状态后再发送。";input.Focus();return;}await SendAsync();};actions.Controls.Add(stop);actions.Controls.Add(microphone);actions.Controls.Add(send);composer.Controls.Add(input);composer.Controls.Add(actions);bottom.Controls.Add(composer);
         transcript.Dock=DockStyle.Fill;bodyHost.Controls.Add(transcript);bodyHost.Controls.Add(results);Controls.Add(bodyHost);Controls.Add(bottom);Controls.Add(topPanel);
         foreach(var button in new[]{send,stop,configure,reset,microphone,readAloud}){button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderSize=0;button.BackColor=BarcaUi.Raised;button.ForeColor=BarcaUi.Text;button.Font=BarcaUi.Font(9);Appearance.Round(button,9);}send.BackColor=BarcaUi.Raised;microphone.BackColor=Appearance.Blue;microphone.ForeColor=BarcaUi.Gold;
         var deviceMenu=new ContextMenuStrip();inputDevice.Click+=(_,_)=>{foreach(ToolStripItem item in deviceMenu.Items.Cast<ToolStripItem>().ToArray())item.Dispose();deviceMenu.Items.Clear();void Add(int id,string name){var item=new ToolStripMenuItem(name){Checked=voice.InputDevice==id};item.Click+=(_,_)=>{voice.InputDevice=id;state.Text="录音设备："+name;};deviceMenu.Items.Add(item);}Add(-1,"Windows 默认输入设备");try{foreach(var device in SpeechIO.InputDevices())Add(device.Id,device.Name);}catch{state.Text="无法读取录音设备";}deviceMenu.Show(inputDevice,new Point(0,inputDevice.Height));};FormClosed+=(_,_)=>deviceMenu.Dispose();
@@ -181,7 +182,7 @@ sealed partial class ChatForm : BarcaWindow
         if(SynchronizationContext.Current is not WindowsFormsSynchronizationContext)SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
         if (pending != null || string.IsNullOrWhiteSpace(input.Text)) return;
         voice.Stop();
-        string prompt = input.Text.Trim();
+        string prompt = input.Text.Trim();retryReply.Visible=false;
         if (prompt.Length > 100_000) { state.Text = "本条消息过长，请缩短后发送"; return; }
         var intent=QuickRouter.Route(prompt);
         if(intent.Kind is not (QuickKind.Ai or QuickKind.FootballAnalysis)){input.Clear();await HandleQuickAsync(intent,prompt);return;}
@@ -215,7 +216,7 @@ sealed partial class ChatForm : BarcaWindow
         catch (OperationCanceledException) { turn.Status = "已停止"; if (!IsDisposed) state.Text = "已停止生成"; }
         catch (Exception error)
         {
-            turn.Status = "未完成";
+            turn.Status = "未完成";retryPrompt=prompt;retryHasTools=turn.ToolLog.Count>0;if(!IsDisposed)retryReply.Visible=true;
             string message = error is System.Net.Http.HttpRequestException ? "连接失败，请检查中转站地址、网络与系统代理" : error.Message;
             message = message.Replace(key, "[Key 已隐藏]", StringComparison.Ordinal);
             if (!IsDisposed) state.Text = message.Length > 240 ? message[..240] : message;
@@ -258,6 +259,8 @@ sealed partial class ChatForm : BarcaWindow
     }
     public Task PreviewSendAsync(string text) { input.Text = text; return SendAsync(); }
     public bool PreviewReplyComplete => turns.LastOrDefault()?.Status == "完成" && transcript.Text.Contains("你好，Leo");
+    internal bool ReplyRetryAvailable=>retryReply.Visible&&pending==null&&send.Enabled;
+    internal void PreviewRetryReply()=>retryReply.PerformClick();
     public void PreviewStop() => stop.PerformClick();
     public bool PreviewWasStopped => turns.LastOrDefault()?.Status == "已停止" && send.Enabled && !stop.Enabled;
     protected override void OnFormClosed(FormClosedEventArgs e) { pending?.Cancel(); voice.Dispose(); renderTimer.Dispose(); base.OnFormClosed(e); }

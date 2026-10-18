@@ -63,6 +63,7 @@ static class FootballFeed
     public static string Status(FootballMatch m) => m.Status.Contains("Postpon", StringComparison.OrdinalIgnoreCase) ? "延期" : m.Status.Contains("Cancel", StringComparison.OrdinalIgnoreCase) ? "取消" : m.State == "in" ? "进行中" : m.State == "post" ? "已结束" : "未开赛";
     public static async Task<FootballCache> FetchAsync(FootballCache old, CancellationToken token)
     {
+        using var moduleRequest=Modules.FootballRequest(token);token=moduleRequest.Token;
         var paths = Enumerable.Range(-4, 12).Select(i => "all/scoreboard?dates=" + DateTimeOffset.UtcNow.AddDays(i).ToString("yyyyMMdd") + "&limit=1000").ToList();
         paths.AddRange(FootballFollowing.Current.Ids.Select(id=>"all/teams/"+id+"/schedule?fixture=true"));
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(18) };
@@ -83,6 +84,7 @@ static class FootballFeed
         var matches = results.SelectMany(x => x.Matches).Where(m => IsRecent(m, now)).DistinctBy(m => m.Id).ToList();
         if (failed > 0) matches.AddRange(old.Matches.Where(m => IsRecent(m, now) && matches.All(n => n.Id != m.Id)));
         var cache = new FootballCache { Updated = now, Matches = matches, FailedSources = failed, SchemaVersion = 2 };
+        token.ThrowIfCancellationRequested();
         try { File.WriteAllText(CachePath + ".tmp", JsonSerializer.Serialize(cache)); File.Move(CachePath + ".tmp", CachePath, true); } catch { }
         return cache;
     }
@@ -153,7 +155,7 @@ sealed class FootballForm : BarcaWindow
         catch{if(!IsDisposed){Render();status.Text=cache.Updated==default?"暂时无法联网 · 暂无缓存，请稍后刷新":"联网失败 · 显示旧缓存 "+cache.Updated.ToLocalTime().ToString("MM-dd HH:mm");}}
         finally{busy=false;if(!IsDisposed)refresh.Enabled=true;}
     }
-    void UpdateStatus()=>status.Text="ESPN  ·  "+cache.Updated.ToLocalTime().ToString("MM-dd HH:mm")+" 更新  ·  "+(cache.FailedSources>0?"部分来源失败，含旧缓存":"缓存 10 分钟")+"  ·  近3天赛果 / 未来赛程  ·  本机时区";
+    void UpdateStatus()=>status.Text=cache.Updated==default?"暂无缓存 · 联网刷新后显示比赛": "ESPN  ·  "+cache.Updated.ToLocalTime().ToString("MM-dd HH:mm")+" 更新  ·  "+(cache.FailedSources>0?"部分来源失败，含旧缓存":"缓存 10 分钟")+"  ·  近3天赛果 / 未来赛程  ·  本机时区";
     void Render()
     {
         if(IsDisposed)return;for(int i=0;i<tabs.Count;i++){tabs[i].Selected=i==filterIndex;tabs[i].Invalidate();}

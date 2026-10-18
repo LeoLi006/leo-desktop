@@ -2,8 +2,13 @@ namespace LeoLauncher;
 
 static class Modules
 {
-    public static string? ForAction(string action)=>action.StartsWith("music_")?"music":action.StartsWith("proxy_")?"clash":action=="terminal_open"?"terminal":action is "web_search" or "watch_open"?"edge":null;
-    public static bool Enabled(Preferences p,string module)=>module switch{"terminal"=>p.TerminalModule,"clash"=>p.ClashModule,"music"=>p.MusicModule,"edge"=>p.EdgeModule,_=>true};
+    static readonly object footballGate=new();static CancellationTokenSource footballLife=new();static bool footballEnabled=true;
+    public static void SetFootball(bool enabled){lock(footballGate){if(enabled==footballEnabled)return;footballEnabled=enabled;if(!enabled)footballLife.Cancel();else{footballLife.Dispose();footballLife=new();}}}
+    public static void RequireFootball(){lock(footballGate)if(!footballEnabled)throw new InvalidOperationException("足球已停用，请在设置 → 功能中开启。");}
+    public static CancellationTokenSource FootballRequest(CancellationToken caller){lock(footballGate){RequireFootball();return CancellationTokenSource.CreateLinkedTokenSource(caller,footballLife.Token);}}
+
+    public static string? ForAction(string action)=>action.StartsWith("football_")||action=="match_add"?"football":action.StartsWith("music_")?"music":action.StartsWith("proxy_")?"clash":action=="terminal_open"?"terminal":action is "web_search" or "watch_open"?"edge":null;
+    public static bool Enabled(Preferences p,string module)=>module switch{"terminal"=>p.TerminalModule,"clash"=>p.ClashModule,"music"=>p.MusicModule,"football"=>p.FootballModule,"edge"=>p.EdgeModule,_=>true};
     public static void Require(Preferences p,string? module){if(module!=null&&!Enabled(p,module))throw new InvalidOperationException("此功能已停用，请在设置 → 功能中开启。");}
 }
 
@@ -31,12 +36,17 @@ sealed class EscapeWindows:IMessageFilter
 
 static class EdgeDock
 {
-    public static Point Snap(Rectangle pet,Rectangle area,int footer,int threshold=26)
+    public static DockSide ChooseSide(Rectangle pet,Rectangle area,int footer,Size movement,int threshold=26)
     {
-        int x=pet.X,y=pet.Y;
-        int right=area.Right-pet.Width,bottom=area.Bottom-pet.Height-footer;
-        if(Math.Abs(x-area.Left)<=threshold)x=area.Left;else if(Math.Abs(x-right)<=threshold)x=right;
-        if(Math.Abs(y-area.Top)<=threshold)y=area.Top;else if(Math.Abs(y-bottom)<=threshold)y=bottom;
-        return new Point(x,y);
+        var horizontal=Math.Abs(pet.Left-area.Left)<=threshold?DockSide.Left:Math.Abs(pet.Right-area.Right)<=threshold?DockSide.Right:DockSide.None;
+        var vertical=Math.Abs(pet.Top-area.Top)<=threshold?DockSide.Top:Math.Abs(pet.Bottom+footer-area.Bottom)<=threshold?DockSide.Bottom:DockSide.None;
+        if(horizontal!=DockSide.None&&vertical!=DockSide.None)return Math.Abs(movement.Height)>Math.Abs(movement.Width)?vertical:horizontal;
+        return horizontal!=DockSide.None?horizontal:vertical;
+    }
+    public static Point Snap(Rectangle pet,Rectangle area,int footer,int threshold=26,Size movement=default)
+    {
+        return ChooseSide(pet,area,footer,movement,threshold) switch{
+            DockSide.Left=>new(area.Left,pet.Y),DockSide.Right=>new(area.Right-pet.Width,pet.Y),
+            DockSide.Top=>new(pet.X,area.Top),DockSide.Bottom=>new(pet.X,area.Bottom-pet.Height-footer),_=>pet.Location};
     }
 }

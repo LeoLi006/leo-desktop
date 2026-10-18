@@ -117,6 +117,8 @@ sealed class SettingsForm : BarcaWindow
         CheckBox Check(string text, int y, bool value) { var check = new CheckBox { Text = text, Bounds = new Rectangle(8, y, 550, 28), Checked = value, ForeColor = BarcaUi.Text, Font = BarcaUi.Font(9.5f) }; general.Controls.Add(check); return check; }
         var startup = Check("登录 Windows 后自动启动 Leo", 100, !preview && LeoStartup.Enabled);
         checks.StartupFixed=()=>startup.Checked=LeoStartup.Enabled;
+        checks.RepairPaths=()=>{try{if(preview||!modules.EditPaths(this))return;var next=JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!;next.ModuleExecutables=modules.Paths;apply(next,LeoStartup.Enabled);status.Text="软件路径已更新";}catch(Exception e){status.Text=e.Message;}};
+        checks.RepairHotkeys=()=>{Select(1);status.Text="点击冲突的快捷键输入框，换一个组合后保存；原设置在保存成功前保留。";};
         var full = Check("游戏或视频全屏时自动隐藏", 140, p.HideInFullscreen);
         Label("应用与剪贴板", 195, true);
         var history = Check("记住最近使用的应用", 235, p.RememberHistory);
@@ -166,8 +168,8 @@ sealed partial class PetForm
             catch { LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
-        prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
-        foot.ConfigureModules(prefs);launcher.RefreshModules();
+        prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
+        Modules.SetFootball(prefs.FootballModule);foot.ConfigureModules(prefs);launcher.RefreshModules();
         prefs.PetSize = next.PetSize; prefs.RememberHistory = next.RememberHistory; prefs.ContextAware = next.ContextAware; prefs.HideInFullscreen = next.HideInFullscreen; prefs.ClipboardHistory = next.ClipboardHistory;
         prefs.SearchHotkey = next.SearchHotkey; prefs.VoiceHotkey = next.VoiceHotkey; prefs.LyricsHotkey = next.LyricsHotkey; lyricsHotkeyRegistered = next.MusicModule&&next.LyricsHotkey != Keys.None;
         if(!previewMode)RegisterConfiguredHotkeys();

@@ -104,7 +104,7 @@ sealed partial class PetForm
         string label=step.Label.Length>0?step.Label:step.Kind;
         switch(step.Kind)
         {
-            case "proxy_on":case "proxy_off":bool enabled=step.Kind=="proxy_on";return(label,async()=>{var status=await Task.Run(()=>ClashProxy.SetEnabled(enabled));if(status.Enabled!=enabled)throw new IOException("代理状态未确认");});
+            case "proxy_on":case "proxy_off":bool enabled=step.Kind=="proxy_on";return(label,async()=>{await ClientOperations.Proxy(enabled);});
             case "url":var start=FootTools.EdgeUrlStart(step.Value);return(label,()=>{Process.Start(start);return Task.CompletedTask;});
             case "watch":var links=new WatchLinkStore(Path.Combine(Store.Root,"leo-watch-links.json")).Items;int index=int.Parse(step.Value);var link=index<0?links.FirstOrDefault(l=>l.Url.Length>0):links.ElementAtOrDefault(index);if(link==null||link.Url.Length==0)throw new ArgumentException("请先在足球窗口填写观赛网址，或编辑组合改用网址操作");var watch=FootTools.EdgeUrlStart(link.Url);return(link.Name,()=>{Process.Start(watch);return Task.CompletedTask;});
             case "app":var app=launcher.FileApplications.FirstOrDefault(a=>a.Target.Equals(step.Value,StringComparison.OrdinalIgnoreCase))??throw new ArgumentException("应用未找到或索引尚未就绪，请稍后重试或重新选择应用");return(app.Name,()=>{launcher.LaunchFromAssistant(app);return Task.CompletedTask;});
