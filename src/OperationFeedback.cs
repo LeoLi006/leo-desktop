@@ -48,6 +48,7 @@ sealed class LeoToast : Form
         using var border=new Pen(Color.FromArgb(82,67,82));e.Graphics.DrawPath(border,path);
         using var stripe=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(12,3,Width-24,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,12,3,Width-24,4);
     }
+    internal bool IsBusy=>current?.Busy==true;
     public bool PreviewHasRetry => retry.Visible;
     internal bool PreviewTextFits=>message.Height>=message.GetPreferredSize(new Size(message.Width,0)).Height&&message.Bottom<(retry.Visible?retry.Top:ClientSize.Height)&&!message.Bounds.IntersectsWith(close.Bounds)&&ClientRectangle.Contains(retry.Visible?retry.Bounds:message.Bounds);
     public void Follow() { if(Visible){var pet=anchor();Location=PopupPlacement.Place(pet,Size,Screen.FromRectangle(pet).WorkingArea);} }

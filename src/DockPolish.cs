@@ -26,6 +26,8 @@ sealed partial class PetForm
         dockMotion.Reveal(650);dockMotion.Tick(682,true,true);float partial=dockMotion.Progress;BeginDragPickup();bool captured=dragPickup!=null;RevealDock(true);
         using var image=new Bitmap(Width,Height);using var g=Graphics.FromImage(image);DrawPet(g,PetDrawingBounds(ClientSize));checks["unfolding_drag_captures_and_blends_current_pose"]=partial>0&&partial<1&&captured&&dragPickup!=null&&dockMotion.Progress==0;
         pickupStarted=clock.ElapsedMilliseconds-170;DrawPet(g,PetDrawingBounds(ClientSize));checks["drag_pickup_expires_without_loop_or_disposed_image"]=dragPickup==null;
-        return checks;
+        var area=Screen.FromControl(this).WorkingArea;RevealDock(true);Location=new Point(area.Left,area.Top+Height);dockMotion.Reset(0);feedback=new LeoToast(()=>Bounds);feedback.Present(new("正在等待测试客户端…",Busy:true));
+        for(int t=0;t<=2400;t+=32)AdvanceDock(t,new Point(area.Right-3,area.Bottom-3));checks["busy_operation_keeps_feedback_and_cancel_accessible"]=dockMotion.Progress==0&&feedback.Visible;
+        feedback.Dispose();feedback=null;return checks;
     }
 }
