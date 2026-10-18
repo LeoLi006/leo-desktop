@@ -22,8 +22,15 @@ sealed partial class PetForm
             prefs.FootballModule=true;prefs.MatchDayOutfits=true;prefs.MatchDayKit=id;UpdateMatchDay();var skin=CurrentSkin();checks[id+"_loads_complete_atomic_skin"]=skin!=null;if(skin==null)continue;
             using(var original=new Bitmap(Path.Combine(Store.Root,"assets","leo.png"))){
                 checks[id+"_uses_identical_default_pose_atlas"]=SkinAnimationTests.Hash(original)==SkinAnimationTests.Hash(skin.Main);
-                bool face=true;for(int y=0;y<110;y++)for(int x=0;x<192;x++){var p=original.GetPixel(x,y);if(p.A>128)face&=KitPalette.Replace(p,skin.NameOfKit)==p;}
+                row=frame=0;using var dressed=new Bitmap(192,208);using(var paint=Graphics.FromImage(dressed))DrawAnimationFrame(paint,new RectangleF(0,0,192,208));
+                bool face=true;for(int y=0;y<110;y++)for(int x=0;x<192;x++){var p=original.GetPixel(x,y);if(p.A==255)face&=dressed.GetPixel(x,y)==p;}
                 checks[id+"_preserves_default_face_wool_ears_and_eyes"]=face;
+                var texture=KitTexture.Load(skin.NameOfKit);var samples=new HashSet<int>();for(int v=0;v<8;v++)for(int u=0;u<8;u++)samples.Add(texture.Sample(u/7f,v/7f).ToArgb());
+                checks[id+"_uses_team_crest_collar_and_pattern_texture"]=samples.Count>20;
+                var pants=dressed.GetPixel(96,166);checks[id+"_has_team_specific_shorts"]=skin.NameOfKit=="city"?pants.R>140:skin.NameOfKit=="spain"||pants.R<70;
+                row=11;frame=0;using var verticalDressed=new Bitmap(192,208);using(var paint=Graphics.FromImage(verticalDressed))DrawAnimationFrame(paint,new RectangleF(0,0,192,208));
+                bool verticalFace=true;for(int y=0;y<92;y++)for(int x=0;x<192;x++){var p=skin.Vertical.GetPixel(x,y);if(p.A==255)verticalFace&=verticalDressed.GetPixel(x,y)==p;}
+                checks[id+"_vertical_drag_preserves_mouth_and_face_colors"]=verticalFace;
             }
             bool allFrames=true;var images=new HashSet<string>();
             for(int r=0;r<13;r++){

@@ -11,7 +11,7 @@ sealed class AnimationSkin:IDisposable
     public static string? Name(string? id)=>id switch{"382"=>"city","20232"=>"miami","202"=>"argentina","164"=>"spain",_=>null};
     public AnimationSkin(string name)
     {
-        NameOfKit=name;string root=Path.Combine(Store.Root,"assets");
+        NameOfKit=name;KitTexture.Load(name);string root=Path.Combine(Store.Root,"assets");
         Bitmap? main=null,vertical=null;DockSprites? dock=null;DockBridge? bridge=null;
         try{main=new(Path.Combine(root,"leo.png"));vertical=new(Path.Combine(root,"vertical-drag.png"));dock=new(kit:name);bridge=new(Path.Combine(root,"edge-bridge-v1.png"),main,name);Main=main;Vertical=vertical;Dock=dock;Bridge=bridge;}
         catch{main?.Dispose();vertical?.Dispose();dock?.Dispose();bridge?.Dispose();throw;}
