@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>LeoLauncher</AssemblyName><ApplicationIcon>leo.ico</ApplicationIcon>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>0.46.0</Version><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>0.46.1</Version><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets/**/*" Link="assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
@@ -16,7 +16,10 @@
     <Reference Include="NAudio.Core"><HintPath>../.deps/naudio.core/lib/netstandard2.0/NAudio.Core.dll</HintPath></Reference>
     <Reference Include="sherpa-onnx"><HintPath>../.deps/sherpa/lib/net8.0/sherpa-onnx.dll</HintPath></Reference>
     <Content Include="../.deps/native/runtimes/win-x64/native/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-  <Content Include="../assets/**/*" Link="assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="../assets/**/*" Link="assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest">
+      <CopyToOutputDirectory Condition="Exists('Assets/%(RecursiveDir)%(Filename)%(Extension)')">Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory Condition="Exists('Assets/%(RecursiveDir)%(Filename)%(Extension)')">Never</CopyToPublishDirectory>
+    </Content>
 <Content Include="../licenses/**/*" Link="licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>
 
