@@ -14,6 +14,7 @@ static class DockAnimationTests
                 foreach(int size in new[]{80,136,230}){
                     var source=sprites.Source(progress,0,side);var bounds=sprites.Destination(new Size(size,size*208/192),progress,side,source);
                     intact&=new RectangleF(0,0,size,size*208/192).Contains(bounds);
+                    intact&=bounds.Width<=size*(138f/192)+.01f;
                 }
                 using var image=new Bitmap(128,140);using(var g=Graphics.FromImage(image)){g.Clear(BarcaUi.Canvas);sprites.Draw(g,image.Size,progress,side,0);}
                 using var stream=new MemoryStream();image.Save(stream,System.Drawing.Imaging.ImageFormat.Png);rendered.Add(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream.ToArray())));

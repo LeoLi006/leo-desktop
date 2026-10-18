@@ -29,11 +29,11 @@ sealed class DockMotion
 
 sealed class DockSprites:IDisposable
 {
-    readonly Bitmap[] frames;readonly Rectangle[] sources;
+    readonly Bitmap[] frames;readonly Rectangle[] sources;readonly string? kit;
     public const int FramesPerDirection=6;
-    public DockSprites(string? path=null)
+    public DockSprites(string? path=null,string? kit=null)
     {
-        using var sheet=new Bitmap(path??Path.Combine(Store.Root,"assets","edge-motion-v1.png"));
+        this.kit=kit;using var sheet=new Bitmap(path??Path.Combine(Store.Root,"assets","edge-motion-v1.png"));
         var locked=sheet.LockBits(new Rectangle(0,0,sheet.Width,sheet.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
         var data=new byte[Math.Abs(locked.Stride)*sheet.Height];Marshal.Copy(locked.Scan0,data,0,data.Length);int stride=locked.Stride;sheet.UnlockBits(locked);
         var visited=new bool[sheet.Width*sheet.Height];var components=new List<(Rectangle box,List<int> pixels)>();
@@ -73,6 +73,7 @@ sealed class DockSprites:IDisposable
     public RectangleF Destination(Size size,float progress,DockSide side,Rectangle source)
     {
         float inset=Math.Max(2,size.Width*.025f),scale=Math.Min((size.Width-inset*2)/sources.Max(r=>r.Width),(size.Height-inset*2)/sources.Max(r=>r.Height));
+        scale=Math.Min(scale,size.Width*(138f/192)/sources.Max(r=>r.Width));
         float w=source.Width*scale,h=source.Height*scale,x=(size.Width-w)/2,y=size.Height-h-inset;
         float edgeX=side==DockSide.Left?inset:side==DockSide.Right?size.Width-w-inset:x;
         float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:(size.Height-h)/2;
@@ -80,7 +81,8 @@ sealed class DockSprites:IDisposable
     }
     public RectangleF Draw(Graphics graphics,Size size,float progress,DockSide side,long now,float opacity=1,float? positionProgress=null)
     {
-        int index=Index(progress,side);var target=Destination(size,positionProgress??progress,side,sources[index]);using var alpha=new ImageAttributes();alpha.SetColorMatrix(new ColorMatrix{Matrix33=opacity});graphics.DrawImage(frames[index],Rectangle.Round(target),0,0,frames[index].Width,frames[index].Height,GraphicsUnit.Pixel,alpha);return target;
+        int index=Index(progress,side);var target=Destination(size,positionProgress??progress,side,sources[index]);if(kit!=null){KitPalette.Draw(graphics,frames[index],target,new RectangleF(Point.Empty,frames[index].Size),kit,opacity);return target;}
+        using var alpha=new ImageAttributes();alpha.SetColorMatrix(new ColorMatrix{Matrix33=opacity});graphics.DrawImage(frames[index],Rectangle.Round(target),0,0,frames[index].Width,frames[index].Height,GraphicsUnit.Pixel,alpha);return target;
     }
     public void Dispose(){foreach(var frame in frames)frame.Dispose();}
 }

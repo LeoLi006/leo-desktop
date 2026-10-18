@@ -6,12 +6,12 @@ sealed class DockBridge:IDisposable
 {
     public const float End=.42f;
     public const int Count=9;
-    readonly Bitmap sheet,idle;
+    readonly Bitmap sheet,idle;readonly string? kit;
     readonly Rectangle[] sources=new Rectangle[32];
     readonly Rectangle idleSource;
-    public DockBridge(string path,Bitmap main)
+    public DockBridge(string path,Bitmap main,string? kit=null)
     {
-        sheet=new(path);idle=new Bitmap(main.Width/8,main.Height/11);
+        this.kit=kit;sheet=new(path);idle=new Bitmap(main.Width/8,main.Height/11);
         using(var g=Graphics.FromImage(idle))g.DrawImage(main,new Rectangle(Point.Empty,idle.Size),new Rectangle(Point.Empty,idle.Size),GraphicsUnit.Pixel);
         idleSource=Visible(idle,new Rectangle(Point.Empty,idle.Size));
         var parts=Parts(sheet);if(parts.Length!=32)throw new IOException("起步动画必须包含四个方向各八帧");
@@ -54,13 +54,14 @@ sealed class DockBridge:IDisposable
         float sx=start.Width/first.Width+(end.Width/last.Width-start.Width/first.Width)*t;
         float sy=start.Height/first.Height+(end.Height/last.Height-start.Height/first.Height)*t;
         float w=frame==0?start.Width:source.Width*sx,h=frame==0?start.Height:source.Height*sy;
-        float fit=Math.Min(1,Math.Min(size.Width/w,size.Height/h));w*=fit;h*=fit;
+        float fit=Math.Min(1,Math.Min(size.Width*(138f/192)/w,size.Height/h));w*=fit;h*=fit;
         float cx=start.Left+start.Width/2+(end.Left+end.Width/2-start.Left-start.Width/2)*t;
         float bottom=start.Bottom+(end.Bottom-start.Bottom)*t;
         var target=new RectangleF(cx-w/2,bottom-h,w,h);
         // Keep ears inside the window, including the top-edge bending poses.
         target.X=Math.Clamp(target.X,0,Math.Max(0,size.Width-target.Width));target.Y=Math.Clamp(target.Y,0,Math.Max(0,size.Height-target.Height));
-        g.DrawImage(frame==0?idle:sheet,target,source,GraphicsUnit.Pixel);return target;
+        if(kit!=null)KitPalette.Draw(g,frame==0?idle:sheet,target,source,kit);
+        else g.DrawImage(frame==0?idle:sheet,target,source,GraphicsUnit.Pixel);return target;
     }
     public void Dispose(){sheet.Dispose();idle.Dispose();}
 }

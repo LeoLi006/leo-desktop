@@ -20,6 +20,11 @@ sealed partial class PetForm
         int line=0;
         foreach(var id in new[]{"382","20232","202","164"}){
             prefs.FootballModule=true;prefs.MatchDayOutfits=true;prefs.MatchDayKit=id;UpdateMatchDay();var skin=CurrentSkin();checks[id+"_loads_complete_atomic_skin"]=skin!=null;if(skin==null)continue;
+            using(var original=new Bitmap(Path.Combine(Store.Root,"assets","leo.png"))){
+                checks[id+"_uses_identical_default_pose_atlas"]=SkinAnimationTests.Hash(original)==SkinAnimationTests.Hash(skin.Main);
+                bool face=true;for(int y=0;y<110;y++)for(int x=0;x<192;x++){var p=original.GetPixel(x,y);if(p.A>128)face&=KitPalette.Replace(p,skin.NameOfKit)==p;}
+                checks[id+"_preserves_default_face_wool_ears_and_eyes"]=face;
+            }
             bool allFrames=true;var images=new HashSet<string>();
             for(int r=0;r<13;r++){
                 int count=r is 1 or 2 or 9 or 10?8:r is 3 or 11 or 12?4:r==4?5:r==5?8:6;
