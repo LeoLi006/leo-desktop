@@ -34,7 +34,9 @@ static class QuickRouter
         match=Regex.Match(text,@"^(?:查找应用|搜索应用|找应用)[：:\s]*(.*)$");if(match.Success)return new(QuickKind.SearchApp,match.Groups[1].Value);
         match=Regex.Match(text,@"^(?:网页搜索|联网搜索|搜一下|搜索)[：:\s]*(.+)$");if(match.Success)return new(QuickKind.Web,match.Groups[1].Value);
         if(Regex.IsMatch(text,"天气|新闻|汇率|股价")&&!Regex.IsMatch(text,"分析|总结|解读"))return new(QuickKind.Web,text);
-        bool football=team.Length>0||Regex.IsMatch(text,"足球|比赛|看球|球赛|欧冠|英超|西甲|美职联|球队近况")||text.Contains("今晚")&&Regex.IsMatch(text,"值得看|看什么");
+        bool national=ClubCatalog.Find(team)?.IsNational==true;
+        bool nationalFootball=Regex.IsMatch(text,"国家队|足球|球队|世界杯|欧洲杯|美洲杯|亚洲杯|进球|踢球|战术|开球")||Regex.IsMatch(text,"下一场|上一场|赛程|赛果|比分|积分榜|近况|排名")&&!Regex.IsMatch(text,"经济|人口|历史|旅游|签证|政治|地理|面积|语言|首都|科技|教育|文化|电影|总统");
+        bool football=team.Length>0&&(!national||nationalFootball)||Regex.IsMatch(text,"足球|比赛|看球|球赛|欧冠|英超|西甲|美职联|球队近况")||text.Contains("今晚")&&Regex.IsMatch(text,"值得看|看什么");
         if(football){
             bool analysis=Regex.IsMatch(text,"为什么|分析|解读|总结|怎么看|原因|预测|战术");
             if(analysis)return new(QuickKind.FootballAnalysis,text,team);

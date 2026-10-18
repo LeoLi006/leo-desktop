@@ -20,18 +20,19 @@ sealed class ClientOperationHub
     public ClientOperationHub(Action<LeoNotice> feedback){notify=feedback;}
     public Task<string> Run(string resource,string request,Func<ClientOperation,Task<string>> work,CancellationToken caller=default)
     {
+        void Emit(LeoNotice notice)=>notify(notice with{Module=resource=="music"?"music":resource=="clash"?"clash":notice.Module,OperationId=resource+":"+request});
         Task<string> task;lock(gate){string key=resource+"\n"+request;
             if(!pending.TryGetValue(key,out task!)){
                 var completion=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);task=completion.Task;pending[key]=task;
                 var previous=resources.GetValueOrDefault(resource)??Task.CompletedTask;resources[resource]=task;
                 long id=++sequence;
                 _=Task.Run(async()=>{
-                    var context=new ClientOperation(notice=>{lock(gate)if(id==sequence)notify(notice);});
+                    var context=new ClientOperation(notice=>{lock(gate)if(id==sequence)Emit(notice);});
                     using var linked=caller.Register(context.Cancel);_=context.OfferCancel();
                     try{context.Report("正在等待前一个操作…");try{await previous.WaitAsync(context.Token);}catch(Exception)when(!context.Token.IsCancellationRequested){}
-                    context.Token.ThrowIfCancellationRequested();string result=await work(context);context.Finish();lock(gate){pending.Remove(key);if(id==sequence)notify(new(result));}completion.TrySetResult(result);}
-                    catch(OperationCanceledException){context.Finish();lock(gate)if(id==sequence)notify(new("已停止后续操作，已启动的软件保留"));completion.TrySetCanceled();}
-                    catch(Exception e){context.Finish();lock(gate){pending.Remove(key);if(id==sequence)notify(new(e.Message,true,()=>Run(resource,request,work),ActionLabel:"重试"));}completion.TrySetException(e);}
+                    context.Token.ThrowIfCancellationRequested();string result=await work(context);context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(result));}completion.TrySetResult(result);}
+                    catch(OperationCanceledException){context.Finish();lock(gate)if(id==sequence)Emit(new("已停止后续操作，已启动的软件保留"));completion.TrySetCanceled();}
+                    catch(Exception e){context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(e.Message,true,()=>Run(resource,request,work),ActionLabel:"重试"));}completion.TrySetException(e);}
                     finally{lock(gate){if(pending.GetValueOrDefault(key)==task)pending.Remove(key);if(resources.GetValueOrDefault(resource)==task)resources.Remove(resource);}}
                 });
             }

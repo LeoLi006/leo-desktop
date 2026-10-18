@@ -1,0 +1,83 @@
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Security.Cryptography;
+using System.IO.Compression;
+namespace LeoLauncher;
+static class Upgrade46Tests
+{
+    static readonly DateTimeOffset now=new(2026,10,18,13,0,0,TimeSpan.FromHours(8));
+    public static Dictionary<string,bool> Check(string output)
+    {
+        Directory.CreateDirectory(output);var checks=new Dictionary<string,bool>();string run=Path.Combine(output,"cases-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(run);
+        string inboxFile=Path.Combine(run,"inbox.json");var inbox=new NoticeInbox(inboxFile);int actions=0;var item=inbox.Add("测试操作失败","error",unique:"operation-1",action:()=>{actions++;return Task.CompletedTask;});inbox.Add("重复到达的提醒","error",unique:"operation-1");
+        checks["inbox_deduplicates_and_persists_unread"]=inbox.Items.Count==1&&new NoticeInbox(inboxFile).Unread==1;
+        Pump(inbox.ActionFor(item.Id)!.Value.Run());checks["retry_actions_work_but_are_not_persisted"]=actions==1&&new NoticeInbox(inboxFile).ActionFor(item.Id)==null;
+        inbox.Read(item.Id);checks["read_status_persists"]=new NoticeInbox(inboxFile).Unread==0;inbox.Add("未读保留",unique:"unread-check");inbox.ClearRead();checks["clear_read_does_not_touch_unread"]=inbox.Items.Count==1&&inbox.Unread==1;inbox.ReadAll();inbox.ClearRead();
+        var focus=new FocusSession(Path.Combine(run,"focus.json"));focus.Start(25,true,now);var ordinary=new DailyTask("ordinary","普通事项",DateOnly.FromDateTime(now.Date),now);var important=ordinary with{Id="important",Important=true};var match=ordinary with{Id="match",MatchId="espn:123"};
+        checks["focus_routes_only_important_and_match_reminders_to_popups"]=!focus.ShouldInterrupt(ordinary,now)&&focus.ShouldInterrupt(important,now)&&focus.ShouldInterrupt(match,now);
+        checks["focus_survives_restart_without_extending_deadline"]=new FocusSession(Path.Combine(run,"focus.json")).Until==now.AddMinutes(25);
+        focus.SetImportant(false);checks["all_reminders_can_be_quiet_during_focus"]=!focus.ShouldInterrupt(important,now)&&!focus.ShouldInterrupt(match,now);checks["focus_completes_once"]=focus.Complete(now.AddMinutes(26))&&!focus.Complete(now.AddMinutes(27))&&focus.ShouldInterrupt(ordinary,now.AddMinutes(26));
+        var store=new TodoStore(null);var task=store.Add("右键标为重要",DateOnly.FromDateTime(DateTime.Today));store.SetImportant(task.Id,true);checks["task_importance_survives_serialization_and_undo"]=JsonSerializer.Deserialize<DailyTask>(JsonSerializer.Serialize(store.Items.Single()))!.Important;store.Undo();checks["task_importance_survives_serialization_and_undo"]&=!store.Items.Single().Important;
+        var p=new Preferences{ClipboardPauseUntil=now.AddMinutes(10),ClipboardBlockedApps=["Bitwarden","foo.bar.exe"]};checks["paused_clipboard_does_not_backfill"]=ClipboardPrivacy.ShouldSkip(p,now,null,null)&&!ClipboardPrivacy.Paused(p,now.AddMinutes(11));p.ClipboardPauseUntil=null;
+        checks["clipboard_owner_and_foreground_exclusions_match_exact_process"]=ClipboardPrivacy.ShouldSkip(p,now,"bitwarden.exe","notepad")&&ClipboardPrivacy.ShouldSkip(p,now,"other","FOO.BAR")&&!ClipboardPrivacy.ShouldSkip(p,now,"bitwardenhelper","notepad");
+        checks["common_secret_formats_are_rejected_but_normal_text_is_kept"]=ClipboardPrivacy.Sensitive("Bearer abcdefghijklmnopqrstuvwxyz123456")&&ClipboardPrivacy.Sensitive("sk-proj-abcdefghijklmnop123456")&&ClipboardPrivacy.Sensitive("-----BEGIN RSA PRIVATE KEY-----")&&ClipboardPrivacy.Sensitive("{\"password\":\"example-password\"}")&&!ClipboardPrivacy.Sensitive("明天去取快递，地址保存在收藏里");
+        var data=new DataObject();data.SetData("CanIncludeInClipboardHistory",new MemoryStream(new byte[4]));checks["windows_sensitive_clipboard_marker_is_respected"]=ClipboardPrivacy.MarkedPrivate(data);
+        var history=new ClipHistory(Path.Combine(run,"clipboard.json"));history.Add(new("text","old","old",now.AddDays(-8)));history.Add(new("text","favorite","favorite",now.AddDays(-80),true));history.Add(new("text","new","new",now));history.Expire(7,now);checks["expiry_preserves_favorites_and_recent_history"]=history.Items.Count==2&&history.Items.Any(i=>i.Content=="favorite")&&new ClipHistory(Path.Combine(run,"clipboard.json")).Items.Count==2;
+        var gateInbox=new NoticeInbox(null);int guarded=0;var guardedItem=gateInbox.Add("代理失败","error",unique:"clash:on",action:()=>{guarded++;return Task.CompletedTask;});gateInbox.Add("代理失败","error",action:()=>{guarded+=100;return Task.CompletedTask;});Pump(gateInbox.ActionFor(guardedItem.Id)!.Value.Run());checks["generic_duplicate_feedback_does_not_replace_guarded_retry"]=guarded==1;
+        bool invalid=false;try{ClipboardPrivacy.Apps(new string('a',81));}catch(ArgumentException){invalid=true;}checks["privacy_rules_validate_and_preserve_dotted_names"]=invalid&&ClipboardPrivacy.Apps("Bitwarden.exe\nbitwarden\nfoo.bar.exe").SequenceEqual(new[]{"bitwarden","foo.bar"});
+        checks["catalog_has_clubs_and_55_unique_national_teams"]=ClubCatalog.All.Count(c=>c.IsNational)==55&&ClubCatalog.All.Select(c=>c.Id).Distinct().Count()==ClubCatalog.All.Length&&Club.For("国足").Id=="658"&&Club.For("Argentina").IsNational&&!Club.For("曼城").IsNational;
+        checks["national_following_persists_and_tags_matches"]=NationalFollowing(run);
+        checks["country_abbreviations_do_not_match_inside_other_words"]=ClubCatalog.Mention("cancel request")==""&&ClubCatalog.Mention("check target settings")==""&&ClubCatalog.Mention("ARG 下一场")=="阿根廷";
+        checks["country_queries_route_locally_and_casual_mentions_stay_chat"]=QuickRouter.Route("阿根廷下一场什么时候").Kind==QuickKind.Football&&QuickRouter.Route("中国国家队赛程").Kind==QuickKind.Football&&QuickRouter.Route("我喜欢巴萨和曼城的球衣").Kind==QuickKind.Ai;
+        bool wrongCompetition=false;try{NationalCompetitions.ValidateTable(Club.For("中国") with{League="afc.asian.cup"},"{\"name\":\"AFC Champions League Two\"}");}catch(FormatException){wrongCompetition=true;}NationalCompetitions.ValidateTable(Club.For("中国") with{League="afc.asian.cup"},"{\"name\":\"AFC Asian Cup\"}");checks["country_tables_reject_similarly_named_club_competitions"]=wrongCompetition;
+        checks["country_mentions_do_not_hijack_nonfootball_analysis"]=QuickRouter.Route("分析一下中国的经济发展").Kind==QuickKind.Ai&&QuickRouter.Route("法国为什么这么大").Kind==QuickKind.Ai&&QuickRouter.Route("分析西班牙国家队的战术").Kind==QuickKind.FootballAnalysis;
+        checks["national_competition_caches_are_separate"]=TeamData.CachePath(Club.For("阿根廷"))!=TeamData.CachePath(Club.For("阿根廷") with{League="conmebol.america"})&&NationalCompetitions.For(Club.For("中国")).Any(c=>c.Id=="afc.asian.cup");
+        var fixture=new FootballMatch("game",now.AddHours(3),"fifa.friendly","202","Argentina","205","Brazil","pre","Scheduled","VS",true);
+        checks["matchday_uses_only_followed_valid_today_matches"]=MatchDay.Choose([fixture],["202"],now)?.Club.Id=="202"&&MatchDay.Choose([fixture],[],now)==null&&MatchDay.Choose([fixture with{Status="Postponed"}],["202"],now)==null&&MatchDay.Choose([fixture with{Kickoff=now.AddDays(1)}],["202"],now)==null;
+        checks["national_heavyweight_games_are_focus_matches"]=FootballFeed.IsFocus(fixture)&&FootballFeed.Name("Men's International Friendly")=="国际友谊赛";
+        checks["live_match_has_priority_over_later_match"]=MatchDay.Choose([fixture,fixture with{Id="live",State="in",Kickoff=now.AddMinutes(-20)}],["202"],now)?.Match.Id=="live";
+        RenderAssets(checks,output);inbox.Add("明天下午三点取快递","reminder",task.Id,"reminder-preview");inbox.Add("QQ音乐已接收点歌","operation");inbox.Add("示例：客户端未就绪，可稍后重试","error",action:()=>Task.CompletedTask);
+        using(var window=new NoticeInboxForm(inbox,_=>{}))Snapshot(window,Path.Combine(output,"notifications46.png"));focus.Start(25,true,DateTimeOffset.Now);using(var window=new FocusForm(focus,()=>{}))Snapshot(window,Path.Combine(output,"focus46.png"));using(var window=new ClipboardPrivacyForm(new Preferences(),()=>{},true))Snapshot(window,Path.Combine(output,"clipboard-privacy46.png"));using(var window=new UpdateForm(true))Snapshot(window,Path.Combine(output,"updates46.png"));
+        var follows=new FootballFollowing(null);follows.Replace(["83","382","20232","202","164","658"]);using(var window=new FollowingManager(follows)){Snapshot(window,Path.Combine(output,"national-following46.png"));window.Show();Application.DoEvents();var country=Descendants(window).OfType<BarcaButton>().Single(b=>b.Text=="国家队");country.PerformClick();Application.DoEvents();checks["country_filter_is_visible_and_selectable"]=country.Selected&&Descendants(window).OfType<FollowChoice>().Count()==55;Snapshot(window,Path.Combine(output,"national-only46.png"));}
+        using(var window=new BarcaWindow{ClientSize=new(900,700)}){var team=new TeamView("阿根廷",true,()=>{});window.Controls.Add(team);window.Show();Application.DoEvents();var combo=Descendants(window).OfType<ComboBox>().Single();combo.SelectedIndex=1;Application.DoEvents();checks["national_detail_switches_competition_in_same_window"]=combo.Text=="美洲杯"&&team.FindForm()==window;Snapshot(window,Path.Combine(output,"national-detail46.png"));}
+        using(var pet=new PetForm(new Preferences(),true)){pet.Show();Application.DoEvents();foreach(var pair in pet.VerifyCompanion46())checks[pair.Key]=pair.Value;}
+        Pump(Updates(checks,run));return checks;
+    }
+    static bool NationalFollowing(string run){var follows=new FootballFollowing(Path.Combine(run,"following.json"));follows.Replace(["83","202","658"]);var reopened=new FootballFollowing(Path.Combine(run,"following.json"));var m=new FootballMatch("n",now,"fifa.world","202","Argentina","205","Brazil","pre","Scheduled","VS",true);return reopened.Ids.SequenceEqual(new[]{"83","202","658"})&&FootballFeed.FollowTags(m,reopened.Names).SequenceEqual(new[]{"阿根廷"});}
+    static void RenderAssets(Dictionary<string,bool> checks,string output)
+    {
+        using var sprites=new MatchDaySprites();using var preview=new Bitmap(900,285);using var g=Graphics.FromImage(preview);g.Clear(BarcaUi.Canvas);bool transparent=true;int x=0;using var font=BarcaUi.Font(12,true);
+        foreach(var (id,name) in new[]{("382","曼城"),("20232","迈阿密国际"),("202","阿根廷"),("164","西班牙")}){string asset=MatchDay.Asset(id)!;var value=sprites.Get(asset);transparent&=value.Image.GetPixel(0,0).A<8&&value.Source.Width>0&&value.Source.Height>0;sprites.Draw(g,new RectangleF(x+22,8,180,220),asset,0);TextRenderer.DrawText(g,name,font,new Rectangle(x,245,225,30),BarcaUi.Gold,TextFormatFlags.HorizontalCenter);x+=225;}
+        preview.Save(Path.Combine(output,"matchday-kits46.png"));checks["all_four_generated_kits_have_alpha_and_render_without_clipping"]=transparent;
+    }
+    internal static IEnumerable<Control> Descendants(Control root){foreach(Control c in root.Controls){yield return c;foreach(var child in Descendants(c))yield return child;}}
+    static void Snapshot(Form form,string file){form.Show();Application.DoEvents();using var bitmap=new Bitmap(form.Width,form.Height);form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(file);form.Hide();}
+    static void Pump(Task task){var watch=System.Diagnostics.Stopwatch.StartNew();while(!task.IsCompleted&&watch.ElapsedMilliseconds<15000){Application.DoEvents();Thread.Sleep(5);}if(!task.IsCompleted)throw new TimeoutException("focused check timed out");task.GetAwaiter().GetResult();}
+    sealed class MockHttp(Func<HttpRequestMessage,CancellationToken,Task<HttpResponseMessage>> respond):HttpMessageHandler{protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)=>respond(request,token);}
+    static HttpResponseMessage Reply(string text,HttpStatusCode code=HttpStatusCode.OK)=>new(code){Content=new StringContent(text)};
+    static async Task Updates(Dictionary<string,bool> checks,string root)
+    {
+        string tag="v999.0.0",filename="Leo-v999.0.0-win-x64.zip";string package=LeoUpdates.AssetUrl(tag,filename),sha=LeoUpdates.AssetUrl(tag,filename+".sha256");
+        string json=JsonSerializer.Serialize(new{tag_name=tag,draft=false,prerelease=false,body="更新说明",assets=new[]{new{name=filename,browser_download_url=package},new{name=filename+".sha256",browser_download_url=sha}}});var release=LeoUpdates.ParseRelease(json);
+        checks["updates_accept_only_matching_official_asset_urls"]=!release.SourceOnly&&LeoUpdates.ParseRelease(json.Replace(package,"https://example.com/package.zip")).SourceOnly;
+        using(var http=new HttpClient(new MockHttp((request,_)=>Task.FromResult(request.RequestUri!.AbsolutePath.EndsWith("latest")?Reply("",HttpStatusCode.NotFound):Reply("[{\"name\":\"v999.0.0\"}]"))))){var found=await LeoUpdates.Check(http,CancellationToken.None);checks["source_only_tags_never_offer_automatic_install"]=found is {SourceOnly:true}&&found.PackageUrl=="";}
+        string zip=Path.Combine(root,"release-fixture.zip");using(var archive=ZipFile.Open(zip,ZipArchiveMode.Create)){var manifest=new ReleaseManifest{Version="999.0.0"};foreach(string name in new[]{"LeoLauncher.exe","LeoLauncher.dll","coreclr.dll","System.Windows.Forms.dll"}){byte[] data=Encoding.UTF8.GetBytes("fixture "+name);manifest.Files[name]=Convert.ToHexString(SHA256.HashData(data));using var stream=archive.CreateEntry("payload/"+name).Open();stream.Write(data);}using var writer=new StreamWriter(archive.CreateEntry("payload/release-manifest.json").Open());writer.Write(JsonSerializer.Serialize(manifest));}
+        byte[] bytes=File.ReadAllBytes(zip);string checksum=Convert.ToHexString(SHA256.HashData(bytes))+"  "+filename;
+        using(var http=new HttpClient(new MockHttp((request,_)=>Task.FromResult(request.RequestUri!.AbsoluteUri.EndsWith(".sha256")?Reply(checksum):new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(bytes)})))){string payload=await LeoUpdates.Download(http,release,Path.Combine(root,"good-cache"),null,CancellationToken.None);checks["update_download_checks_hash_and_manifest_before_install"]=LeoInstaller.Verify(payload).Version=="999.0.0";}
+        bool rejected=false;using(var http=new HttpClient(new MockHttp((request,_)=>Task.FromResult(request.RequestUri!.AbsoluteUri.EndsWith(".sha256")?Reply(new string('0',64)+"  "+filename):new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(bytes)}))))try{await LeoUpdates.Download(http,release,Path.Combine(root,"bad-cache"),null,CancellationToken.None);}catch(IOException){rejected=true;}
+        checks["bad_update_checksum_is_rejected_and_partial_files_removed"]=rejected&&!Directory.EnumerateFiles(Path.Combine(root,"bad-cache"),"*",SearchOption.AllDirectories).Any();
+        string slip=Path.Combine(root,"slip.zip");using(var archive=ZipFile.Open(slip,ZipArchiveMode.Create)){using var writer=new StreamWriter(archive.CreateEntry("payload/../../escape.dll").Open());writer.Write("bad");}rejected=false;try{LeoUpdates.ExtractVerified(slip,Path.Combine(root,"extract"),release);}catch(IOException){rejected=true;}checks["update_extraction_blocks_path_traversal"]=rejected&&!File.Exists(Path.Combine(root,"escape.dll"));
+        using var cancel=new CancellationTokenSource();cancel.Cancel();using(var http=new HttpClient(new MockHttp((_,token)=>Task.FromCanceled<HttpResponseMessage>(token)))){rejected=false;try{await LeoUpdates.Download(http,release,Path.Combine(root,"cancel-cache"),null,cancel.Token);}catch(OperationCanceledException){rejected=true;}checks["canceling_download_preserves_current_install"]=rejected;}
+    }
+}
+sealed partial class PetForm
+{
+    internal Dictionary<string,bool> VerifyCompanion46()
+    {
+        var checks=new Dictionary<string,bool>();notices.Add("示例提醒","reminder");int before=launcherOpens;hit.SimulateClick(new Point(Width-10,10));checks["unread_dot_opens_inbox_without_toggling_launcher"]=noticeWindow?.Visible==true&&launcherOpens==before;noticeWindow?.Close();
+        focus.Start(25,true,DateTimeOffset.Now);row=3;Animate();checks["focus_keeps_idle_quiet_and_does_not_disable_chat"]=row==0&&animation.Interval==1000;ShowChat();checks["focus_keeps_idle_quiet_and_does_not_disable_chat"]&=chat?.Visible==true;chat?.Close();focus.Stop();
+        var national=Club.For("阿根廷");prefs.MatchDayKit=national.Id;UpdateMatchDay();checks["manual_matchday_kit_is_drawn_only_when_module_enabled"]=matchDayAsset=="argentina-v1.png";prefs.FootballModule=false;UpdateMatchDay();using var image=new Bitmap(Width,Height);using var g=Graphics.FromImage(image);checks["manual_matchday_kit_is_drawn_only_when_module_enabled"]&=!DrawMatchDay(g,PetDrawingBounds(ClientSize));prefs.FootballModule=true;return checks;
+    }
+}

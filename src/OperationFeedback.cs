@@ -1,13 +1,14 @@
 namespace LeoLauncher;
 
-sealed record LeoNotice(string Text, bool Error = false, Func<Task>? Retry = null, bool Busy = false, string ActionLabel = "重试");
+sealed record LeoNotice(string Text, bool Error = false, Func<Task>? Retry = null, bool Busy = false, string ActionLabel = "重试",string? Module=null,string? OperationId=null);
 static class OperationFeedback
 {
     public static Action<LeoNotice>? Sink;
     public static void Show(string text) => Sink?.Invoke(new(text));
+    public static void Result(string text,string module,string operationId)=>Sink?.Invoke(new(text,Module:module,OperationId:operationId));
     public static void Undo(string text,Action action)=>Sink?.Invoke(new(text,Retry:()=>{action();Show("已撤销");return Task.CompletedTask;},ActionLabel:"撤销"));
     public static void Pending(string text) => Sink?.Invoke(new(text, Busy: true));
-    public static void Error(string text, Func<Task>? retry = null,string label="重试") => Sink?.Invoke(new(text, true, retry,ActionLabel:label));
+    public static void Error(string text, Func<Task>? retry = null,string label="重试",string? module=null,string? operationId=null) => Sink?.Invoke(new(text, true, retry,ActionLabel:label,Module:module,OperationId:operationId));
 }
 
 sealed class LeoToast : Form
@@ -63,7 +64,9 @@ sealed partial class PetForm
     {
         if (IsDisposed || Disposing || previewMode) return;
         if (InvokeRequired) { BeginInvoke(() => PresentFeedback(notice)); return; }
-        if (hiddenForFullscreen) return;
+        if(!notice.Busy&&notice.Retry!=null&&notice.Module!=null){var retryAction=notice.Retry;string module=notice.Module;notice=notice with{Retry=()=>{Modules.Require(prefs,module);return retryAction();}};}
+        if(!notice.Busy)notices.Add(notice.Text,notice.Error?"error":"operation",unique:notice.OperationId==null?"":(notice.Error?"error:":"result:")+notice.OperationId+":"+DateTime.Now.ToString("yyyyMMddHHmm"),action:notice.Retry,label:notice.ActionLabel);
+        if (hiddenForFullscreen||focus.Active(DateTimeOffset.Now)&&!notice.Busy&&!notice.Error) return;
         feedback ??= new LeoToast(() => Bounds);
         feedback.Present(notice);
     }

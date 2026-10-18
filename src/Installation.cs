@@ -87,11 +87,11 @@ static class LeoInstaller
 sealed class InstallForm:BarcaWindow
 {
     readonly TextBox path=new(){BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text};bool busy;
-    public InstallForm()
+    public InstallForm(string? initialTarget=null)
     {
         Text="Leo · 安装与更新";ClientSize=new(590,355);BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;Font=BarcaUi.Font(10);StartPosition=FormStartPosition.CenterScreen;MaximizeBox=false;
         var chrome=BarcaUi.Chrome(this,"LEO  /  安装与更新","首次安装无需开发环境。更新保留个人数据，并自动备份。");
-        path.Bounds=new(24,116,430,30);path.Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Leo");var browse=new BarcaButton{Text="选择…",Bounds=new(466,114,98,33)};
+        path.Bounds=new(24,116,430,30);path.Text=initialTarget??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Leo");var browse=new BarcaButton{Text="选择…",Bounds=new(466,114,98,33)};
         browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog{Description="选择 Leo 专用文件夹",UseDescriptionForTitle=true,SelectedPath=path.Text};if(picker.ShowDialog(this)==DialogResult.OK)path.Text=picker.SelectedPath;};
         var shortcut=new CheckBox{Text="创建开始菜单入口",Checked=true,Bounds=new(24,164,250,29),ForeColor=BarcaUi.Text};var launch=new CheckBox{Text="完成后启动 Leo",Checked=true,Bounds=new(300,164,250,29),ForeColor=BarcaUi.Text};
         var status=new Label{Text="更新前会备份程序和个人配置；安装失败自动恢复程序。",Bounds=new(24,210,540,67),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)};var install=new BarcaButton{Text="安装 / 更新",Bounds=new(424,294,140,36)};var rollback=new BarcaButton{Text="回退上次更新",Bounds=new(258,294,150,36)};

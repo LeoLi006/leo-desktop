@@ -1,0 +1,13 @@
+﻿National team catalog and badges
+Verified: 2026-10-18
+55 senior men's national teams, merged with the existing club catalog.
+Sources:
+https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/teams?limit=100
+https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.friendly/teams?limit=300
+Schedules: https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/{id}/schedule
+Standings: https://site.api.espn.com/apis/v2/sports/soccer/{competition}/standings
+Badges: https://a.espncdn.com/i/teamlogos/soccer/500/{id}.png
+USA badge: https://a.espncdn.com/i/teamlogos/countries/500/usa.png
+Team identifiers, names, competitions, logos and flags remain the property of the respective rights holders. No player likenesses are used in the generated lamb assets.
+
+Asian Cup uses afc.asian.cup. The similarly named afc.cup is a club competition and must not be used for national-team tables. National table responses are checked against competition metadata before caching.

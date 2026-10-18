@@ -125,6 +125,8 @@ sealed class SettingsForm : BarcaWindow
         var context = Check("结合前台应用与使用时段排序", 275, p.ContextAware);
         var clipboard = Check("保存剪贴板历史", 315, p.ClipboardHistory);
         var migrate=new BarcaButton{Text="配置迁移与恢复…",Bounds=new Rectangle(8,362,225,34)};migrate.Click+=(_,_)=>{using var dialog=new ConfigMigrationForm(p,next=>apply(next,!preview&&LeoStartup.Enabled),configImported??(()=>{}),preview,applications);if(dialog.ShowDialog(this)==DialogResult.OK)Close();};general.Controls.Add(migrate);
+        var privacy=new BarcaButton{Text="剪贴板保护…",Bounds=new Rectangle(242,362,150,34)};privacy.Click+=(_,_)=>{using var dialog=new ClipboardPrivacyForm(p,()=>{},preview);dialog.ShowDialog(this);};general.Controls.Add(privacy);
+        var update=new BarcaButton{Text="检查更新…",Bounds=new Rectangle(404,362,146,34)};update.Click+=(_,_)=>{using var dialog=new UpdateForm(preview);dialog.ShowDialog(this);};general.Controls.Add(update);
         var fields = new[]{p.SearchHotkey,p.VoiceHotkey,p.LyricsHotkey}.Select(k => new HotkeyField(k)).ToArray();
         foreach(var field in fields){field.Enter+=(_,_)=>capture?.Invoke(true);field.Leave+=(_,_)=>capture?.Invoke(false);}
         Deactivate+=(_,_)=>capture?.Invoke(false);
@@ -167,6 +169,7 @@ sealed partial class PetForm
             try { LeoStartup.SetEnabled(startup); Store.Save(next); }
             catch { LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
+        prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.MatchDayOutfits=next.MatchDayOutfits;prefs.MatchDayKit=next.MatchDayKit;ClipboardPrivacy.Notify();matchDayLoaded=-60000;
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
         Modules.SetFootball(prefs.FootballModule);foot.ConfigureModules(prefs);launcher.RefreshModules();

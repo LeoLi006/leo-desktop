@@ -50,13 +50,18 @@ static class FootballFeed
         return following.Where(x=>ClubCatalog.Find(x) is {} club&&Has(club.Id)).ToArray();
     }
     static readonly HashSet<string> BigClubs = new() { "83", "86", "1068", "382", "364", "360", "359", "363", "367", "160", "132", "111", "110", "103", "124", "114", "104", "105", "131", "11420", "176", "167", "174" };
-    public static bool IsFocus(FootballMatch m) => BigClubs.Contains(m.HomeId) && BigClubs.Contains(m.AwayId);
+    static readonly HashSet<string> BigNationals=["202","205","478","164","481","482","448","162","449","459","477","212","208"];
+    public static bool IsFocus(FootballMatch m) => BigClubs.Contains(m.HomeId) && BigClubs.Contains(m.AwayId)||BigNationals.Contains(m.HomeId)&&BigNationals.Contains(m.AwayId);
     static readonly Dictionary<string, string> Names = new(StringComparer.OrdinalIgnoreCase) {
         ["Barcelona"]="巴塞罗那", ["Inter Miami CF"]="迈阿密国际", ["Manchester City"]="曼城", ["Argentina"]="阿根廷", ["Real Madrid"]="皇家马德里", ["Atlético Madrid"]="马德里竞技", ["Atletico Madrid"]="马德里竞技", ["Liverpool"]="利物浦", ["Arsenal"]="阿森纳", ["Chelsea"]="切尔西", ["Manchester United"]="曼联", ["Tottenham Hotspur"]="热刺", ["Bayern Munich"]="拜仁慕尼黑", ["Borussia Dortmund"]="多特蒙德", ["Paris Saint-Germain"]="巴黎圣日耳曼", ["Juventus"]="尤文图斯", ["AC Milan"]="AC米兰", ["Internazionale"]="国际米兰", ["Spanish LALIGA"]="西甲", ["English Premier League"]="英超", ["UEFA Champions League"]="欧冠", ["MLS"]="美职联", ["Italian Serie A"]="意甲", ["German Bundesliga"]="德甲", ["French Ligue 1"]="法甲"
     };
     public static string Name(string text)
     {
         if (text.StartsWith("UEFA Champions League", StringComparison.OrdinalIgnoreCase)) return "欧冠";
+        if(text.Contains("World Cup Qualif",StringComparison.OrdinalIgnoreCase))return "世界杯预选赛";
+        if(text.Contains("FIFA World Cup",StringComparison.OrdinalIgnoreCase))return "世界杯";
+        if(text.Contains("International Friendly",StringComparison.OrdinalIgnoreCase))return "国际友谊赛";
+        foreach(var (english,chinese) in new[]{("UEFA European Championship","欧洲杯"),("UEFA Nations League","欧国联"),("Copa America","美洲杯"),("Copa América","美洲杯"),("Asian Cup","亚洲杯"),("Africa Cup of Nations","非洲杯"),("Gold Cup","中北美金杯赛")})if(text.Contains(english,StringComparison.OrdinalIgnoreCase))return chinese;
         var known=ClubCatalog.Find(text);if(known!=null)return known.Name;
         return text switch { "LALIGA" => "西甲", "Bundesliga" => "德甲", "Serie A" => "意甲", "Ligue 1" => "法甲", "Ipswich Town" => "伊普斯维奇", "Real Betis" => "皇家贝蒂斯", "Atlanta United FC" => "亚特兰大联", "AEK Athens" => "雅典AEK", "Aston Villa" => "阿斯顿维拉", "Red Bull New York" => "纽约红牛", "New York Red Bulls" => "纽约红牛", "FC Cincinnati" => "辛辛那提FC", _ => ClubNames.Translate(Names.GetValueOrDefault(text, text)) };
     }

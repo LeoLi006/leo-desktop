@@ -28,6 +28,7 @@ sealed class ConfigMigration
         if(bundle.Format!="LeoConfig"||bundle.Version!=1)throw new ArgumentException("不支持这个配置文件版本。");
         var p=bundle.Preferences;
         if(p==null||p.PetSize is <80 or >230||p.Favorites==null||p.Favorites.Any(string.IsNullOrWhiteSpace)||p.Aliases==null||p.ModuleExecutables==null||p.Aliases.Any(x=>x.Value==null||x.Value.Any(a=>string.IsNullOrWhiteSpace(a)||a.Length>30)))throw new ArgumentException("外观、收藏或简称配置无效。");
+        if(p.ClipboardExpireDays is not(0 or 1 or 7 or 30)||p.ClipboardBlockedApps==null||p.ClipboardBlockedApps.Count>60)throw new ArgumentException("剪贴板保护规则无效。");ClipboardPrivacy.Apps(string.Join("\n",p.ClipboardBlockedApps));if(p.MatchDayKit is not("auto" or "83" or "382" or "20232" or "202" or "164"))throw new ArgumentException("比赛日装扮配置无效。");
         LeoHotkeys.Validate(LeoHotkeys.Values(p));
         if(bundle.Combos==null||bundle.Combos.Count>24||bundle.Combos.Select(c=>c.Id).Distinct().Count()!=bundle.Combos.Count||bundle.Combos.Select(c=>c.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=bundle.Combos.Count)throw new ArgumentException("自定义组合配置无效。");
         foreach(var combo in bundle.Combos)ComboStore.Validate(combo);

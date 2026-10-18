@@ -21,6 +21,7 @@ static class ClientOperationTests
         checks["slow_operation_exposes_working_cancel"]=offer!=null&&delayed.IsCanceled;
         hub=new(_=>{});int failures=0;try{await hub.Run("client","retry",_=>{failures++;throw new IOException("fixture failure");});}catch(IOException){}
         string recovered=await hub.Run("client","retry",_=>Task.FromResult("recovered"));checks["failed_request_is_removed_and_can_retry"]=failures==1&&recovered=="recovered";
+        var routed=new System.Collections.Concurrent.ConcurrentQueue<LeoNotice>();hub=new(routed.Enqueue);await hub.Run("music","play:fixture",_=>Task.FromResult("accepted"));checks["feedback_identifies_module_and_semantic_request"]=routed.Any(n=>n.Module=="music"&&n.OperationId=="music:play:fixture");
         return checks;
     }
 }

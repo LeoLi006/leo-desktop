@@ -12,7 +12,19 @@ sealed partial class PetForm
 {
     readonly System.Windows.Forms.Timer reminderTimer=new(){Interval=15000};
     readonly TodoStore todoStore;
-    void CheckReminders(){if(hiddenForFullscreen||QuietHours.Load().Contains(DateTime.Now)){if(reminders?.Visible==true)reminders.Hide();return;}if(reminders!=null&&!reminders.IsDisposed&&!reminders.Visible&&reminders.PendingCount>0)reminders.Present([]);try{todoStore.EnsureThrough(DateOnly.FromDateTime(DateTime.Today).AddDays(35));var due=todoStore.Due(DateTimeOffset.Now).Where(t=>!matchSyncBusy||t.MatchId==null).ToArray();if(due.Length==0)return;if(reminders==null||reminders.IsDisposed)reminders=new ReminderForm(todoStore,OpenReminderTask);reminders.Present(due);todoStore.MarkNotified(due.Select(t=>t.Id),DateTimeOffset.Now);tray.BalloonTipTitle="Leo · 清单提醒";tray.BalloonTipText=string.Join("\n",due.Take(3).Select(t=>t.Title))+"\n点提醒窗口可延后10分钟或1小时";tray.ShowBalloonTip(10000);}catch{/* A failed save remains eligible for the next check. */}}
+    void CheckReminders()
+    {
+        bool concentrating=focus.Active(DateTimeOffset.Now);
+        if(concentrating&&reminders!=null&&!reminders.IsDisposed)reminders.Retain(t=>focus.AllowImportant&&(t.Important||t.MatchId!=null));
+        if(hiddenForFullscreen||QuietHours.Load().Contains(DateTime.Now)){if(reminders?.Visible==true)reminders.Hide();return;}
+        if(reminders!=null&&!reminders.IsDisposed&&!reminders.Visible&&reminders.PendingCount>0)reminders.Present([]);
+        try{todoStore.EnsureThrough(DateOnly.FromDateTime(DateTime.Today).AddDays(35));var due=todoStore.Due(DateTimeOffset.Now).Where(t=>!matchSyncBusy||t.MatchId==null).ToArray();if(due.Length==0)return;
+            foreach(var task in due)notices.Add(task.Title,"reminder",task.Id,"reminder:"+task.Id+":"+task.Reminder?.ToString("O")+":"+task.SnoozedUntil?.ToString("O"));
+            var visible=due.Where(t=>focus.ShouldInterrupt(t,DateTimeOffset.Now)).ToArray();
+            if(visible.Length>0){if(reminders==null||reminders.IsDisposed)reminders=new ReminderForm(todoStore,OpenReminderTask);reminders.Present(visible);tray.BalloonTipTitle="Leo · 清单提醒";tray.BalloonTipText=string.Join("\n",visible.Take(3).Select(t=>t.Title))+"\n可在通知收纳盒再次查看";tray.ShowBalloonTip(10000);}
+            var delivered=notices.Error==null?due:visible;if(delivered.Length>0)todoStore.MarkNotified(delivered.Select(t=>t.Id),DateTimeOffset.Now);
+        }catch{/* Failed reminder saves remain eligible for the next check. */}
+    }
     async Task<string> ExecuteLeoAction(string action,string value,CancellationToken token){token.ThrowIfCancellationRequested();if(!LeoActions.Names.Contains(action))throw new ArgumentException("不支持的功能");Modules.Require(prefs,Modules.ForAction(action));
         switch(action){
             case "launcher_open":ShowLauncher();return "已打开应用搜索，可以查看收藏、设置简称与排序。";

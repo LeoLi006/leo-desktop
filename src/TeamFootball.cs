@@ -1,8 +1,10 @@
 ﻿using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
-sealed record Club(string Name,string Id,string League,string LeagueName,string English="",string[]? Aliases=null)
+sealed record Club(string Name,string Id,string League,string LeagueName,string English="",string[]? Aliases=null,string Kind="club")
 {
+    public bool IsNational=>Kind=="national";
+    public string CompetitionName=>NationalCompetitions.Name(this);
     public static Club For(string name)=>ClubCatalog.Find(name)??throw new ArgumentException("球队尚未收录："+name);
 }
 sealed record LeagueRow(string Group,string Id,string Name,string Rank,string Played,string Won,string Drawn,string Lost,string Goals,string Difference,string Points);
@@ -13,7 +15,7 @@ sealed class TeamData
     public string Season {get;set;}="";
     public List<FootballMatch> Matches {get;set;}=new();
     public List<LeagueRow> Rows {get;set;}=new();
-    public static string CachePath(Club club)=>Path.Combine(Store.Root,"leo-team-"+club.Id+".json");
+    public static string CachePath(Club club)=>Path.Combine(Store.Root,"leo-team-"+club.Id+(club.IsNational?"-"+club.League:"")+".json");
     public static TeamData Load(Club club){try{return JsonSerializer.Deserialize<TeamData>(File.ReadAllText(CachePath(club)))??new();}catch{return new();}}
     public static (string Season,List<LeagueRow> Rows) ParseTable(string json)
     {
@@ -49,14 +51,14 @@ sealed class TeamData
             data.Matches=all.Where(m=>m.State=="post").OrderByDescending(m=>m.Kickoff).Take(10).Concat(all.Where(m=>m.State!="post"&&m.Kickoff>=DateTimeOffset.UtcNow.AddDays(-1)).OrderBy(m=>m.Kickoff).Take(10)).ToList();
             data.MatchesUpdated=DateTimeOffset.UtcNow;mf=false;
         }catch{}
-        if(responses[2]!=null)try{var table=ParseTable(responses[2]!);data.Rows=table.Rows;data.Season=table.Season;data.TableUpdated=DateTimeOffset.UtcNow;tf=false;}catch{}
+        if(responses[2]!=null)try{NationalCompetitions.ValidateTable(club,responses[2]!);var table=ParseTable(responses[2]!);if(club.IsNational&&table.Rows.Any(row=>ClubCatalog.Find(row.Id) is {IsNational:false}))throw new FormatException("国家队积分榜返回了俱乐部数据");data.Rows=table.Rows;data.Season=table.Season;data.TableUpdated=DateTimeOffset.UtcNow;tf=false;}catch{}
         if(!mf||!tf)try{File.WriteAllText(CachePath(club)+".tmp",JsonSerializer.Serialize(data));File.Move(CachePath(club)+".tmp",CachePath(club),true);}catch{}
         return(data,mf,tf);
     }
 }
 sealed class TeamView:UserControl
 {
-    readonly Club club;
+    Club club;ComboBox? competitionSelector;
     readonly TodoStore? tasks;
     readonly bool preview;
     TeamData data;
@@ -71,19 +73,20 @@ sealed class TeamView:UserControl
         tasks=planner;club=Club.For(name);preview=previewMode;data=TeamData.Load(club);Dock=DockStyle.Fill;BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;Font=BarcaUi.Font();
         var chrome=new Panel{Dock=DockStyle.Top,Height=66};
         var back=new BarcaButton{Text="‹ 返回",Bounds=new Rectangle(24,15,86,33),AccessibleName="返回赛程"};back.Click+=(_,_)=>goBack();chrome.Controls.Add(back);
-        chrome.Controls.Add(new Label{Text=club.Name+"  /  "+club.LeagueName,Bounds=new Rectangle(130,12,600,29),Font=BarcaUi.Font(14,true),ForeColor=BarcaUi.Text});
+        var competitionTitle=new Label{Text=club.Name+"  /  "+club.CompetitionName,Bounds=new Rectangle(130,12,600,29),Font=BarcaUi.Font(14,true),ForeColor=BarcaUi.Text};chrome.Controls.Add(competitionTitle);
         chrome.Controls.Add(new Label{Text="最近10场赛果 · 未来10场赛程",Bounds=new Rectangle(132,42,600,20),Font=BarcaUi.Font(8.5f),ForeColor=BarcaUi.Muted});
         var toolbar=new Panel{Dock=DockStyle.Top,Height=54};toolbar.Controls.AddRange([matches,table,refresh]);matches.Click+=(_,_)=>{tab=0;Render();};table.Click+=(_,_)=>{tab=1;Render();};refresh.Click+=async(_,_)=>await LoadAsync(true);
+        if(club.IsNational){table.Text="赛事积分榜";var competitions=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Bounds=new Rectangle(390,12,228,29),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text};CompanionUi.ThemeCombo(competitions);competitionSelector=competitions;var choices=NationalCompetitions.For(club);competitions.Items.AddRange(choices.Select(c=>c.Name).Cast<object>().ToArray());competitions.SelectedIndex=0;competitions.SelectedIndexChanged+=async(_,_)=>{if(busy)return;var choice=choices[competitions.SelectedIndex];club=club with{League=choice.Id};competitionTitle.Text=club.Name+"  /  "+club.CompetitionName;data=TeamData.Load(club);tab=1;Render();competitions.Enabled=false;try{await LoadAsync(true);}finally{if(!IsDisposed)competitions.Enabled=true;}};toolbar.Controls.Add(competitions);}
         Controls.Add(list);Controls.Add(status);Controls.Add(toolbar);Controls.Add(chrome);Resize+=(_,_)=>Render();Load+=async(_,_)=>{Render();if(!preview)await LoadAsync(false);};Render();
     }
     async Task LoadAsync(bool force)
     {
         if(busy||preview)return;
         if(!force&&data.MatchesUpdated>DateTimeOffset.UtcNow.AddMinutes(-10)&&data.TableUpdated>DateTimeOffset.UtcNow.AddMinutes(-10)){Render();return;}
-        busy=true;refresh.Enabled=false;status.Text="正在更新球队赛程与联赛积分榜…";
+        busy=true;if(competitionSelector!=null)competitionSelector.Enabled=false;refresh.Enabled=false;status.Text="正在更新球队赛程与积分榜…";
         try{var result=await TeamData.Fetch(club,data,lifetime.Token);data=result.Data;if(!result.MatchesFailed)tasks?.SyncMatches(data.Matches,data.MatchesUpdated);matchesFailed=result.MatchesFailed;tableFailed=result.TableFailed;if(!IsDisposed)Render();}
         catch(OperationCanceledException){}
-        finally{busy=false;if(!IsDisposed)refresh.Enabled=true;}
+        finally{busy=false;if(!IsDisposed){refresh.Enabled=true;if(competitionSelector!=null)competitionSelector.Enabled=true;}}
     }
     void Heading(string text){list.Controls.Add(new Label{Text=text,Width=Math.Max(700,list.ClientSize.Width-55),Height=35,Padding=new Padding(5,8,0,0),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});}
     void Render()
@@ -99,16 +102,17 @@ sealed class TeamView:UserControl
                 if(!rows.Any())list.Controls.Add(new Label{Text="暂无已公布的数据",Width=width,Height=42,Padding=new Padding(5,10,0,0),ForeColor=BarcaUi.Muted});
             }
         }else{
-            Heading(club.LeagueName+"  ·  "+data.Season);
+            var year=System.Text.RegularExpressions.Regex.Match(data.Season,@"\d{4}(?:-\d{2,4})?");Heading(club.CompetitionName+"  ·  "+(club.IsNational&&year.Success?year.Value:data.Season));
+            if(club.IsNational&&data.Rows.Count>0&&!data.Rows.Any(r=>r.Id==club.Id))Heading(club.Name+"未出现在该届积分榜中 · 下方显示完整赛事");
             foreach(var group in data.Rows.GroupBy(r=>r.Group)){
                 if(data.Rows.Select(r=>r.Group).Distinct().Count()>1)Heading(ClubNames.Translate(group.Key));
                 list.Controls.Add(new StandingsLine(null,false){Width=width});
                 foreach(var row in group.OrderBy(r=>int.TryParse(r.Rank,out int rank)?rank:int.MaxValue))list.Controls.Add(new StandingsLine(row,row.Id==club.Id){Width=width});
             }
-            if(data.Rows.Count==0)Heading("暂无积分榜数据，请稍后刷新");
+            if(data.Rows.Count==0)Heading(club.IsNational?"当前赛事暂无小组积分榜（未开赛或已进入淘汰赛），可切换其他赛事":"暂无积分榜数据，请稍后刷新");
         }
         var updated=tab==0?data.MatchesUpdated:data.TableUpdated;bool failed=tab==0?matchesFailed:tableFailed;
-        status.Text="ESPN  ·  "+(updated==default?"暂无缓存":updated.ToLocalTime().ToString("MM-dd HH:mm")+" 更新")+(failed?" · 更新失败，显示已有缓存":" · 缓存10分钟")+"  ·  "+club.LeagueName;
+        status.Text="ESPN  ·  "+(updated==default?"暂无缓存":updated.ToLocalTime().ToString("MM-dd HH:mm")+" 更新")+(failed?" · 更新失败，显示已有缓存":" · 缓存10分钟")+"  ·  "+club.CompetitionName;
         list.ResumeLayout();
     }
     void OpenSource(string url){if(preview)return;try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url){UseShellExecute=true});}catch{status.Text="无法打开浏览器";}}

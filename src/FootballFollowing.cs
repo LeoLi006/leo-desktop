@@ -6,8 +6,9 @@ static class ClubCatalog
     public static readonly Club[] All=JsonSerializer.Deserialize<Club[]>(File.ReadAllText(Path.Combine(Store.Root,"assets","clubs.json")))??throw new IOException("球队目录缺失");
     public static Club? Find(string name)=>All.FirstOrDefault(c=>c.Id==name||c.Name.Equals(name,StringComparison.OrdinalIgnoreCase)||c.English.Equals(name,StringComparison.OrdinalIgnoreCase)||c.Aliases?.Contains(name,StringComparer.OrdinalIgnoreCase)==true);
     public static IEnumerable<string> Names(Club c)=>new[]{c.Name,c.English}.Concat(c.Aliases??[]).Where(s=>s.Length>1);
-    public static string Mention(string text)=>All.SelectMany(c=>Names(c).Select(alias=>(c,alias))).OrderByDescending(x=>x.alias.Length).FirstOrDefault(x=>text.Contains(x.alias,StringComparison.OrdinalIgnoreCase)).c?.Name??"";
-    public static string Pattern=>"(?:"+string.Join("|",All.SelectMany(Names).Distinct().OrderByDescending(s=>s.Length).Select(System.Text.RegularExpressions.Regex.Escape))+")";
+    public static string AliasPattern(string alias)=>System.Text.RegularExpressions.Regex.IsMatch(alias,@"^[A-Za-z0-9 .-]+$")?@"(?<![A-Za-z0-9])"+System.Text.RegularExpressions.Regex.Escape(alias)+@"(?![A-Za-z0-9])":System.Text.RegularExpressions.Regex.Escape(alias);
+    public static string Mention(string text)=>All.SelectMany(c=>Names(c).Select(alias=>(c,alias))).OrderByDescending(x=>x.alias.Length).FirstOrDefault(x=>System.Text.RegularExpressions.Regex.IsMatch(text,AliasPattern(x.alias),System.Text.RegularExpressions.RegexOptions.IgnoreCase)).c?.Name??"";
+    public static string Pattern=>"(?:"+string.Join("|",All.SelectMany(Names).Distinct().OrderByDescending(s=>s.Length).Select(AliasPattern))+")";
 }
 
 sealed class FootballFollowing
@@ -37,9 +38,9 @@ sealed class FollowingManager:BarcaWindow
     public FollowingManager(FootballFollowing store)
     {
         following=store;selected=store.Ids.ToHashSet();Text="Leo · 管理关注";StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(740,635);
-        var header=BarcaUi.Chrome(this,"我的球队","五大联赛球队库 · 搜索、筛选，选择自己的关注");
+        var header=BarcaUi.Chrome(this,"我的球队","俱乐部与国家队 · 搜索、筛选，选择自己的关注");
         var filters=new Panel{Dock=DockStyle.Top,Height=102};filters.Controls.Add(query);var leagues=new FlowLayoutPanel{Bounds=new Rectangle(20,53,700,40)};
-        foreach(string name in new[]{"全部","英超","西甲","意甲","德甲","法甲","美职联"}){var button=new BarcaButton{Text=name,Size=new Size(83,30),Selected=name==league};button.Click+=(_,_)=>{league=name;foreach(var b in leagues.Controls.OfType<BarcaButton>()){b.Selected=b.Text==name;b.Invalidate();}Render();};leagues.Controls.Add(button);}filters.Controls.Add(leagues);
+        foreach(string name in new[]{"全部","英超","西甲","意甲","德甲","法甲","美职联","国家队"}){var button=new BarcaButton{Text=name,Size=new Size(75,30),Selected=name==league};button.Click+=(_,_)=>{league=name;foreach(var b in leagues.Controls.OfType<BarcaButton>()){b.Selected=b.Text==name;b.Invalidate();}Render();};leagues.Controls.Add(button);}filters.Controls.Add(leagues);
         var footer=new Panel{Dock=DockStyle.Bottom,Height=58};var save=new BarcaButton{Text="保存关注",Bounds=new Rectangle(581,9,130,35)};save.Click+=(_,_)=>{try{following.Replace(ClubCatalog.All.Where(c=>selected.Contains(c.Id)).Select(c=>c.Id));DialogResult=DialogResult.OK;}catch(Exception e){count.Text=e.Message;}};footer.Controls.AddRange([count,save]);
         Controls.Add(rows);Controls.Add(footer);Controls.Add(filters);Controls.Add(header);query.TextChanged+=(_,_)=>Render();Render();
     }

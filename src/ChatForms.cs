@@ -219,7 +219,7 @@ sealed partial class ChatForm : BarcaWindow
             turn.Status = "未完成";retryPrompt=prompt;retryHasTools=turn.ToolLog.Count>0;if(!IsDisposed)retryReply.Visible=true;
             string message = error is System.Net.Http.HttpRequestException ? "连接失败，请检查中转站地址、网络与系统代理" : error.Message;
             message = message.Replace(key, "[Key 已隐藏]", StringComparison.Ordinal);
-            if (!IsDisposed) state.Text = message.Length > 240 ? message[..240] : message;
+            if (!IsDisposed){state.Text = message.Length > 240 ? message[..240] : message;if(!preview)OperationFeedback.Error("聊天回复未完成，可回到聊天窗口重试",()=>{if(IsDisposed)throw new InvalidOperationException("聊天窗口已关闭，请从 Leo 重新打开。");OnUi(()=>{Show();Activate();input.Focus();});return Task.CompletedTask;},label:"回到聊天");}
         }
         finally
         {

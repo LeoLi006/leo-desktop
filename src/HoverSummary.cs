@@ -57,7 +57,7 @@ sealed partial class PetForm
             if (clock.ElapsedMilliseconds - hoverSince < 650) return;
             if(hoverCard?.Visible==true&&clock.ElapsedMilliseconds-summaryRenderedAt<30000)return;summaryRenderedAt=clock.ElapsedMilliseconds;
             if (clock.ElapsedMilliseconds - summaryLoadedAt > 60000||summaryFollowingVersion!=FootballFollowing.Current.Version) { summaryFollowingVersion=FootballFollowing.Current.Version;summaryMatches = prefs.FootballModule?LeoSummary.CachedMatches():[]; summaryLoadedAt = clock.ElapsedMilliseconds; }
-            hoverCard ??= new HoverCard(); hoverCard.Present(prefs.FootballModule?LeoSummary.Build(todoStore.Items,summaryMatches,DateTimeOffset.Now):LeoSummary.Build(todoStore.Items,[],DateTimeOffset.Now).Split("\n\n下一场关注比赛")[0],Bounds);
+            hoverCard ??= new HoverCard(); string focusText=(notices.Unread>0?notices.Unread+" 条未读通知 · 点击右上金点查看\n":"")+(focus.Active(DateTimeOffset.Now)?"专注中 · 还剩 "+focus.Remaining(DateTimeOffset.Now)+"\n\n":"");hoverCard.Present(focusText+(prefs.FootballModule?LeoSummary.Build(todoStore.Items,summaryMatches,DateTimeOffset.Now):LeoSummary.Build(todoStore.Items,[],DateTimeOffset.Now).Split("\n\n下一场关注比赛")[0]),Bounds);
         };
         hoverTimer.Start();
     }

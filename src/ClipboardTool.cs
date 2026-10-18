@@ -50,6 +50,7 @@ sealed class ClipHistory
     }
     public void Delete(ClipItem item) { Remember(Items.Where(x=>x.Key==item.Key));Items.RemoveAll(x => x.Key == item.Key); Save(); }
     public void Clear() { Remember(Items.Where(x=>!x.Pinned));Items.RemoveAll(x => !x.Pinned); Save(); }
+    public void Expire(int days,DateTimeOffset now){if(days<=0)return;int removed=Items.RemoveAll(i=>!i.Pinned&&i.Time<now.AddDays(-days));if(removed>0){undo.Clear();Save();}}
     public List<ClipItem> Search(string query) => Items.Where(x => x.Label.Contains(query, StringComparison.OrdinalIgnoreCase) || (x.Kind != "image" && x.Content.Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
     void Save()
     {
@@ -65,27 +66,33 @@ sealed class ClipboardHistoryService : IDisposable
     readonly System.Windows.Forms.Timer timer = new() { Interval = 450 };
     readonly Preferences prefs;
     readonly bool preview;
-    uint lastSequence;
+    uint lastSequence;DateTimeOffset lastExpiry;
+    public void RefreshPrivacy(){History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastSequence=GetClipboardSequenceNumber();}
+    public void OpenPrivacy(IWin32Window? owner=null){using var form=new ClipboardPrivacyForm(prefs,RefreshPrivacy,preview);form.ShowDialog(owner);}
     public ClipHistory History { get; }
     public ClipboardHistoryService(Preferences p, bool previewMode = false)
     {
         prefs = p; preview = previewMode;
         History = new(preview ? null : Path.Combine(Store.Root, "leo-clipboard.json"));
+        History.Expire(p.ClipboardExpireDays,DateTimeOffset.Now);
         timer.Tick += (_, _) => Capture();
+        ClipboardPrivacy.Changed+=RefreshPrivacy;
         if (!preview) timer.Start();
     }
     public bool Enabled { get => prefs.ClipboardHistory; set { prefs.ClipboardHistory = value; lastSequence = GetClipboardSequenceNumber(); Store.Save(prefs); } }
     public void Capture()
     {
         if (preview) return;
+        if(DateTimeOffset.Now-lastExpiry>TimeSpan.FromSeconds(30)){History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastExpiry=DateTimeOffset.Now;}
         uint sequence = GetClipboardSequenceNumber();
-        if (!Enabled) { lastSequence = sequence; return; }
+        if(!Enabled||ClipboardPrivacy.Paused(prefs,DateTimeOffset.Now)){lastSequence=sequence;return;}
         if (sequence == lastSequence) return;
+        if(ClipboardPrivacy.ShouldSkip(prefs,DateTimeOffset.Now,ClipboardPrivacy.OwnerApp(),DesktopContext.Read()?.Process)){lastSequence=sequence;return;}
         try
         {
             var formats = Clipboard.GetDataObject();
             // Respect Windows' exclusion marker used by password managers and sensitive apps.
-            if (formats?.GetDataPresent("ExcludeClipboardContentFromMonitorProcessing") == true) { lastSequence = sequence; return; }
+            if (ClipboardPrivacy.MarkedPrivate(formats)) { lastSequence = sequence; return; }
             ClipItem? item = null;
             if (Clipboard.ContainsFileDropList())
             {
@@ -95,6 +102,7 @@ sealed class ClipboardHistoryService : IDisposable
             else if (Clipboard.ContainsText())
             {
                 string text = Clipboard.GetText();
+                if (prefs.ClipboardBlockSecrets&&ClipboardPrivacy.Sensitive(text)){lastSequence=sequence;return;}
                 if (text.Length > 0 && text.Length <= 100_000) item = new("text", text, text.Replace('\r', ' ').Replace('\n', ' ')[..Math.Min(100, text.Length)], DateTimeOffset.Now);
             }
             else if (Clipboard.ContainsImage())
@@ -125,9 +133,9 @@ sealed class ClipboardHistoryService : IDisposable
             using var stream = new MemoryStream(Convert.FromBase64String(item.Content));
             using var image = Image.FromStream(stream); Clipboard.SetImage(image);
         }
-        lastSequence = GetClipboardSequenceNumber(); History.Add(item with { Time = DateTimeOffset.Now });
+        lastSequence = GetClipboardSequenceNumber(); if(Enabled&&!ClipboardPrivacy.Paused(prefs,DateTimeOffset.Now)&&!(prefs.ClipboardBlockSecrets&&item.Kind=="text"&&ClipboardPrivacy.Sensitive(item.Content)))History.Add(item with { Time = DateTimeOffset.Now });
     }
-    public void Dispose() => timer.Dispose();
+    public void Dispose(){ClipboardPrivacy.Changed-=RefreshPrivacy;timer.Dispose();}
 }
 
 static class ClipboardTool
@@ -144,7 +152,7 @@ static class ClipboardTool
         if (service == null) return null;
         service.Capture();
         var window = new Form { FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = Color.FromArgb(24, 29, 44), ForeColor = Color.White };
-        var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 76, Padding = new Padding(8), WrapContents = true };
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 112, Padding = new Padding(8), WrapContents = true };
         var search = new TextBox { Width = 190, PlaceholderText = "搜索剪切板历史", BackColor = Appearance.Field, ForeColor = Appearance.Ink, BorderStyle = BorderStyle.FixedSingle };
         var enabled = new CheckBox { Text = "记录历史", Checked = service.Enabled, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
         var copy = new Button { Text = "复制", Width = 65, Height = 28 };
@@ -154,7 +162,8 @@ static class ClipboardTool
         var pin = new Button { Text = "收藏", Width = 80, Height = 28 };
         var onlyPins = new CheckBox { Text = "只看收藏", AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
         foreach (var button in new[] { copy, delete, clear, pin,undoButton }) { button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderSize = 0; button.BackColor = Appearance.Field; }
-        bar.Controls.AddRange([search, enabled, copy, pin, delete, clear,undoButton, onlyPins]);
+        var privacy=new BarcaButton{Text="隐私保护…",Width=105,Height=28};privacy.Click+=(_,_)=>service.OpenPrivacy(window);
+        bar.Controls.AddRange([search, enabled, copy, pin, delete, clear,undoButton, onlyPins,privacy]);
         var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = Color.FromArgb(32, 39, 55) };
         var list = new ListBox { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(32, 39, 55), ForeColor = Color.White, IntegralHeight = false, ItemHeight = 30 };
         var text = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(40, 47, 65), ForeColor = Color.White, BorderStyle = BorderStyle.None };

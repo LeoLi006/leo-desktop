@@ -806,5 +806,618 @@
     "Aliases": [
       "迈阿密"
     ]
+  },
+  {
+    "Name": "库拉索",
+    "Id": "11678",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Curaçao",
+    "Aliases": [
+      "CUW"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "意大利",
+    "Id": "162",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Italy",
+    "Aliases": [
+      "ITA"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "西班牙",
+    "Id": "164",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Spain",
+    "Aliases": [
+      "西班牙国家队",
+      "西班牙队",
+      "ESP"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "阿根廷",
+    "Id": "202",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Argentina",
+    "Aliases": [
+      "阿根廷国家队",
+      "ARG"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "墨西哥",
+    "Id": "203",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Mexico",
+    "Aliases": [
+      "MEX"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "巴西",
+    "Id": "205",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Brazil",
+    "Aliases": [
+      "BRA"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "加拿大",
+    "Id": "206",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Canada",
+    "Aliases": [
+      "CAN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "智利",
+    "Id": "207",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Chile",
+    "Aliases": [
+      "CHI"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "哥伦比亚",
+    "Id": "208",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Colombia",
+    "Aliases": [
+      "COL"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "厄瓜多尔",
+    "Id": "209",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Ecuador",
+    "Aliases": [
+      "ECU"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "巴拉圭",
+    "Id": "210",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Paraguay",
+    "Aliases": [
+      "PAR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "秘鲁",
+    "Id": "211",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Peru",
+    "Aliases": [
+      "PER"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "乌拉圭",
+    "Id": "212",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Uruguay",
+    "Aliases": [
+      "URU"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "乌兹别克斯坦",
+    "Id": "2570",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Uzbekistan",
+    "Aliases": [
+      "UZB"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "佛得角",
+    "Id": "2597",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Cape Verde",
+    "Aliases": [
+      "CPV"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "埃及",
+    "Id": "2620",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Egypt",
+    "Aliases": [
+      "EGY"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "海地",
+    "Id": "2654",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Haiti",
+    "Aliases": [
+      "HAI"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "巴拿马",
+    "Id": "2659",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Panama",
+    "Aliases": [
+      "PAN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "新西兰",
+    "Id": "2666",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "New Zealand",
+    "Aliases": [
+      "NZL"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "刚果民主共和国",
+    "Id": "2850",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Congo DR",
+    "Aliases": [
+      "COD"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "摩洛哥",
+    "Id": "2869",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Morocco",
+    "Aliases": [
+      "MAR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "约旦",
+    "Id": "2917",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Jordan",
+    "Aliases": [
+      "JOR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "伊拉克",
+    "Id": "4375",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Iraq",
+    "Aliases": [
+      "IRQ"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "卡塔尔",
+    "Id": "4398",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Qatar",
+    "Aliases": [
+      "QAT"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "加纳",
+    "Id": "4469",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Ghana",
+    "Aliases": [
+      "GHA"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "英格兰",
+    "Id": "448",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "England",
+    "Aliases": [
+      "英格兰国家队",
+      "ENG"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "荷兰",
+    "Id": "449",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Netherlands",
+    "Aliases": [
+      "NED"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "捷克",
+    "Id": "450",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Czechia",
+    "Aliases": [
+      "CZE"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "韩国",
+    "Id": "451",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "South Korea",
+    "Aliases": [
+      "KOR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "波黑",
+    "Id": "452",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Bosnia-Herzegovina",
+    "Aliases": [
+      "BIH"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "比利时",
+    "Id": "459",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Belgium",
+    "Aliases": [
+      "BEL"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "挪威",
+    "Id": "464",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Norway",
+    "Aliases": [
+      "NOR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "土耳其",
+    "Id": "465",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Türkiye",
+    "Aliases": [
+      "TUR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "瑞典",
+    "Id": "466",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Sweden",
+    "Aliases": [
+      "SWE"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "南非",
+    "Id": "467",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "South Africa",
+    "Aliases": [
+      "RSA"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "伊朗",
+    "Id": "469",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Iran",
+    "Aliases": [
+      "IRN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "波兰",
+    "Id": "471",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Poland",
+    "Aliases": [
+      "POL"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "奥地利",
+    "Id": "474",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Austria",
+    "Aliases": [
+      "AUT"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "瑞士",
+    "Id": "475",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Switzerland",
+    "Aliases": [
+      "SUI"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "克罗地亚",
+    "Id": "477",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Croatia",
+    "Aliases": [
+      "CRO"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "法国",
+    "Id": "478",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "France",
+    "Aliases": [
+      "FRA"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "科特迪瓦",
+    "Id": "4789",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Ivory Coast",
+    "Aliases": [
+      "CIV"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "丹麦",
+    "Id": "479",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Denmark",
+    "Aliases": [
+      "DEN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "德国",
+    "Id": "481",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Germany",
+    "Aliases": [
+      "GER"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "葡萄牙",
+    "Id": "482",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Portugal",
+    "Aliases": [
+      "葡萄牙国家队",
+      "POR"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "威尔士",
+    "Id": "578",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Wales",
+    "Aliases": [
+      "WAL"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "苏格兰",
+    "Id": "580",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Scotland",
+    "Aliases": [
+      "SCO"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "阿尔及利亚",
+    "Id": "624",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Algeria",
+    "Aliases": [
+      "ALG"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "日本",
+    "Id": "627",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Japan",
+    "Aliases": [
+      "JPN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "澳大利亚",
+    "Id": "628",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Australia",
+    "Aliases": [
+      "AUS"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "塞内加尔",
+    "Id": "654",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Senegal",
+    "Aliases": [
+      "SEN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "沙特阿拉伯",
+    "Id": "655",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Saudi Arabia",
+    "Aliases": [
+      "KSA"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "中国",
+    "Id": "658",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "China",
+    "Aliases": [
+      "中国国家队",
+      "国足",
+      "CHN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "突尼斯",
+    "Id": "659",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "Tunisia",
+    "Aliases": [
+      "TUN"
+    ],
+    "Kind": "national"
+  },
+  {
+    "Name": "美国",
+    "Id": "660",
+    "League": "fifa.world",
+    "LeagueName": "国家队",
+    "English": "United States",
+    "Aliases": [
+      "美国国家队",
+      "USA"
+    ],
+    "Kind": "national"
   }
 ]

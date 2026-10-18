@@ -12,6 +12,7 @@ sealed partial class TodoView
         Item("移到明天",()=>store.MoveTo(task.Id,DateOnly.FromDateTime(DateTime.Today).AddDays(1)));
         Item("选择日期…",()=>PickTaskDate(task));
         Item("设置提醒…",()=>EditReminder(task));
+        Item(task.Important?"取消重要标记":"标为重要（专注时可提醒）",()=>store.SetImportant(task.Id,!task.Important));
         if(task.SeriesId!=null)Item("仅跳过本次",()=>store.SkipOccurrence(task.Id),task.Completed==null);
         menu.Items.Add(new ToolStripSeparator());Item("删除事项",()=>store.Delete(task.Id));Item("撤销上一步",()=>store.Undo(),store.CanUndo);
         void Attach(Control control){control.ContextMenuStrip=menu;foreach(Control child in control.Controls)Attach(child);}

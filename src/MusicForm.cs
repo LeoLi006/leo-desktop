@@ -59,8 +59,8 @@ sealed partial class MusicForm:BarcaWindow
     {
         try{if(!preview){state.Text="正在准备QQ音乐并点歌…";OperationFeedback.Pending(state.Text);await QQMusic.RequestPlayAsync(song,lifetime.Token);if(IsDisposed)return false;}}
         catch(OperationCanceledException){if(!IsDisposed)state.Text="已取消后续点歌";return false;}
-        catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error("点歌失败："+e.Message,async()=>{await Play(song);});}return false;}
-        state.Text="已发送到QQ音乐："+song.Name;if(!preview)OperationFeedback.Show(state.Text);try{history.Add(song);}catch{state.Text+=" · 使用记录未保存";}return true;
+        catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error("点歌失败："+e.Message,async()=>{await Play(song);},module:"music",operationId:"music:play:"+song.Id);}return false;}
+        state.Text="已发送到QQ音乐："+song.Name;if(!preview)OperationFeedback.Result(state.Text,"music","music:play:"+song.Id);try{history.Add(song);}catch{state.Text+=" · 使用记录未保存";}return true;
     }
     public void Home()=>Display(history.Items.ToArray(),"最近点歌");
     public MusicSong[] Candidates=>latest;

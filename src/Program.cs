@@ -21,6 +21,12 @@ sealed class Preferences
     public bool ContextAware { get; set; } = true;
     public List<string> Favorites { get; set; } = new();
     public bool ClipboardHistory { get; set; } = true;
+    public DateTimeOffset? ClipboardPauseUntil{get;set;}
+    public int ClipboardExpireDays{get;set;}=7;
+    public bool ClipboardBlockSecrets{get;set;}=true;
+    public List<string> ClipboardBlockedApps{get;set;}=["1Password","Bitwarden","KeePass","KeePassXC","LastPass","Dashlane"];
+    public bool MatchDayOutfits{get;set;}=true;
+    public string MatchDayKit{get;set;}="auto";
     public Dictionary<string, string[]> Aliases { get; set; } = new();
     public bool HideInFullscreen { get; set; } = true;
     public bool EdgeDocking { get; set; } = true;
@@ -181,7 +187,7 @@ static class Program
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--package-smoke-test"){try{var checks=PackageSmokeTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--package-verify"){try{var release=LeoInstaller.Verify(AppContext.BaseDirectory);bool selfContained=new[]{typeof(object).Assembly.Location,typeof(Form).Assembly.Location}.All(p=>p.StartsWith(AppContext.BaseDirectory,StringComparison.OrdinalIgnoreCase));File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=selfContained,version=release.Version,files=release.Files.Count,self_contained=selfContained}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.Message}));Environment.ExitCode=1;}return;}
-        if(args.Length==1&&args[0]=="--install-wizard"){Application.Run(new InstallForm());return;}
+        if(args.Length>=1&&args[0]=="--install-wizard"){string? target=args.Length==3&&args[1]=="--target"?args[2]:null;Application.Run(new InstallForm(target));return;}
         if(args.Length==2&&args[0]=="--ask-data-test")
         {
             int models=0;using var window=new ChatForm(false,new ChatSettings(),()=>{models++;throw new InvalidOperationException("不应请求模型");});window.Opacity=0;window.Show();Application.DoEvents();
@@ -189,6 +195,7 @@ static class Program
             Pump(window.PreviewSendAsync("曼城排第几"));bool table=window.PreviewTableRows>0;string first=window.PreviewState;Pump(window.PreviewSendAsync("巴萨下一场什么时候"));bool matches=window.PreviewMatchCards>0;
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
+        if(args.Length==2&&args[0]=="--upgrade46-test"){try{var checks=Upgrade46Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--recovery45-test"){var checks=new Dictionary<string,bool>();Upgrade45Tests.Recovery(checks,Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0}));return;}
         if(args.Length==2&&args[0]=="--upgrade45-test"){var checks=Upgrade45Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));return;}
         if(args.Length==2&&args[0]=="--client-operations-test"){var checks=Task.Run(ClientOperationTests.Check).GetAwaiter().GetResult();File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));return;}
@@ -442,6 +449,7 @@ sealed partial class PetForm : Form
     public PetForm(Preferences p, bool preview = false, bool demo = false)
     {
         if(!preview)Modules.SetFootball(p.FootballModule);
+        notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
         prefs = p; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
@@ -471,13 +479,13 @@ sealed partial class PetForm : Form
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
-        WireMusicMenu(menu);WireComboMenu(menu);
+        WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireMatchDayMenu(menu);
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
         tray.DoubleClick += (_, _) => ShowLauncher();
         // Dock hover is handled by the animation timer so shrinking hit bounds cannot cancel tucking.
-        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { dockClickReveal=dockMotion.Progress>.001f; BeginDragPickup();RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
+        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { noticePress=notices.Unread>0&&dockMotion.Progress<.001f&&e.X>=Width-24&&e.Y<24;if(noticePress){ShowNotices();return;}dockClickReveal=dockMotion.Progress>.001f; BeginDragPickup();RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
         hit.MouseMove += (_, e) => {
             if (!hit.Capture || (Control.MouseButtons & MouseButtons.Left) == 0) return;
             var delta = new Size(Cursor.Position.X - mouseDown.X, Cursor.Position.Y - mouseDown.Y);
@@ -485,6 +493,7 @@ sealed partial class PetForm : Form
         };
         hit.MouseUp += (_, e) => {
             if (e.Button != MouseButtons.Left) return;
+            if(noticePress){noticePress=false;return;}
             bool revealOnly=dockClickReveal;dockClickReveal=false;
             hit.Capture = false;
             if (movedWhileLocked) return;
@@ -535,6 +544,7 @@ sealed partial class PetForm : Form
         if(resourcesDisposed||IsDisposed||Disposing)return;
         if (dragging) { int next = dragTransition.Advance(clock.ElapsedMilliseconds); if (row != next) { row = next; frame = 0; } }
         bool thinking = launcher.HasTextInput || foot.HasTextInput || chat?.IsThinking == true;
+        if(focus.Active(DateTimeOffset.Now)&&!dragging&&!thinking){row=frame=0;animation.Interval=1000;Invalidate();return;}
         int desired = dragging ? row : thinking ? 8 : row != 0 && row != 8 && clock.ElapsedMilliseconds <= rowUntil ? row : 0;
         if (desired != row) { row = desired; frame = 0; }
         animation.Interval = dragging && dragTransition.IsPending ? 40 : row == 8 ? 420 : row is 11 or 12 ? 180 : 140;
@@ -603,8 +613,10 @@ sealed partial class PetForm : Form
     void DrawPet(Graphics graphics, RectangleF destination)
     {
         if(DrawDragPickup(graphics,destination)||DrawDockPet(graphics,destination))return;
+        if(row==0&&DrawMatchDay(graphics,destination)){DrawCompanionBadges(graphics,destination);return;}
         bool vertical = row is 11 or 12;
         graphics.DrawImage(vertical ? verticalAtlas : atlas, destination, new Rectangle(frame * 192, (vertical ? row - 11 : row) * 208, 192, 208), GraphicsUnit.Pixel);
+        DrawCompanionBadges(graphics,destination);
     }
     static RectangleF PetDrawingBounds(Size size)
     {
@@ -802,6 +814,7 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
+        companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();matchDaySprites?.Dispose();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
