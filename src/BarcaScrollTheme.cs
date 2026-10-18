@@ -64,7 +64,7 @@ sealed class SpeechSurface:Panel
         var g=e.Graphics;g.Clear(Parent?.BackColor??BarcaUi.Canvas);if(Width<3||Height<3)return;
         g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using var path=Appearance.Path(new Rectangle(1,1,Width-3,Height-3),15);using var fill=new SolidBrush(BackColor);g.FillPath(fill,path);
-        using var outline=new Pen(IsUser?Color.FromArgb(44,68,104):Color.FromArgb(76,48,68));g.DrawPath(outline,path);
+        using var outline=new Pen(IsUser?UiTheme.Color(44,68,104):UiTheme.Color(76,48,68));g.DrawPath(outline,path);
         using var accent=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(18,5,60,3),Appearance.Blue,Appearance.Red,0f);g.FillRectangle(accent,18,5,60,3);
     }
 }

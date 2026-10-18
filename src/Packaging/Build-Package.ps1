@@ -28,6 +28,12 @@ Copy-Item -LiteralPath (Join-Path $corePack 'THIRD-PARTY-NOTICES.TXT') -Destinat
 Copy-Item -LiteralPath (Join-Path $desktopPack 'LICENSE') -Destination (Join-Path $noticeDir 'windowsdesktop-LICENSE.txt')
 # Build from source; never read installed app or personal data.
 Copy-Item -LiteralPath (Join-Path $root 'src/USER_GUIDE.md'),(Join-Path $root 'src/RELEASE_NOTES.md') -Destination $payload
+# Ship the public example screenshots with the guide; never capture personal desktop data.
+$screenshotDir=Join-Path $payload 'assets/docs/screenshots'
+New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'src/docs/screenshots/v0.50-five-themes.png'),(Join-Path $root 'src/docs/screenshots/v0.50-ui-detail.png'),(Join-Path $root 'src/docs/screenshots/v0.50-launcher.png'),(Join-Path $root 'src/docs/screenshots/v0.50-football.png') -Destination $screenshotDir
+$guideCopy=Join-Path $payload 'USER_GUIDE.md'
+(Get-Content -LiteralPath $guideCopy -Raw).Replace('](docs/screenshots/','](assets/docs/screenshots/') | Set-Content -LiteralPath $guideCopy -Encoding utf8
 # Keep supplemental docs under the already-supported assets path so older updaters
 # can verify this release without accepting a new top-level filename.
 $animationDocs=Join-Path $payload 'assets/docs'
@@ -35,7 +41,7 @@ New-Item -ItemType Directory -Path $animationDocs -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'src/ANIMATION-NOTES.md') -Destination $animationDocs
 $releaseCopy=Join-Path $payload 'RELEASE_NOTES.md'
 $releaseText=Get-Content -LiteralPath $releaseCopy -Raw
-$releaseText.Replace('](ANIMATION-NOTES.md)','](assets/docs/ANIMATION-NOTES.md)') | Set-Content -LiteralPath $releaseCopy -Encoding utf8
+$releaseText.Replace('](ANIMATION-NOTES.md)','](assets/docs/ANIMATION-NOTES.md)').Replace('](docs/screenshots/','](assets/docs/screenshots/') | Set-Content -LiteralPath $releaseCopy -Encoding utf8
 Get-ChildItem -LiteralPath $payload -File | Where-Object {$_.Extension -in '.pdb','.xml'} | Remove-Item
 $files=[ordered]@{}
 foreach($file in Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName){

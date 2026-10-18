@@ -108,7 +108,7 @@ sealed partial class PetForm
     bool movingDock;
     long dockFootShownAt;
     bool dockAwaitExit,dockClickReveal;
-    void BeginDockTuck(){var side=DockMotion.Detect(Bounds,Screen.FromControl(this).WorkingArea,foot.ReservedSpace,dockSide);if(!prefs.EdgeDocking||side==DockSide.None)return;dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
+    void BeginDockTuck(){var side=DesktopDock.Detect(Bounds,foot.ReservedSpace,dockSide);if(!prefs.EdgeDocking||side==DockSide.None)return;dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
     void StartDockAnimation(){if(previewMode)return;dockMotion.Reset(clock.ElapsedMilliseconds);dockTimer.Tick+=(_,_)=>UpdateDockAnimation();dockTimer.Start();}
     void RevealDock(bool immediate=false)
     {
@@ -138,8 +138,8 @@ sealed partial class PetForm
     }
     void AdvanceDock(long now,Point pointer)
     {
-        var anchor=new Rectangle(new Point(Left-dockShift.X,Top-dockShift.Y),Size);var area=Screen.FromRectangle(anchor).WorkingArea;
-        var side=prefs.EdgeDocking?DockMotion.Detect(anchor,area,foot.ReservedSpace,dockSide):DockSide.None;
+        var anchor=new Rectangle(new Point(Left-dockShift.X,Top-dockShift.Y),Size);var area=DesktopDock.Area(anchor,DesktopDock.Displays());
+        var side=prefs.EdgeDocking?DesktopDock.Detect(anchor,foot.ReservedSpace,dockSide):DockSide.None;
         if(dockAwaitExit&&dockMotion.Progress>.995f&&!hit.Bounds.Contains(pointer))dockAwaitExit=false;
         bool engaged=!dockAwaitExit&&hit.Bounds.Contains(pointer)||foot.Visible&&(foot.Bounds.Contains(pointer)||foot.IsSearchOpen)||dragging||launcher.Visible||feedback?.IsBusy==true||ContextMenuStrip?.Visible==true;
         if(side!=DockSide.None)dockSide=side;

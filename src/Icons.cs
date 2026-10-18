@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace LeoLauncher;
 
-sealed class AppIcons : IDisposable
+sealed partial class AppIcons : IDisposable
 {
     readonly Dictionary<string, Bitmap> images = new(StringComparer.OrdinalIgnoreCase);
     readonly object gate = new();

@@ -14,7 +14,7 @@ static class SkinSelection
 
 sealed partial class PetForm
 {
-    void UpdateSkin(){bool changed=SkinSelection.Migrate(prefs);if(changed&&!previewMode)Store.Save(prefs);Invalidate();}
+    void UpdateSkin(){bool changed=SkinSelection.Migrate(prefs);if(changed&&!previewMode)Store.Save(prefs);UiTheme.Configure(SkinSelection.Id(prefs),prefs.DisplayName);if(tray!=null)tray.Text=UiTheme.Name+" · 桌面伙伴";Invalidate();}
     void WireSkinMenu(ContextMenuStrip menu)
     {
         UpdateSkin();var skins=new ToolStripMenuItem("皮肤");menu.Items.Insert(2,skins);

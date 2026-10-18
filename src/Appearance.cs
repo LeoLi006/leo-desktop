@@ -3,14 +3,14 @@ namespace LeoLauncher;
 
 static class Appearance
 {
-    public static readonly Color Background = Color.FromArgb(16, 27, 49);
-    public static readonly Color Ink = Color.FromArgb(235, 239, 248);
-    public static readonly Color Muted = Color.FromArgb(157, 174, 200);
-    public static readonly Color Field = Color.FromArgb(28, 44, 70);
-    public static readonly Color Accent = Color.FromArgb(224, 191, 118);
-    public static readonly Color Blue = Color.FromArgb(37, 75, 132);
-    public static readonly Color Red = Color.FromArgb(130, 34, 67);
-    public static readonly Color Hover = Color.FromArgb(36, 53, 82);
+    public static Color Background => UiTheme.Color(16, 27, 49);
+    public static Color Ink => UiTheme.Color(235, 239, 248);
+    public static Color Muted => UiTheme.Color(157, 174, 200);
+    public static Color Field => UiTheme.Color(28, 44, 70);
+    public static Color Accent => UiTheme.Color(224, 191, 118);
+    public static Color Blue => UiTheme.Color(37, 75, 132);
+    public static Color Red => UiTheme.Color(130, 34, 67);
+    public static Color Hover => UiTheme.Color(36, 53, 82);
     public static Font Body(float size = 9.5f) => new("Microsoft YaHei UI", size, FontStyle.Regular);
     public static GraphicsPath Path(Rectangle bounds, int radius)
     {

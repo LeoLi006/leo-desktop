@@ -100,7 +100,7 @@ sealed class SettingsForm : BarcaWindow
         var navigation = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 50, Padding = new Padding(22, 10, 0, 0) };
         var host = new Panel { Dock = DockStyle.Fill, Padding = new Padding(22, 4, 22, 8) };
         var footer = new Panel { Dock = DockStyle.Bottom, Height = 77, Padding = new Padding(24, 8, 24, 12) };
-        var general = new Panel { Dock = DockStyle.Fill }; var shortcuts = new Panel { Dock = DockStyle.Fill }; var api = new Panel { Dock = DockStyle.Fill };
+        var general = new Panel { Dock = DockStyle.Fill, AutoScroll=true }; var shortcuts = new Panel { Dock = DockStyle.Fill }; var api = new Panel { Dock = DockStyle.Fill };
         var scene=new SceneSettings(preview,applications);var modules=new ModulesView(p);var checks=new HealthChecksView(p,preview,hotkeyStatus);var usage=new UsageSettingsView(preview);host.Controls.AddRange([general, shortcuts, api,scene,modules,checks,usage]);
         var status = new Label { Bounds = new Rectangle(24, 7, 440, 59), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(8.5f) };
         var save = new BarcaButton { Text = "保存设置", Bounds = new Rectangle(500, 14, 112, 36), ForeColor = BarcaUi.Gold };
@@ -109,9 +109,9 @@ sealed class SettingsForm : BarcaWindow
         void Select(int index) { for (int i = 0; i < pages.Length; i++) { pages[i].Visible = i == index; tabs[i].Selected = i == index; tabs[i].Invalidate(); } save.Visible = index < 2||index==4; status.Text = index==4?"功能开关与停靠设置保存后立即生效。":index==5?"检查默认只读取本机状态；API 连接需手动检测。":index==6?"限额单独保存；本地操作不占用模型请求额度。":index == 3 ? "新建或编辑组合后保存；执行时不调用模型 API。" : index == 2 ? "API 单独保存；Key 只在本机加密存储。" : "常规与快捷键统一保存，立即生效。"; }
         foreach (var (label, index) in new[] { ("常规", 0), ("快捷键", 1), ("API", 2), ("自定义",3),("功能",4),("运行检查",5),("用量",6) }) { var tab = new BarcaButton { Text = label, Size = new Size(77, 31), Margin = new Padding(0, 0, 6, 0) }; tab.Click += (_, _) => Select(index); tabs.Add(tab); navigation.Controls.Add(tab); }
         Label Label(string text, int y, bool title = false) { var label = new Label { Text = text, Bounds = new Rectangle(5, y, 550, title ? 30 : 24), ForeColor = title ? BarcaUi.Gold : BarcaUi.Muted, Font = BarcaUi.Font(title ? 11 : 9, title) }; general.Controls.Add(label); return label; }
-        Label("外观与启动", 10, true);
+        var nameField=new TextBox{Text=p.DisplayName,MaxLength=24,Bounds=new Rectangle(105,10,265,29),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,AccessibleName="伙伴名字"};Label("伙伴名字",12);general.Controls.Add(nameField);
         Label("Leo 大小", 55);
-        var scale = new TrackBar { Bounds = new Rectangle(105, 48, 350, 45), Minimum = 80, Maximum = 230, Value = Math.Clamp(p.PetSize, 80, 230), TickStyle = TickStyle.None, AccessibleName = "Leo 大小" };
+        var scale = new MsnSlider { Bounds = new Rectangle(105, 48, 350, 38), Value = Math.Clamp(p.PetSize, 80, 230), AccessibleName = "Leo 大小" };
         var sizeValue = new Label { Bounds = new Rectangle(475, 55, 75, 25), ForeColor = BarcaUi.Text };
         void SizeText() => sizeValue.Text = scale.Value + " px"; scale.ValueChanged += (_, _) => SizeText(); SizeText(); general.Controls.AddRange([scale, sizeValue]);
         CheckBox Check(string text, int y, bool value) { var check = new CheckBox { Text = text, Bounds = new Rectangle(8, y, 550, 28), Checked = value, ForeColor = BarcaUi.Text, Font = BarcaUi.Font(9.5f) }; general.Controls.Add(check); return check; }
@@ -138,7 +138,7 @@ sealed class SettingsForm : BarcaWindow
         shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 250, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
         var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(405, 8, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < 3; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
         var apiEditor = new ApiSettingsForm(preview ? new ChatSettings() : ChatSettings.Load(), preview, true, apiChanged); api.Controls.Add(apiEditor); apiEditor.Show();
-        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
+        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
         Controls.Add(host); Controls.Add(footer); Controls.Add(navigation); Controls.Add(header); MinimumSize = MaximumSize = Size; Select(0);
     }
 }
@@ -169,7 +169,7 @@ sealed partial class PetForm
             try { LeoStartup.SetEnabled(startup); Store.Save(next); }
             catch { LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
-        prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
+        prefs.DisplayName=UiTheme.ValidateName(next.DisplayName);prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
         Modules.SetFootball(prefs.FootballModule);foot.ConfigureModules(prefs);launcher.RefreshModules();

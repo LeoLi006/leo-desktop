@@ -1,7 +1,7 @@
 using System.Diagnostics;
 namespace LeoLauncher;
 
-sealed class LauncherForm : Form
+sealed partial class LauncherForm : Form
 {
     readonly TextBox query = new();
     int selection;bool keyboardNavigation;
@@ -102,7 +102,7 @@ sealed class LauncherForm : Form
         StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 248);
         BackColor = Appearance.Background; ForeColor = Appearance.Ink; Font = Appearance.Body();
         Appearance.Round(this, 16);
-        Controls.Add(new Label { Text = "LEO", Left = 22, Top = 9, Width = 43, Height = 22, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Appearance.Accent });
+        var brand=new Label { Text = "LEO", Left = 22, Top = 9, Width = 43, Height = 22, AutoEllipsis=true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Appearance.Accent };Controls.Add(brand);
         var footballButton = new GlyphButton("football") { Bounds = new Rectangle(69, 7, 28, 24), AccessibleName = "足球赛程", FlatStyle = FlatStyle.Flat };
         footballButton.FlatAppearance.BorderSize = 0;
         footballButton.Click += (_, _) => {
@@ -117,6 +117,7 @@ sealed class LauncherForm : Form
         };
         Controls.Add(footballButton);
         var musicButton=new GlyphButton("music"){Bounds=new Rectangle(102,7,28,24),AccessibleName="QQ音乐点歌",FlatStyle=FlatStyle.Flat,Visible=prefs.MusicModule};musicButton.FlatAppearance.BorderSize=0;musicButton.Click+=(_,_)=>OpenMusicFromAssistant();Controls.Add(musicButton);
+        void BrandLayout(){brand.Width=Math.Clamp(TextRenderer.MeasureText(brand.Text,brand.Font).Width+6,43,270);footballButton.Left=brand.Right+4;musicButton.Left=footballButton.Right+5;}brand.TextChanged+=(_,_)=>BrandLayout();BrandLayout();
         var size = new MsnSlider { Value = Math.Clamp(p.PetSize, 80, 230) };
         size.AutoSize = false; size.SetBounds(390, 6, 145, 28);
         size.AccessibleName = "Leo 大小";

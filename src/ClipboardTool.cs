@@ -151,7 +151,7 @@ static class ClipboardTool
     {
         if (service == null) return null;
         service.Capture();
-        var window = new Form { FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = Color.FromArgb(24, 29, 44), ForeColor = Color.White };
+        var window = new Form { FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = UiTheme.Color(24, 29, 44), ForeColor = Color.White };
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 112, Padding = new Padding(8), WrapContents = true };
         var search = new TextBox { Width = 190, PlaceholderText = "搜索剪切板历史", BackColor = Appearance.Field, ForeColor = Appearance.Ink, BorderStyle = BorderStyle.FixedSingle };
         var enabled = new CheckBox { Text = "记录历史", Checked = service.Enabled, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
@@ -164,9 +164,9 @@ static class ClipboardTool
         foreach (var button in new[] { copy, delete, clear, pin,undoButton }) { button.FlatStyle = FlatStyle.Flat; button.FlatAppearance.BorderSize = 0; button.BackColor = Appearance.Field; }
         var privacy=new BarcaButton{Text="隐私保护…",Width=105,Height=28};privacy.Click+=(_,_)=>service.OpenPrivacy(window);
         bar.Controls.AddRange([search, enabled, copy, pin, delete, clear,undoButton, onlyPins,privacy]);
-        var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = Color.FromArgb(32, 39, 55) };
-        var list = new ListBox { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Color.FromArgb(32, 39, 55), ForeColor = Color.White, IntegralHeight = false, ItemHeight = 30 };
-        var text = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.FromArgb(40, 47, 65), ForeColor = Color.White, BorderStyle = BorderStyle.None };
+        var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = UiTheme.Color(32, 39, 55) };
+        var list = new ListBox { Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = UiTheme.Color(32, 39, 55), ForeColor = Color.White, IntegralHeight = false, ItemHeight = 30 };
+        var text = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, BackColor = UiTheme.Color(40, 47, 65), ForeColor = Color.White, BorderStyle = BorderStyle.None };
         var picture = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, Visible = false };
         var state = new Label { Dock = DockStyle.Bottom, Height = 30, Padding = new Padding(10, 5, 0, 0), ForeColor = Color.LightSteelBlue };
         split.Panel1.Controls.Add(list); split.Panel2.Controls.Add(text); split.Panel2.Controls.Add(picture);

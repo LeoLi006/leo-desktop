@@ -108,10 +108,13 @@ sealed partial class ChatForm : BarcaWindow
         todoAction=onTodo;openClipboard=clipboardAction;planStore=planner;
         TopMost = false; ShowInTaskbar = true; Text = "Leo · AI 对话"; StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 610); MinimumSize = new Size(500, 430);
         Font=BarcaUi.Font(10);BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;ClientSize=new Size(620,440);MinimumSize=new Size(600,430);Text="问 Leo";
-        CanResize=true;FormBorderStyle=FormBorderStyle.Sizable;MaximizeBox=true;MinimizeBox=true;Text="Leo";ClientSize=new Size(720,600);MinimumSize=new Size(490,360);Padding=new Padding(1);
+        CanResize=true;FormBorderStyle=FormBorderStyle.None;MaximizeBox=true;MinimizeBox=true;Text="Leo";ClientSize=new Size(720,600);MinimumSize=new Size(490,360);Padding=new Padding(7);
         var chrome=new Panel{Dock=DockStyle.Top,Height=55,Padding=new Padding(18,10,16,8)};
-        chrome.Controls.Add(new Label{Text="LEO",Dock=DockStyle.Fill,Font=BarcaUi.Font(15,true),ForeColor=BarcaUi.Gold});
-        settingsButton.Text="···";settingsButton.Width=36;settingsButton.Dock=DockStyle.Right;chrome.Controls.Add(settingsButton);
+        var brand=new Label{Text="LEO",Dock=DockStyle.Fill,Font=BarcaUi.Font(15,true),ForeColor=BarcaUi.Gold};chrome.Controls.Add(brand);
+        void Maximize(){MaximizedBounds=Screen.FromControl(this).WorkingArea;WindowState=WindowState==FormWindowState.Maximized?FormWindowState.Normal:FormWindowState.Maximized;}
+        foreach(Control c in new Control[]{brand,chrome}){c.MouseDown+=(_,e)=>{if(e.Button==MouseButtons.Left)BarcaUi.Drag(this);};c.DoubleClick+=(_,_)=>Maximize();}
+        foreach(var (glyph,action) in new (string,Action)[]{("−",()=>WindowState=FormWindowState.Minimized),("□",Maximize),("×",()=>Close())}){var control=new BarcaButton{Text=glyph,Dock=DockStyle.Right,Width=32,Margin=new Padding(2)};control.Click+=(_,_)=>action();chrome.Controls.Add(control);}
+        settingsButton.Text="···";settingsButton.Width=36;settingsButton.Dock=DockStyle.Right;chrome.Controls.Add(settingsButton);chrome.Controls.SetChildIndex(settingsButton,1);
         settingsButton.Click+=(_,_)=>{options.Visible=!options.Visible;topPanel.Height=options.Visible?154:55;};
         configure.Text="连接设置";configure.Size=new Size(92,30);reset.Text="清空对话";reset.Size=new Size(88,30);remember.Text="保存会话";remember.Checked=settings.RememberConversation;remember.AutoSize=true;remember.Padding=new Padding(8,5,0,0);remember.ForeColor=BarcaUi.Muted;
         var header=new FlowLayoutPanel{Dock=DockStyle.Top,Height=43,Padding=new Padding(23,6,8,3),WrapContents=false};header.Controls.AddRange([configure,reset,remember]);
@@ -152,7 +155,7 @@ sealed partial class ChatForm : BarcaWindow
         };
         readAloud.Click += (_, _) => {
             if (preview) return;
-            try { if (voice.Speaking) voice.StopSpeaking(); else voice.Speak(lastAnswer.Length>0?lastAnswer:turns.LastOrDefault(x => x.Assistant.Length > 0)?.Assistant ?? "你好，我是 Leo。"); }
+            try { if (voice.Speaking) voice.StopSpeaking(); else voice.Speak(lastAnswer.Length>0?lastAnswer:turns.LastOrDefault(x => x.Assistant.Length > 0)?.Assistant ?? UiTheme.Rename("你好，我是 Leo。")); }
             catch { state.Text = "无法朗读，请检查 Windows 语音和音频输出"; }
         };
         voice.Changed += () => OnUi(UpdateVoice);
@@ -170,7 +173,7 @@ sealed partial class ChatForm : BarcaWindow
     void UpdateState() => state.Text = "按“说话”输入，快捷键可在 Leo 设置中调整";
     public static List<ApiMessage> Context(IEnumerable<ChatTurn> history, string prompt, bool toolsEnabled = false)
     {
-        string instruction = "当前本地时间："+DateTimeOffset.Now.ToString("yyyy-MM-dd dddd HH:mm zzz")+"。你是桌面伙伴Leo的大脑，主要任务是理解用户的自然语言并协调Leo已有功能，不是办公助手。默认用中文简短自然回答，通常不超过150字，用户要求深入时再展开。语音输入和朗读由本地界面处理，你处理识别后的文字。只有明确附带的查询数据是已联网核验的事实；没有通用网页浏览能力，不得假装搜索新闻、伤停或实时信息。资料不足时直接说明并建议用户用网页搜索。提醒仅在Leo运行期间生效，退出期间错过的会在下次启动补报，不可声称关机也会响铃。清单和提醒使用leo_action工具实际处理后再报告结果；查询任务也要先调用工具读取。";
+        string instruction = "你的名字是“"+UiTheme.Name+"”，下文的Leo是此应用的产品名，回复时使用你的名字。当前本地时间："+DateTimeOffset.Now.ToString("yyyy-MM-dd dddd HH:mm zzz")+"。你是桌面伙伴Leo的大脑，主要任务是理解用户的自然语言并协调Leo已有功能，不是办公助手。默认用中文简短自然回答，通常不超过150字，用户要求深入时再展开。语音输入和朗读由本地界面处理，你处理识别后的文字。只有明确附带的查询数据是已联网核验的事实；没有通用网页浏览能力，不得假装搜索新闻、伤停或实时信息。资料不足时直接说明并建议用户用网页搜索。提醒仅在Leo运行期间生效，退出期间错过的会在下次启动补报，不可声称关机也会响铃。清单和提醒使用leo_action工具实际处理后再报告结果；查询任务也要先调用工具读取。";
         instruction += toolsEnabled ? "工具包括search_apps、open_app，以及提供时的leo_action。leo_action可安排清单和提醒、查询足球数据、打开Leo界面、操作系统代理、管理收藏/简称/剪贴板收藏、搜索网页、调整Leo大小。只执行用户明确要求的操作，使用返回结果回答，操作失败要如实说明。没有提供的功能不要编造。仅在用户明确要求查找或打开软件时使用。先查找再使用返回的精确 ID 打开；候选有歧义时先问用户。根据工具返回结果如实报告，不伪造执行成功。没有文件读取、删除或终端执行能力。" : "当前未启用应用工具，没有应用启动、文件访问或终端执行能力，不要声称已执行本地操作。";
         var result = new List<ApiMessage> { new("system", instruction) };
         foreach (var turn in history.Where(x => x.Status == "完成").TakeLast(20)) { result.Add(new("user", turn.User)); result.Add(new("assistant", turn.Assistant)); }

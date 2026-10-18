@@ -46,7 +46,7 @@ sealed class LeoToast : Form
     {
         base.OnPaint(e);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using var path=Appearance.Path(new Rectangle(1,1,Width-3,Height-3),12);
-        using var border=new Pen(Color.FromArgb(82,67,82));e.Graphics.DrawPath(border,path);
+        using var border=new Pen(UiTheme.Color(82,67,82));e.Graphics.DrawPath(border,path);
         using var stripe=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(12,3,Width-24,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,12,3,Width-24,4);
     }
     internal bool IsBusy=>current?.Busy==true;
@@ -59,7 +59,7 @@ sealed class LeoToast : Form
 sealed partial class PetForm
 {
     LeoToast? feedback;
-    void OnMonitorsChanged(){if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke(()=>{if(!IsDisposed){Location=Clamp(Location);PositionFoot();hoverCard?.Hide();feedback?.Follow();}});}catch(InvalidOperationException){}}
+    void OnMonitorsChanged(){if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke(()=>{if(!IsDisposed){RevealDock(true);dockSide=DockSide.None;Location=Clamp(Location);PositionFoot();hoverCard?.Hide();feedback?.Follow();}});}catch(InvalidOperationException){}}
     void PresentFeedback(LeoNotice notice)
     {
         if (IsDisposed || Disposing || previewMode) return;

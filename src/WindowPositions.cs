@@ -36,7 +36,7 @@ static class WindowPositions
         if (!preview && saved.TryGetValue(name, out var position))
         {
             screen = Screen.AllScreens.FirstOrDefault(s => s.DeviceName == position.Monitor) ?? screen;
-            if (form.FormBorderStyle == FormBorderStyle.Sizable)
+            if (form.FormBorderStyle == FormBorderStyle.Sizable || form is ChatForm)
                 form.Size = new Size(Math.Clamp(position.Bounds.Width, form.MinimumSize.Width, Math.Max(form.MinimumSize.Width, screen.WorkingArea.Width)), Math.Clamp(position.Bounds.Height, form.MinimumSize.Height, Math.Max(form.MinimumSize.Height, screen.WorkingArea.Height)));
             form.Location = Restore(position, screen.WorkingArea, form.Size).Location;
             if (form.Bounds.IntersectsWith(pet)) form.Location = PopupPlacement.Place(pet, form.Size, screen.WorkingArea);

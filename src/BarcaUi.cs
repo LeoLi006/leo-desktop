@@ -4,15 +4,16 @@ namespace LeoLauncher;
 
 static class BarcaUi
 {
-    public static readonly Color Canvas=Color.FromArgb(11,18,33), Surface=Color.FromArgb(19,30,49), Raised=Color.FromArgb(25,40,63), Line=Color.FromArgb(39,55,78), Gold=Color.FromArgb(231,194,119), Text=Color.FromArgb(237,242,250), Muted=Color.FromArgb(139,158,184);
+    public static Color Canvas=>UiTheme.Color(11,18,33); public static Color Surface=>UiTheme.Color(19,30,49); public static Color Raised=>UiTheme.Color(25,40,63); public static Color Line=>UiTheme.Color(39,55,78); public static Color Gold=>UiTheme.Color(231,194,119); public static Color Text=>UiTheme.Color(237,242,250); public static Color Muted=>UiTheme.Color(139,158,184);
     public static Font Font(float size=10, bool bold=false) => new("Microsoft YaHei UI",size,bold?FontStyle.Bold:FontStyle.Regular);
     [DllImport("user32.dll")] static extern bool ReleaseCapture();
     [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
+    public static void Drag(Form form){ReleaseCapture();SendMessage(form.Handle,0xA1,(IntPtr)2,IntPtr.Zero);}
     public static Panel Chrome(Form form,string title,string subtitle)
     {
         form.FormBorderStyle=FormBorderStyle.None; form.BackColor=Canvas; form.ForeColor=Text; form.Padding=new Padding(1); form.Font=Font();
         var header=new StripeHeader {Dock=DockStyle.Top,Height=88};
-        var name=new Label {Text=title,Bounds=new Rectangle(26,18,480,30),Font=Font(17,true),ForeColor=Text,BackColor=Color.Transparent};
+        var name=new Label {Text=title,AutoEllipsis=true,Bounds=new Rectangle(26,18,480,30),Font=Font(17,true),ForeColor=Text,BackColor=Color.Transparent};
         var sub=new Label {Text=subtitle,Bounds=new Rectangle(28,54,650,21),Font=Font(9),ForeColor=Muted,BackColor=Color.Transparent};
         header.Controls.Add(name); header.Controls.Add(sub);
         foreach(Control c in new Control[]{header,name,sub}) c.MouseDown+=(_,e)=> {if(e.Button==MouseButtons.Left){ReleaseCapture();SendMessage(form.Handle,0xA1,(IntPtr)2,IntPtr.Zero);}};
@@ -35,7 +36,7 @@ static class BarcaUi
 sealed class StripeHeader:Panel
 {
     public StripeHeader(){DoubleBuffered=true;BackColor=BarcaUi.Canvas;}
-    protected override void OnPaintBackground(PaintEventArgs e){if(Width<1||Height<1)return;using var fill=new LinearGradientBrush(ClientRectangle,Color.FromArgb(16,33,58),Color.FromArgb(44,21,39),0f);e.Graphics.FillRectangle(fill,ClientRectangle);}
+    protected override void OnPaintBackground(PaintEventArgs e){if(Width<1||Height<1)return;using var fill=new LinearGradientBrush(ClientRectangle,UiTheme.Color(16,33,58),UiTheme.Color(44,21,39),0f);e.Graphics.FillRectangle(fill,ClientRectangle);}
     protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);if(Width<2||Height<2)return;using var b=new LinearGradientBrush(new Rectangle(0,0,Width,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(b,0,0,Width,4);using var p=new Pen(BarcaUi.Line);e.Graphics.DrawLine(p,22,Height-1,Width-22,Height-1);}
 }
 sealed class RoundedSurface:Panel
@@ -71,7 +72,7 @@ sealed class MatchCard:Control
         TextRenderer.DrawText(g,match.Score,score,new Rectangle(center-54,37,108,35),BarcaUi.Text,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(g,FootballFeed.Name(match.Away),body,new Rectangle(center+64,45,center-112,25),BarcaUi.Text,TextFormatFlags.Right|TextFormatFlags.EndEllipsis);
         BarcaUi.DrawBadge(g,match.AwayId,new Rectangle(Width-42,42,27,27));
-        TextRenderer.DrawText(g,FootballFeed.Status(match),small,new Rectangle(center-50,68,100,16),match.State=="in"?Color.FromArgb(97,219,157):BarcaUi.Muted,TextFormatFlags.HorizontalCenter);
+        TextRenderer.DrawText(g,FootballFeed.Status(match),small,new Rectangle(center-50,68,100,16),match.State=="in"?UiTheme.Color(97,219,157):BarcaUi.Muted,TextFormatFlags.HorizontalCenter);
     }
     protected override void Dispose(bool disposing){if(disposing){body.Dispose();small.Dispose();score.Dispose();}base.Dispose(disposing);}
 }
@@ -102,7 +103,7 @@ sealed class ConversationView:Panel
         rendering=true;
         try {
         history=turns.ToList();var data=new List<(string Name,string Text,bool User)>();
-        if(history.Count==0){data.Add(("LEO","你好，我是 Leo。\n\n有什么想聊的？也可以让我打开应用，或点击麦克风直接说话。",false));}
+        if(history.Count==0){data.Add(("LEO",UiTheme.Rename("你好，我是 Leo。\n\n有什么想聊的？也可以让我打开应用，或点击麦克风直接说话。"),false));}
         foreach(var turn in history.TakeLast(40)){data.Add(("你",turn.User,true));string details=turn.ToolLog.Count>0?string.Join("\n",turn.ToolLog)+"\n\n":"";data.Add(("LEO",details+(turn.Assistant.Length>0?turn.Assistant:"正在思考…")+(turn.Status=="完成"?"":"\n["+turn.Status+"]"),false));}
         bool follow=VerticalScroll.Value+ClientSize.Height>=DisplayRectangle.Height-70;
         int savedScroll=-AutoScrollPosition.Y;
@@ -114,8 +115,8 @@ sealed class ConversationView:Panel
             var item=data[i];
             if(i==rows.Count){var row=new SpeechSurface{BackColor=BarcaUi.Surface};var label=new Label{Font=labelFont,ForeColor=BarcaUi.Gold,Bounds=new Rectangle(17,11,500,20)};var rich=new RichTextBox{ReadOnly=true,BorderStyle=BorderStyle.None,DetectUrls=false,Font=bodyFont,ForeColor=BarcaUi.Text,ScrollBars=RichTextBoxScrollBars.None};row.Controls.Add(label);row.Controls.Add(rich);Controls.Add(row);rows.Add(row);texts.Add(rich);signatures.Add("");}
             var panel=rows[i];var text=texts[i];int width=item.User?Math.Max(260,(int)(available*.82)):available;
-            ((SpeechSurface)panel).IsUser=item.User;panel.BackColor=item.User?Color.FromArgb(27,48,79):Color.FromArgb(32,27,48);text.BackColor=panel.BackColor;
-            ((Label)panel.Controls[0]).Text=item.User?"你":"LEO  ·  随时在你身边";((Label)panel.Controls[0]).Width=width-34;
+            ((SpeechSurface)panel).IsUser=item.User;panel.BackColor=item.User?UiTheme.Color(27,48,79):UiTheme.Color(32,27,48);text.BackColor=panel.BackColor;
+            ((Label)panel.Controls[0]).Text=item.User?"你":UiTheme.Name+"  ·  随时在你身边";((Label)panel.Controls[0]).Width=width-34;
             text.SetBounds(17,38,width-34,50);
             if(signatures[i]!=item.Text){text.Text=item.Text;signatures[i]=item.Text;}
             int height=Math.Clamp(TextRenderer.MeasureText(item.Text,bodyFont,new Size(width-39,int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl).Height+12,35,1400);
@@ -136,8 +137,10 @@ class BarcaWindow:Form
     {
         if(!CanResize&&m.Msg==0x112&&(m.WParam.ToInt64()&0xFFF0) is 0xF000 or 0xF030){m.Result=IntPtr.Zero;return;}
         base.WndProc(ref m);
+        if(CanResize&&FormBorderStyle==FormBorderStyle.None&&m.Msg==0x84&&WindowState==FormWindowState.Normal){var p=PointToClient(new Point(unchecked((short)(long)m.LParam),unchecked((short)((long)m.LParam>>16))));m.Result=(IntPtr)ResizeHit(p,ClientSize);}
         if(!CanResize&&m.Msg==0x84&&m.Result.ToInt64() is >=10 and <=17)m.Result=(IntPtr)1;
     }
+    internal static int ResizeHit(Point p,Size size){bool l=p.X<7,r=p.X>=size.Width-7,t=p.Y<7,b=p.Y>=size.Height-7;return t?(l?13:r?14:12):b?(l?16:r?17:15):l?10:r?11:1;}
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd,int attribute,ref int value,int size);
     protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);if(CanResize){int dark=1;try{DwmSetWindowAttribute(Handle,20,ref dark,4);}catch{}}}
 }

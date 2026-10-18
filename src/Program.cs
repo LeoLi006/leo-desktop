@@ -26,6 +26,7 @@ sealed class Preferences
     public bool ClipboardBlockSecrets{get;set;}=true;
     public List<string> ClipboardBlockedApps{get;set;}=["1Password","Bitwarden","KeePass","KeePassXC","LastPass","Dashlane"];
     public string? SkinId{get;set;}
+    public string DisplayName{get;set;}="Leo";
     // Read old saved settings once, then omit these retired fields.
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public bool? MatchDayOutfits{get;set;}
@@ -186,7 +187,7 @@ static class Program
         Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         Application.EnableVisualStyles();
         if(args.Length>0&&args[0]=="--dock-animation-test")Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
-        BarcaScrollTheme.Start();
+        BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--package-smoke-test"){try{var checks=PackageSmokeTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
@@ -200,6 +201,7 @@ static class Program
             File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=table&&matches&&models==0,standings_rendered=table,matches_rendered=matches,first_state=first,last_state=window.PreviewState,model_requests=models},new JsonSerializerOptions{WriteIndented=true}));return;
         }
         if(args.Length==2&&args[0]=="--pet-transparency-test"){try{var checks=PetTransparencyTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
+        if(args.Length==2&&args[0]=="--theme-desktop-test"){try{var checks=ThemeDesktopTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--skin-animation-test"){try{var checks=SkinAnimationTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--upgrade46-test"){try{var checks=Upgrade46Tests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--recovery45-test"){var checks=new Dictionary<string,bool>();Upgrade45Tests.Recovery(checks,Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_requests=0}));return;}
@@ -456,7 +458,7 @@ sealed partial class PetForm : Form
     {
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
-        prefs = p; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        prefs = p; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName);p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -467,7 +469,7 @@ sealed partial class PetForm : Form
         var size = Math.Clamp(p.PetSize, 80, 230);
         ClientSize = new Size(size, size * 208 / 192);
         var screen = Screen.PrimaryScreen!.WorkingArea;
-        Location = p.X < 0 ? new Point(screen.Right - Width - 36, screen.Bottom - Height - 36) : Clamp(new Point(p.X, p.Y));
+        Location = p.X == -1 && p.Y == -1 ? new Point(screen.Right - Width - 36, screen.Bottom - Height - 36) : Clamp(new Point(p.X, p.Y));
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);
         foot = new FootTools(p.PetSize, preview);
         foot.ConfigureModules(prefs);
@@ -503,7 +505,7 @@ sealed partial class PetForm : Form
             bool revealOnly=dockClickReveal;dockClickReveal=false;
             hit.Capture = false;
             if (movedWhileLocked) return;
-            if (dragging) { if(prefs.EdgeDocking){var area=Screen.FromControl(this).WorkingArea;dockSide=EdgeDock.ChooseSide(Bounds,area,foot.ReservedSpace,lastDragMovement);Location=Clamp(EdgeDock.Snap(Bounds,area,foot.ReservedSpace,movement:lastDragMovement));} prefs.X = Left; prefs.Y = Top; if(!previewMode)Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
+            if (dragging) { if(prefs.EdgeDocking){var areas=DesktopDock.Displays();var area=DesktopDock.Area(Bounds,areas);dockSide=DesktopDock.Choose(Bounds,area,foot.ReservedSpace,lastDragMovement,areas);Location=DesktopDock.Snap(Bounds,area,foot.ReservedSpace,dockSide);} prefs.X = Left; prefs.Y = Top; if(!previewMode)Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
             else if(!revealOnly) {
                 row = 3; rowUntil = clock.ElapsedMilliseconds + 800; frame = 0;
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
@@ -518,7 +520,7 @@ sealed partial class PetForm : Form
         animation.Start();
         fullscreenTimer.Tick += (_, _) => PollFullscreen();
         if (!preview) fullscreenTimer.Start();
-        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle="Leo · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
+        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
     }
     protected override bool ShowWithoutActivation => true;
     void ShowChat()
