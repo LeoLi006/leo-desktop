@@ -27,7 +27,15 @@ Copy-Item -LiteralPath (Join-Path $corePack 'LICENSE.TXT') -Destination (Join-Pa
 Copy-Item -LiteralPath (Join-Path $corePack 'THIRD-PARTY-NOTICES.TXT') -Destination (Join-Path $noticeDir 'dotnet-runtime-THIRD-PARTY-NOTICES.txt')
 Copy-Item -LiteralPath (Join-Path $desktopPack 'LICENSE') -Destination (Join-Path $noticeDir 'windowsdesktop-LICENSE.txt')
 # Build from source; never read installed app or personal data.
-Copy-Item -LiteralPath (Join-Path $root 'src/USER_GUIDE.md'),(Join-Path $root 'src/RELEASE_NOTES.md'),(Join-Path $root 'src/ANIMATION-NOTES.md') -Destination $payload
+Copy-Item -LiteralPath (Join-Path $root 'src/USER_GUIDE.md'),(Join-Path $root 'src/RELEASE_NOTES.md') -Destination $payload
+# Keep supplemental docs under the already-supported assets path so older updaters
+# can verify this release without accepting a new top-level filename.
+$animationDocs=Join-Path $payload 'assets/docs'
+New-Item -ItemType Directory -Path $animationDocs -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'src/ANIMATION-NOTES.md') -Destination $animationDocs
+$releaseCopy=Join-Path $payload 'RELEASE_NOTES.md'
+$releaseText=Get-Content -LiteralPath $releaseCopy -Raw
+$releaseText.Replace('](ANIMATION-NOTES.md)','](assets/docs/ANIMATION-NOTES.md)') | Set-Content -LiteralPath $releaseCopy -Encoding utf8
 Get-ChildItem -LiteralPath $payload -File | Where-Object {$_.Extension -in '.pdb','.xml'} | Remove-Item
 $files=[ordered]@{}
 foreach($file in Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName){
