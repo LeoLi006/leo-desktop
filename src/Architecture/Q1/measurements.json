@@ -1,0 +1,735 @@
+{
+  "format": "leo-q1-summary-1",
+  "profiles": [
+    {
+      "profile": "preview",
+      "runs": 3,
+      "runtime": "9.0.6",
+      "logical_processors": 18,
+      "construction_to_show_ms": {
+        "min": 334.5096,
+        "median": 334.7878,
+        "max": 439.7465
+      },
+      "quick_note_show_ms": {
+        "min": 54.6031,
+        "median": 102.86795000000001,
+        "max": 243.0138
+      },
+      "module_disable_cancel_ms": {
+        "min": 12.1908,
+        "median": 14.1921,
+        "max": 45.555
+      },
+      "scenes": [
+        {
+          "scene": "idle",
+          "seconds": {
+            "min": 8.0032632,
+            "median": 8.0104811,
+            "max": 8.0120998
+          },
+          "cpu_one_core_percent": {
+            "min": 4.880821612864113,
+            "median": 5.460491143657497,
+            "max": 7.6072209945043126
+          },
+          "cpu_machine_percent": {
+            "min": 0.2711567562702285,
+            "median": 0.3033606190920832,
+            "max": 0.4226233885835729
+          },
+          "allocated_bytes": {
+            "min": 70376,
+            "median": 70376,
+            "max": 100552
+          },
+          "private_bytes_after": {
+            "min": 39075840,
+            "median": 39079936,
+            "max": 39247872
+          },
+          "handles_after": {
+            "min": 330,
+            "median": 330,
+            "max": 330
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 24,
+            "median": 24,
+            "max": 24
+          },
+          "frames": {
+            "min": 57,
+            "median": 57,
+            "max": 58
+          },
+          "pump_gap_p95_ms": {
+            "min": 30.784900000000107,
+            "median": 30.895700000000033,
+            "max": 31.690700000000106
+          }
+        },
+        {
+          "scene": "docked",
+          "seconds": {
+            "min": 8.0004465,
+            "median": 8.0051319,
+            "max": 8.0081664
+          },
+          "cpu_one_core_percent": {
+            "min": 0,
+            "median": 0.19530159972946506,
+            "max": 0.3902266566289132
+          },
+          "cpu_machine_percent": {
+            "min": 0,
+            "median": 0.010850088873859172,
+            "max": 0.021679258701606287
+          },
+          "allocated_bytes": {
+            "min": 41000,
+            "median": 41000,
+            "max": 41000
+          },
+          "private_bytes_after": {
+            "min": 69816320,
+            "median": 70574080,
+            "max": 71245824
+          },
+          "handles_after": {
+            "min": 333,
+            "median": 333,
+            "max": 333
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 24,
+            "median": 24,
+            "max": 24
+          },
+          "frames": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "pump_gap_p95_ms": {
+            "min": 17.03099999999995,
+            "median": 21.522399999999834,
+            "max": 25.080599999999777
+          }
+        },
+        {
+          "scene": "hidden",
+          "seconds": {
+            "min": 8.0044536,
+            "median": 8.0122563,
+            "max": 8.0139704
+          },
+          "cpu_one_core_percent": {
+            "min": 0,
+            "median": 0.39002746330019417,
+            "max": 0.39040766005564703
+          },
+          "cpu_machine_percent": {
+            "min": 0,
+            "median": 0.021668192405566344,
+            "max": 0.021689314447535947
+          },
+          "allocated_bytes": {
+            "min": 32800,
+            "median": 41000,
+            "max": 41000
+          },
+          "private_bytes_after": {
+            "min": 69767168,
+            "median": 70574080,
+            "max": 71237632
+          },
+          "handles_after": {
+            "min": 333,
+            "median": 333,
+            "max": 333
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 22,
+            "median": 22,
+            "max": 22
+          },
+          "frames": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "pump_gap_p95_ms": {
+            "min": 28.195800000000418,
+            "median": 28.88079999999991,
+            "max": 29.38209999999981
+          }
+        },
+        {
+          "scene": "windows",
+          "seconds": {
+            "min": 8.0025078,
+            "median": 8.0081249,
+            "max": 8.0177488
+          },
+          "cpu_one_core_percent": {
+            "min": 4.872003473094592,
+            "median": 5.662287514421416,
+            "max": 7.024116219765753
+          },
+          "cpu_machine_percent": {
+            "min": 0.2706668596163662,
+            "median": 0.3145715285789676,
+            "max": 0.3902286788758752
+          },
+          "allocated_bytes": {
+            "min": 82120,
+            "median": 82120,
+            "max": 97584
+          },
+          "private_bytes_after": {
+            "min": 71929856,
+            "median": 71946240,
+            "max": 73379840
+          },
+          "handles_after": {
+            "min": 336,
+            "median": 339,
+            "max": 339
+          },
+          "gdi_after": {
+            "min": 71,
+            "median": 71,
+            "max": 71
+          },
+          "user_after": {
+            "min": 76,
+            "median": 76,
+            "max": 76
+          },
+          "frames": {
+            "min": 57,
+            "median": 57,
+            "max": 57
+          },
+          "pump_gap_p95_ms": {
+            "min": 31.511099999999715,
+            "median": 31.631800000000112,
+            "max": 31.923499999999876
+          }
+        }
+      ]
+    },
+    {
+      "profile": "companion",
+      "runs": 3,
+      "runtime": "9.0.6",
+      "logical_processors": 18,
+      "construction_to_show_ms": {
+        "min": 386.8906,
+        "median": 667.0506,
+        "max": 826.2289
+      },
+      "quick_note_show_ms": {
+        "min": 20.211,
+        "median": 57.56155,
+        "max": 236.1662
+      },
+      "module_disable_cancel_ms": {
+        "min": 11.7659,
+        "median": 16.80875,
+        "max": 61.2359
+      },
+      "scenes": [
+        {
+          "scene": "idle",
+          "seconds": {
+            "min": 8.0001074,
+            "median": 8.0041338,
+            "max": 8.0113436
+          },
+          "cpu_one_core_percent": {
+            "min": 4.875898719410811,
+            "median": 6.246772136667681,
+            "max": 6.640535850806204
+          },
+          "cpu_machine_percent": {
+            "min": 0.2708832621894895,
+            "median": 0.3470428964815378,
+            "max": 0.36891865837812243
+          },
+          "allocated_bytes": {
+            "min": 187832,
+            "median": 187832,
+            "max": 187832
+          },
+          "private_bytes_after": {
+            "min": 40112128,
+            "median": 40206336,
+            "max": 40755200
+          },
+          "handles_after": {
+            "min": 338,
+            "median": 338,
+            "max": 338
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 33,
+            "median": 33,
+            "max": 33
+          },
+          "frames": {
+            "min": 56,
+            "median": 57,
+            "max": 57
+          },
+          "pump_gap_p95_ms": {
+            "min": 26.19630000000052,
+            "median": 26.600299999999834,
+            "max": 26.770900000000438
+          }
+        },
+        {
+          "scene": "docked",
+          "seconds": {
+            "min": 8.0094095,
+            "median": 8.0122378,
+            "max": 8.0171668
+          },
+          "cpu_one_core_percent": {
+            "min": 0.7800567277221852,
+            "median": 0.975415228800575,
+            "max": 1.1693657165770832
+          },
+          "cpu_machine_percent": {
+            "min": 0.043336484873454734,
+            "median": 0.05418973493336528,
+            "max": 0.06496476203206018
+          },
+          "allocated_bytes": {
+            "min": 254200,
+            "median": 262400,
+            "max": 262400
+          },
+          "private_bytes_after": {
+            "min": 72085504,
+            "median": 72597504,
+            "max": 72638464
+          },
+          "handles_after": {
+            "min": 341,
+            "median": 341,
+            "max": 341
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 33,
+            "median": 33,
+            "max": 33
+          },
+          "frames": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "pump_gap_p95_ms": {
+            "min": 25.236499999999978,
+            "median": 25.6798,
+            "max": 25.73350000000005
+          }
+        },
+        {
+          "scene": "hidden",
+          "seconds": {
+            "min": 8.003034,
+            "median": 8.0044778,
+            "max": 8.0144986
+          },
+          "cpu_one_core_percent": {
+            "min": 0.19495917062110413,
+            "median": 0.39040647973313136,
+            "max": 0.39047691163126386
+          },
+          "cpu_machine_percent": {
+            "min": 0.010831065034505784,
+            "median": 0.021689248874062855,
+            "max": 0.021693161757292436
+          },
+          "allocated_bytes": {
+            "min": 32800,
+            "median": 41000,
+            "max": 41000
+          },
+          "private_bytes_after": {
+            "min": 72019968,
+            "median": 72519680,
+            "max": 72556544
+          },
+          "handles_after": {
+            "min": 341,
+            "median": 341,
+            "max": 341
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 25,
+            "median": 25,
+            "max": 25
+          },
+          "frames": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "pump_gap_p95_ms": {
+            "min": 26.875,
+            "median": 27.05029999999988,
+            "max": 27.58699999999999
+          }
+        },
+        {
+          "scene": "windows",
+          "seconds": {
+            "min": 8.0010623,
+            "median": 8.0192632,
+            "max": 8.0203122
+          },
+          "cpu_one_core_percent": {
+            "min": 4.091174904637753,
+            "median": 4.481396744778249,
+            "max": 5.663310483159218
+          },
+          "cpu_machine_percent": {
+            "min": 0.22728749470209736,
+            "median": 0.24896648582101383,
+            "max": 0.3146283601755121
+          },
+          "allocated_bytes": {
+            "min": 205000,
+            "median": 205000,
+            "max": 205000
+          },
+          "private_bytes_after": {
+            "min": 74014720,
+            "median": 74457088,
+            "max": 74481664
+          },
+          "handles_after": {
+            "min": 344,
+            "median": 344,
+            "max": 344
+          },
+          "gdi_after": {
+            "min": 71,
+            "median": 71,
+            "max": 71
+          },
+          "user_after": {
+            "min": 85,
+            "median": 85,
+            "max": 85
+          },
+          "frames": {
+            "min": 56,
+            "median": 57,
+            "max": 57
+          },
+          "pump_gap_p95_ms": {
+            "min": 26.26950000000005,
+            "median": 26.5249,
+            "max": 27.50839999999971
+          }
+        }
+      ]
+    },
+    {
+      "profile": "common",
+      "runs": 3,
+      "runtime": "9.0.6",
+      "logical_processors": 18,
+      "construction_to_show_ms": {
+        "min": 783.5079,
+        "median": 842.4807,
+        "max": 855.4725
+      },
+      "quick_note_show_ms": {
+        "min": 72.9292,
+        "median": 107.50405,
+        "max": 209.4992
+      },
+      "module_disable_cancel_ms": {
+        "min": 12.0629,
+        "median": 17.93655,
+        "max": 31.6223
+      },
+      "scenes": [
+        {
+          "scene": "idle",
+          "seconds": {
+            "min": 8.0087675,
+            "median": 8.0117692,
+            "max": 8.0139844
+          },
+          "cpu_one_core_percent": {
+            "min": 6.435844407499906,
+            "median": 7.603895510452953,
+            "max": 8.194144729510503
+          },
+          "cpu_machine_percent": {
+            "min": 0.35754691152777257,
+            "median": 0.42243863946960847,
+            "max": 0.4552302627505835
+          },
+          "allocated_bytes": {
+            "min": 204232,
+            "median": 225880,
+            "max": 225920
+          },
+          "private_bytes_after": {
+            "min": 39378944,
+            "median": 40079360,
+            "max": 40185856
+          },
+          "handles_after": {
+            "min": 331,
+            "median": 339,
+            "max": 339
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 38,
+            "median": 38,
+            "max": 38
+          },
+          "frames": {
+            "min": 56,
+            "median": 56,
+            "max": 56
+          },
+          "pump_gap_p95_ms": {
+            "min": 26.354999999999563,
+            "median": 26.6886999999997,
+            "max": 27.1545000000001
+          }
+        },
+        {
+          "scene": "docked",
+          "seconds": {
+            "min": 8.0088141,
+            "median": 8.0107635,
+            "max": 8.0145348
+          },
+          "cpu_one_core_percent": {
+            "min": 0,
+            "median": 1.1697497401845458,
+            "max": 2.340600867819903
+          },
+          "cpu_machine_percent": {
+            "min": 0,
+            "median": 0.06498609667691921,
+            "max": 0.13003338154555016
+          },
+          "allocated_bytes": {
+            "min": 270600,
+            "median": 278800,
+            "max": 278800
+          },
+          "private_bytes_after": {
+            "min": 71303168,
+            "median": 72101888,
+            "max": 72220672
+          },
+          "handles_after": {
+            "min": 334,
+            "median": 342,
+            "max": 342
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 38,
+            "median": 38,
+            "max": 38
+          },
+          "frames": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "pump_gap_p95_ms": {
+            "min": 25.8433,
+            "median": 25.940700000000106,
+            "max": 26.435600000000022
+          }
+        },
+        {
+          "scene": "hidden",
+          "seconds": {
+            "min": 8.0118828,
+            "median": 8.0121726,
+            "max": 8.0137555
+          },
+          "cpu_one_core_percent": {
+            "min": 0,
+            "median": 0.19497724880675482,
+            "max": 0.5850473066443926
+          },
+          "cpu_machine_percent": {
+            "min": 0,
+            "median": 0.010832069378153045,
+            "max": 0.0325026281469107
+          },
+          "allocated_bytes": {
+            "min": 49200,
+            "median": 49200,
+            "max": 49200
+          },
+          "private_bytes_after": {
+            "min": 71270400,
+            "median": 72028160,
+            "max": 72134656
+          },
+          "handles_after": {
+            "min": 334,
+            "median": 342,
+            "max": 342
+          },
+          "gdi_after": {
+            "min": 42,
+            "median": 42,
+            "max": 42
+          },
+          "user_after": {
+            "min": 30,
+            "median": 30,
+            "max": 30
+          },
+          "frames": {
+            "min": 0,
+            "median": 0,
+            "max": 0
+          },
+          "pump_gap_p95_ms": {
+            "min": 26.90219999999954,
+            "median": 26.937299999999595,
+            "max": 27.711499999999432
+          }
+        },
+        {
+          "scene": "windows",
+          "seconds": {
+            "min": 8.009825,
+            "median": 8.0145763,
+            "max": 8.016907
+          },
+          "cpu_one_core_percent": {
+            "min": 4.8725150485093565,
+            "median": 5.657114855817699,
+            "max": 6.043675696243605
+          },
+          "cpu_machine_percent": {
+            "min": 0.270695280472742,
+            "median": 0.31428415865653886,
+            "max": 0.33575976090242254
+          },
+          "allocated_bytes": {
+            "min": 213200,
+            "median": 221400,
+            "max": 221400
+          },
+          "private_bytes_after": {
+            "min": 73338880,
+            "median": 74059776,
+            "max": 74215424
+          },
+          "handles_after": {
+            "min": 337,
+            "median": 345,
+            "max": 345
+          },
+          "gdi_after": {
+            "min": 71,
+            "median": 71,
+            "max": 71
+          },
+          "user_after": {
+            "min": 90,
+            "median": 90,
+            "max": 90
+          },
+          "frames": {
+            "min": 57,
+            "median": 57,
+            "max": 57
+          },
+          "pump_gap_p95_ms": {
+            "min": 26.850400000000263,
+            "median": 27.207499999999982,
+            "max": 27.237800000000107
+          }
+        }
+      ]
+    }
+  ],
+  "passive_live": {
+    "seconds": 31.4497352,
+    "cpu_ms": 687.5,
+    "cpu_one_core_percent": 2.1860279446804376,
+    "private_bytes": {
+      "min": 126500864,
+      "median": 126500864.0,
+      "max": 126570496
+    },
+    "working_set": {
+      "min": 222244864,
+      "median": 222244864.0,
+      "max": 222289920
+    },
+    "handles": {
+      "min": 896,
+      "median": 896.0,
+      "max": 899
+    },
+    "threads": {
+      "min": 26,
+      "median": 26.0,
+      "max": 27
+    }
+  }
+}

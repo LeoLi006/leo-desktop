@@ -1,0 +1,437 @@
+[
+  {
+    "module": {
+      "format": "leo-capability-draft/0",
+      "id": "apps",
+      "name": "应用启动",
+      "moduleVersion": "0.0.0",
+      "hostRange": "draft-only",
+      "protocol": "leo-action-draft/0",
+      "runtime": "builtin-adapter",
+      "dependencies": [
+        {
+          "id": "application-index",
+          "required": true
+        },
+        {
+          "id": "shell",
+          "required": true
+        }
+      ],
+      "enablement": "host-controlled",
+      "configVersion": 1,
+      "dataOwner": "apps",
+      "actions": [
+        {
+          "id": "app_open",
+          "description": "应用启动",
+          "legacyOwner": "core",
+          "input": {
+            "type": "object",
+            "properties": {
+              "app_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "app_id"
+            ],
+            "additionalProperties": false
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "app_id": {
+                "type": "string"
+              },
+              "started": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "app_id",
+              "started"
+            ],
+            "additionalProperties": false
+          },
+          "timeoutMs": 15000,
+          "effect": "external",
+          "idempotency": "non-idempotent",
+          "concurrency": {
+            "resource": "applications",
+            "policy": "serial"
+          },
+          "cancel": "cooperative",
+          "retry": "none",
+          "compensation": "none",
+          "evidence": "process-start-returned"
+        }
+      ],
+      "contributions": [
+        {
+          "kind": "search",
+          "actionId": "app_open",
+          "title": "应用启动",
+          "when": "enabled"
+        }
+      ]
+    },
+    "request": {
+      "protocol": "leo-action-draft/0",
+      "requestId": "fixture-apps",
+      "traceId": "fixture-trace",
+      "parentRequestId": null,
+      "source": "search",
+      "actionId": "app_open",
+      "parameters": {
+        "app_id": "fixture-app"
+      },
+      "deadline": "2030-01-01T12:00:10Z"
+    },
+    "result": {
+      "requestId": "fixture-apps",
+      "status": "succeeded",
+      "data": {
+        "app_id": "fixture-app",
+        "started": true
+      },
+      "error": null,
+      "evidence": {
+        "level": "accepted",
+        "kind": "process-start-returned"
+      },
+      "retryable": false
+    }
+  },
+  {
+    "module": {
+      "format": "leo-capability-draft/0",
+      "id": "planner",
+      "name": "添加事项",
+      "moduleVersion": "0.0.0",
+      "hostRange": "draft-only",
+      "protocol": "leo-action-draft/0",
+      "runtime": "builtin-adapter",
+      "dependencies": [
+        {
+          "id": "todo-store",
+          "required": true
+        }
+      ],
+      "enablement": "host-controlled",
+      "configVersion": 1,
+      "dataOwner": "planner",
+      "actions": [
+        {
+          "id": "todo_add",
+          "description": "添加事项",
+          "legacyOwner": "core",
+          "input": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "day": {
+                "type": "string",
+                "format": "date"
+              },
+              "reminder": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "title",
+              "day"
+            ],
+            "additionalProperties": false
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "saved": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "saved"
+            ],
+            "additionalProperties": false
+          },
+          "timeoutMs": 15000,
+          "effect": "local-write",
+          "idempotency": "non-idempotent",
+          "concurrency": {
+            "resource": "todos",
+            "policy": "serial"
+          },
+          "cancel": "cooperative",
+          "retry": "none",
+          "compensation": "none",
+          "evidence": "store-commit"
+        }
+      ],
+      "contributions": [
+        {
+          "kind": "search",
+          "actionId": "todo_add",
+          "title": "添加事项",
+          "when": "enabled"
+        }
+      ]
+    },
+    "request": {
+      "protocol": "leo-action-draft/0",
+      "requestId": "fixture-planner",
+      "traceId": "fixture-trace",
+      "parentRequestId": null,
+      "source": "search",
+      "actionId": "todo_add",
+      "parameters": {
+        "title": "示例事项",
+        "day": "2030-01-01"
+      },
+      "deadline": "2030-01-01T12:00:10Z"
+    },
+    "result": {
+      "requestId": "fixture-planner",
+      "status": "succeeded",
+      "data": {
+        "id": "fixture-task",
+        "saved": true
+      },
+      "error": null,
+      "evidence": {
+        "level": "confirmed",
+        "kind": "store-commit"
+      },
+      "retryable": false
+    }
+  },
+  {
+    "module": {
+      "format": "leo-capability-draft/0",
+      "id": "football",
+      "name": "查询比赛",
+      "moduleVersion": "0.0.0",
+      "hostRange": "draft-only",
+      "protocol": "leo-action-draft/0",
+      "runtime": "builtin-adapter",
+      "dependencies": [
+        {
+          "id": "football-provider",
+          "required": true
+        }
+      ],
+      "enablement": "host-controlled",
+      "configVersion": 1,
+      "dataOwner": "football",
+      "actions": [
+        {
+          "id": "football_facts",
+          "description": "查询比赛",
+          "legacyOwner": "football",
+          "input": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "additionalProperties": false
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kickoff": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kickoff"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "updated": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "stale": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "matches",
+              "updated",
+              "stale"
+            ],
+            "additionalProperties": false
+          },
+          "timeoutMs": 15000,
+          "effect": "none",
+          "idempotency": "idempotent",
+          "concurrency": {
+            "resource": "football-feed",
+            "policy": "share-read"
+          },
+          "cancel": "cooperative",
+          "retry": "transient-read-only",
+          "compensation": "none",
+          "evidence": "provider-or-cache"
+        }
+      ],
+      "contributions": []
+    },
+    "request": {
+      "protocol": "leo-action-draft/0",
+      "requestId": "fixture-football",
+      "traceId": "fixture-trace",
+      "parentRequestId": null,
+      "source": "search",
+      "actionId": "football_facts",
+      "parameters": {
+        "query": "fixture-team"
+      },
+      "deadline": "2030-01-01T12:00:10Z"
+    },
+    "result": {
+      "requestId": "fixture-football",
+      "status": "succeeded",
+      "data": {
+        "matches": [
+          {
+            "id": "fixture-match",
+            "kickoff": "2030-01-01T12:00:00Z"
+          }
+        ],
+        "updated": "2030-01-01T10:00:00Z",
+        "stale": false
+      },
+      "error": null,
+      "evidence": {
+        "level": "confirmed",
+        "kind": "provider-or-cache"
+      },
+      "retryable": false
+    }
+  },
+  {
+    "module": {
+      "format": "leo-capability-draft/0",
+      "id": "media",
+      "name": "暂停播放",
+      "moduleVersion": "0.0.0",
+      "hostRange": "draft-only",
+      "protocol": "leo-action-draft/0",
+      "runtime": "builtin-adapter",
+      "dependencies": [
+        {
+          "id": "media-provider",
+          "required": true
+        }
+      ],
+      "enablement": "host-controlled",
+      "configVersion": 1,
+      "dataOwner": "media",
+      "actions": [
+        {
+          "id": "media_pause",
+          "description": "暂停播放",
+          "legacyOwner": "media",
+          "input": {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "session_id"
+            ],
+            "additionalProperties": false
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "session_id": {
+                "type": "string"
+              },
+              "paused": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "session_id",
+              "paused"
+            ],
+            "additionalProperties": false
+          },
+          "timeoutMs": 15000,
+          "effect": "external",
+          "idempotency": "idempotent",
+          "concurrency": {
+            "resource": "media-session",
+            "policy": "serial"
+          },
+          "cancel": "cooperative",
+          "retry": "none",
+          "compensation": "none",
+          "evidence": "session-state-readback"
+        }
+      ],
+      "contributions": [
+        {
+          "kind": "search",
+          "actionId": "media_pause",
+          "title": "暂停播放",
+          "when": "enabled"
+        }
+      ]
+    },
+    "request": {
+      "protocol": "leo-action-draft/0",
+      "requestId": "fixture-media",
+      "traceId": "fixture-trace",
+      "parentRequestId": null,
+      "source": "search",
+      "actionId": "media_pause",
+      "parameters": {
+        "session_id": "fixture-session"
+      },
+      "deadline": "2030-01-01T12:00:10Z"
+    },
+    "result": {
+      "requestId": "fixture-media",
+      "status": "succeeded",
+      "data": {
+        "session_id": "fixture-session",
+        "paused": true
+      },
+      "error": null,
+      "evidence": {
+        "level": "confirmed",
+        "kind": "session-state-readback"
+      },
+      "retryable": false
+    }
+  }
+]

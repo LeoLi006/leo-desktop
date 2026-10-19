@@ -210,6 +210,9 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--baseline-test"){BaselineProbe.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--baseline-runtime-test"){BaselineProbe.Run(args[1],true);return;}
+        if(args.Length==2&&args[0]=="--baseline-companion-test"){BaselineProbe.Run(args[1],true,true);return;}
         if(args.Length==2&&args[0]=="--companion-layer-test"){CompanionLayerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--quiet-planner-test"){QuietPlannerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--soak-test"){SoakProbe.Run(args[1]);return;}
