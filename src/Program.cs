@@ -210,6 +210,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--companion-layer-test"){CompanionLayerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--quiet-planner-test"){QuietPlannerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--soak-test"){SoakProbe.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--robustness-test"){RobustnessTests.Run(args[1]);return;}
@@ -585,6 +586,7 @@ sealed partial class PetForm : Form
         if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;
         bool hide = prefs.HideInFullscreen && FullscreenMonitor.IsFullscreenOn(Screen.FromControl(this));
         SetFullscreenHidden(hide);
+        if(!hide)FeatureFaults.Run("桌宠图层恢复",RestoreCompanionLayer);
     }
     void SetFullscreenHidden(bool hide)
     {
@@ -897,4 +899,3 @@ sealed partial class PetForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
     protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}
 }
-
