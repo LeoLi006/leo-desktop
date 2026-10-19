@@ -196,6 +196,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--release100-test"){Release100Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform53-test"){Platform53Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform52-test"){Platform52Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--package-smoke-test"){try{var checks=PackageSmokeTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
