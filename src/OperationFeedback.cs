@@ -13,7 +13,10 @@ static class OperationFeedback
 
 sealed class LeoToast : Form
 {
-    readonly Label message = new() { Bounds = new Rectangle(14, 11, 290, 49), ForeColor = BarcaUi.Text, Font = BarcaUi.Font(9), AutoEllipsis = false };
+    readonly Font noticeFont = BarcaUi.Font(9);
+    const TextFormatFlags NoticeFlags=TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl|TextFormatFlags.NoPrefix;
+    Rectangle messageBounds;
+    string messageText="";
     readonly BarcaButton retry = new() { Text = "重试", Bounds = new Rectangle(235, 66, 66, 27), ForeColor = BarcaUi.Gold };
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1900 };
     readonly Func<Rectangle> anchor;
@@ -23,37 +26,42 @@ sealed class LeoToast : Form
     public LeoToast(Func<Rectangle> pet)
     {
         anchor = pet; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true; StartPosition = FormStartPosition.Manual; ClientSize = new Size(320, 103); BackColor = BarcaUi.Surface;
-        DoubleBuffered=true; Appearance.Round(this, 13); Controls.Add(message); Controls.Add(retry);
+        AutoScaleMode=AutoScaleMode.None;
+        SetStyle(ControlStyles.ResizeRedraw|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);
+        DoubleBuffered=true; Appearance.Round(this, 13); Controls.Add(retry);
         close.SetBounds(237,6,22,22); close.Click += (_, _) => Hide(); Controls.Add(close);
         retry.Click += async (_, _) => { var action = current?.Retry; if (action == null) return; retry.Enabled = false; try { await action(); } catch (Exception e) { Present(new(e.Message, true, action)); } finally { if (!IsDisposed) retry.Enabled = true; } };
         timer.Tick += (_, _) => { if (!Bounds.Contains(Cursor.Position)) { timer.Stop(); Hide(); } };
     }
     public void Present(LeoNotice notice)
     {
-        current = notice; message.Text = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
-        message.ForeColor = notice.Error ? Color.LightSalmon : BarcaUi.Text;
-        int width=message.Text.Length>90?320:270;
+        current = notice; messageText = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
+        int width=messageText.Length>90?320:270;
         int textWidth=width-54;
-        int textHeight=Math.Max(25,TextRenderer.MeasureText(message.Text,message.Font,new Size(textWidth,int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl).Height+6);
+        int textHeight=Math.Max(25,TextRenderer.MeasureText(messageText,noticeFont,new Size(textWidth,int.MaxValue),NoticeFlags).Height+6);
+        SuspendLayout();
         ClientSize=new Size(width,Math.Max(52,14+textHeight+(notice.Retry!=null?39:10)));Appearance.Round(this,12);
-        message.SetBounds(15,14,textWidth,textHeight);close.SetBounds(width-31,6,22,22);retry.SetBounds(width-76,Height-33,64,25);
+        messageBounds=new(15,14,textWidth,textHeight);close.SetBounds(width-31,6,22,22);retry.SetBounds(width-76,Height-33,64,25);
         retry.Text=notice.ActionLabel;retry.Visible = notice.Retry != null; retry.Enabled = true;
+        ResumeLayout(true);
         var pet = anchor(); Location = PopupPlacement.Place(pet, Size, Screen.FromRectangle(pet).WorkingArea);
         timer.Stop(); timer.Interval = notice.Error ? Math.Clamp(notice.Text.Length*80,5000,12000) : notice.Retry!=null?4500:1900; if(!notice.Busy)timer.Start();
-        Show();
+        Show();Invalidate(true);Update();
     }
     protected override void OnPaint(PaintEventArgs e)
     {
-        base.OnPaint(e);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        base.OnPaint(e);
+        TextRenderer.DrawText(e.Graphics,messageText,noticeFont,messageBounds,current?.Error==true?Color.LightSalmon:BarcaUi.Text,NoticeFlags);
+        e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using var path=Appearance.Path(new Rectangle(1,1,Width-3,Height-3),12);
         using var border=new Pen(UiTheme.Color(82,67,82));e.Graphics.DrawPath(border,path);
         using var stripe=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(12,3,Width-24,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,12,3,Width-24,4);
     }
     internal bool IsBusy=>current?.Busy==true;
     public bool PreviewHasRetry => retry.Visible;
-    internal bool PreviewTextFits=>message.Height>=message.GetPreferredSize(new Size(message.Width,0)).Height&&message.Bottom<(retry.Visible?retry.Top:ClientSize.Height)&&!message.Bounds.IntersectsWith(close.Bounds)&&ClientRectangle.Contains(retry.Visible?retry.Bounds:message.Bounds);
+    internal bool PreviewTextFits=>messageBounds.Height>=TextRenderer.MeasureText(messageText,noticeFont,new Size(messageBounds.Width,int.MaxValue),NoticeFlags).Height&&messageBounds.Bottom<(retry.Visible?retry.Top:ClientSize.Height)&&!messageBounds.IntersectsWith(close.Bounds)&&ClientRectangle.Contains(messageBounds)&&ClientRectangle.Contains(retry.Visible?retry.Bounds:close.Bounds);
     public void Follow() { if(Visible){var pet=anchor();Location=PopupPlacement.Place(pet,Size,Screen.FromRectangle(pet).WorkingArea);} }
-    protected override void Dispose(bool disposing) { if (disposing) timer.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) { if (disposing){timer.Dispose();noticeFont.Dispose();} base.Dispose(disposing); }
 }
 
 sealed partial class PetForm

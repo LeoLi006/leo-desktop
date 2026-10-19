@@ -207,6 +207,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--feedback-pointer-test"){FeedbackPointerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
@@ -526,17 +527,19 @@ sealed partial class PetForm : Form
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
         tray.DoubleClick += (_, _) => ShowLauncher();
         // Dock hover is handled by the animation timer so shrinking hit bounds cannot cancel tucking.
-        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) { noticePress=notices.Unread>0&&dockMotion.Progress<.001f&&e.X>=Width-24&&e.Y<24;if(noticePress){ShowNotices();return;}dockClickReveal=dockMotion.Progress>.001f; BeginDragPickup();RevealDock(true); launcherVisibleOnPress = launcher.Visible; movedWhileLocked = false; mouseDown = Cursor.Position; origin = Location; previousDragPoint = origin; dragTransition.Reset(); dragging = false; hit.Capture = true; } };
+        hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) BeginPetPress(hit.PointToScreen(e.Location)); };
         hit.MouseMove += (_, e) => {
-            if (!hit.Capture || (Control.MouseButtons & MouseButtons.Left) == 0) return;
+            if (!pointerPressed || noticePress || !hit.Capture || (Control.MouseButtons & MouseButtons.Left) == 0) return;
             var delta = new Size(Cursor.Position.X - mouseDown.X, Cursor.Position.Y - mouseDown.Y);
             ApplyDrag(delta);
         };
         hit.MouseUp += (_, e) => {
-            if (e.Button != MouseButtons.Left) return;
-            if(noticePress){noticePress=false;return;}
+            if (e.Button != MouseButtons.Left || !pointerPressed) return;
+            bool openNotice=noticePress&&NoticeHitBounds.Contains(PointToClient(hit.PointToScreen(e.Location)));
+            bool wasNotice=noticePress;pointerPressed=false;noticePress=false;
             bool revealOnly=dockClickReveal;dockClickReveal=false;
             hit.Capture = false;
+            if(wasNotice){if(openNotice)FeatureFaults.Run("通知收纳盒",ShowNotices);return;}
             if (movedWhileLocked) return;
             if (dragging) { if(prefs.EdgeDocking){var areas=DesktopDock.Displays();var area=DesktopDock.Area(Bounds,areas);dockSide=DesktopDock.Choose(Bounds,area,foot.ReservedSpace,lastDragMovement,areas);Location=DesktopDock.Snap(Bounds,area,foot.ReservedSpace,dockSide);} prefs.X = Left; prefs.Y = Top; if(!previewMode)Store.Save(prefs); dragTransition.Reset(); row = 0; frame = 0; dragging=false; BeginDockTuck(); }
             else if(!revealOnly) {
@@ -544,6 +547,7 @@ sealed partial class PetForm : Form
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
             }
         };
+        hit.MouseCaptureChanged+=(_,_)=>{if(!hit.Capture)CancelPetPress();};
         Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();};
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; if(!hit.Visible)hit.Show(this); PositionFoot(); if(!foot.Visible)foot.Show(this); };
         LocationChanged += (_, _) => OnDockLocationChanged();

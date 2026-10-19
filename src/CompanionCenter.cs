@@ -62,7 +62,23 @@ sealed class FocusForm:BarcaWindow
 }
 sealed partial class PetForm
 {
-    readonly NoticeInbox notices;readonly FocusSession focus;readonly System.Windows.Forms.Timer companionTimer=new(){Interval=1000};NoticeInboxForm? noticeWindow;FocusForm? focusWindow;bool noticePress;
+    readonly NoticeInbox notices;readonly FocusSession focus;readonly System.Windows.Forms.Timer companionTimer=new(){Interval=1000};NoticeInboxForm? noticeWindow;FocusForm? focusWindow;bool noticePress,pointerPressed;
+    Rectangle NoticeHitBounds=>notices.Unread>0&&dockMotion.Progress<.001f?new Rectangle(Math.Max(0,Width-36),0,36,36):Rectangle.Empty;
+    void BeginPetPress(Point pointer)
+    {
+        CancelPetPress();
+        noticePress=NoticeHitBounds.Contains(PointToClient(pointer));pointerPressed=true;
+        if(noticePress){hit.Capture=true;hoverCard?.Hide();return;}
+        dockClickReveal=dockMotion.Progress>.001f;BeginDragPickup();RevealDock(true);
+        launcherVisibleOnPress=launcher.Visible;movedWhileLocked=false;mouseDown=pointer;origin=Location;previousDragPoint=origin;dragTransition.Reset();dragging=false;hit.Capture=true;
+    }
+    void CancelPetPress()
+    {
+        if(!pointerPressed)return;
+        pointerPressed=noticePress=dockClickReveal=false;
+        if(dragging){dragging=false;row=frame=0;rowUntil=0;dragTransition.Reset();}
+        dragPickup?.Dispose();dragPickup=null;movedWhileLocked=false;
+    }
     void WireCompanionMenu(ContextMenuStrip menu)
     {
         var inbox=new ToolStripMenuItem("通知收纳盒");inbox.Click+=(_,_)=>ShowNotices();var concentrate=new ToolStripMenuItem("临时专注");concentrate.Click+=(_,_)=>{RevealDock(true);if(focusWindow==null||focusWindow.IsDisposed)focusWindow=new FocusForm(focus,()=>{Invalidate();CheckReminders();});if(!focusWindow.Visible)WindowPositions.Prepare(focusWindow,"focus",Bounds,previewMode);WindowInteraction.Show(focusWindow);};menu.Items.Insert(0,inbox);menu.Items.Insert(1,concentrate);menu.Opening+=(_,_)=>{inbox.Text="通知收纳盒"+(notices.Unread>0?" · "+notices.Unread:"");concentrate.Text=focus.Active(DateTimeOffset.Now)?"专注中 · "+focus.Remaining(DateTimeOffset.Now):"临时专注";};
@@ -71,6 +87,13 @@ sealed partial class PetForm
     void ShowNotices(){RevealDock(true);launcher.Hide();if(noticeWindow==null||noticeWindow.IsDisposed)noticeWindow=new(notices,id=>{var task=todoStore.Items.FirstOrDefault(t=>t.Id==id);if(task==null)throw new InvalidOperationException("这条事项已经删除。");OpenReminderTask(task);});if(!noticeWindow.Visible)WindowPositions.Prepare(noticeWindow,"notifications",Bounds,previewMode);WindowInteraction.Show(noticeWindow);}
     void DrawCompanionBadges(Graphics g,RectangleF bounds)
     {
-        if(notices.Unread>0){using var dot=new SolidBrush(BarcaUi.Gold);g.FillEllipse(dot,bounds.Right-16,bounds.Top+4,10,10);}
+        if(NoticeHitBounds.IsEmpty)return;
+        var button=new Rectangle(Width-29,5,23,23);
+        g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        using var shape=Appearance.Path(button,7);using var fill=new SolidBrush(BarcaUi.Surface);g.FillPath(fill,shape);
+        using var pen=new Pen(BarcaUi.Gold,1.3f);g.DrawPath(pen,shape);
+        g.DrawRectangle(pen,button.Left+5,button.Top+7,12,9);
+        g.DrawLines(pen,[new Point(button.Left+5,button.Top+7),new Point(button.Left+11,button.Top+12),new Point(button.Left+17,button.Top+7)]);
+        using var dot=new SolidBrush(BarcaUi.Gold);g.FillEllipse(dot,button.Right-5,button.Top-1,6,6);
     }
 }

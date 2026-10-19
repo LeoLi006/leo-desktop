@@ -153,7 +153,7 @@ sealed partial class PetForm
         var anchor=new Rectangle(new Point(Left-dockShift.X,Top-dockShift.Y),Size);var area=DesktopDock.Area(anchor,DesktopDock.Displays());
         var side=prefs.EdgeDocking?DesktopDock.Detect(anchor,foot.ReservedSpace,dockSide):DockSide.None;
         if(dockAwaitExit&&dockMotion.Progress>.995f&&!hit.Bounds.Contains(pointer))dockAwaitExit=false;
-        bool engaged=!dockAwaitExit&&hit.Bounds.Contains(pointer)||foot.Visible&&(foot.Bounds.Contains(pointer)||foot.IsSearchOpen)||dragging||launcher.Visible||feedback?.IsBusy==true||ContextMenuStrip?.Visible==true;
+        bool engaged=!dockAwaitExit&&hit.Bounds.Contains(pointer)||foot.Visible&&(foot.Bounds.Contains(pointer)||foot.IsSearchOpen)||pointerPressed||dragging||launcher.Visible||noticeWindow?.ContainsFocus==true||feedback?.IsBusy==true||ContextMenuStrip?.Visible==true;
         if(side!=DockSide.None){dockSide=side;var snapped=DesktopDock.Snap(anchor,area,foot.ReservedSpace,side);if(snapped!=anchor.Location){movingDock=true;try{Location=new Point(snapped.X+dockShift.X,snapped.Y+dockShift.Y);}finally{movingDock=false;}}}
         float before=dockMotion.Progress;dockMotion.Tick(now,side!=DockSide.None,engaged);
         int shiftY=dockSide==DockSide.Bottom?(int)Math.Round(dockMotion.Progress*foot.ReservedSpace):0;
