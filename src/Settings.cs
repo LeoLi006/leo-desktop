@@ -118,12 +118,15 @@ sealed class SettingsForm : BarcaWindow
         var startup = Check("登录 Windows 后自动启动 Leo", 100, !preview && LeoStartup.Enabled);
         checks.StartupFixed=()=>startup.Checked=LeoStartup.Enabled;
         checks.RepairPaths=()=>{try{if(preview||!modules.EditPaths(this))return;var next=JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!;modules.Apply(next);apply(next,LeoStartup.Enabled);status.Text="软件路径已更新";}catch(Exception e){status.Text=e.Message;}};
+        void OpenModuleStatus(){ModuleStatusForm? dialog=null;dialog=new ModuleStatusForm(p,id=>{if(id=="api"){dialog!.Close();Select(2);return;}dialog!.Close();Select(4);if(id.StartsWith("ext:")){using var manager=new ExtensionManager(p,preview);manager.ShowDialog(this);return;}if(id=="football"){status.Text="足球模块已就绪；入口显示可单独调整。";return;}if(ModuleStatuses.Read(p).FirstOrDefault(s=>s.Id==id)?.State==ModuleState.Disabled){status.Text="勾选对应模块并保存即可启用。";return;}checks.RepairPaths?.Invoke();});using(dialog)dialog.ShowDialog(this);}
+        checks.ShowModuleStatus=OpenModuleStatus;modules.ShowModuleStatus=OpenModuleStatus;
         checks.RepairHotkeys=()=>{Select(1);status.Text="点击冲突的快捷键输入框，换一个组合后保存；原设置在保存成功前保留。";};
+        var autoUpdates=Check("自动检查更新，仅发现新版时提醒（每天）", 176, p.AutoUpdateNotifications);
         var full = Check("游戏或视频全屏时自动隐藏", 140, p.HideInFullscreen);
-        Label("应用与剪贴板", 195, true);
-        var history = Check("记住最近使用的应用", 235, p.RememberHistory);
-        var context = Check("结合前台应用与使用时段排序", 275, p.ContextAware);
-        var clipboard = Check("保存剪贴板历史", 315, p.ClipboardHistory);
+        Label("应用与剪贴板", 211, true);
+        var history = Check("记住最近使用的应用", 245, p.RememberHistory);
+        var context = Check("结合前台应用与使用时段排序", 283, p.ContextAware);
+        var clipboard = Check("保存剪贴板历史", 321, p.ClipboardHistory);
         var migrate=new BarcaButton{Text="配置迁移与恢复…",Bounds=new Rectangle(8,362,225,34)};migrate.Click+=(_,_)=>{using var dialog=new ConfigMigrationForm(p,next=>apply(next,!preview&&LeoStartup.Enabled),configImported??(()=>{}),preview,applications);if(dialog.ShowDialog(this)==DialogResult.OK)Close();};general.Controls.Add(migrate);
         var privacy=new BarcaButton{Text="剪贴板保护…",Bounds=new Rectangle(242,362,150,34)};privacy.Click+=(_,_)=>{using var dialog=new ClipboardPrivacyForm(p,()=>{},preview);dialog.ShowDialog(this);};general.Controls.Add(privacy);
         var update=new BarcaButton{Text="检查更新…",Bounds=new Rectangle(404,362,146,34)};update.Click+=(_,_)=>{using var dialog=new UpdateForm(preview);dialog.ShowDialog(this);};general.Controls.Add(update);
@@ -139,7 +142,7 @@ sealed class SettingsForm : BarcaWindow
         shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 250, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
         var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(405, 8, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < 3; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
         var apiEditor = new ApiSettingsForm(preview ? new ChatSettings() : ChatSettings.Load(), preview, true, apiChanged); api.Controls.Add(apiEditor); apiEditor.Show();
-        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
+        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.AutoUpdateNotifications=autoUpdates.Checked;next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
         Controls.Add(host); Controls.Add(footer); Controls.Add(navigation); Controls.Add(header); MinimumSize = MaximumSize = Size; Select(0);
     }
 }
@@ -171,7 +174,7 @@ sealed partial class PetForm
             try { if(startup!=wasStartup)LeoStartup.SetEnabled(startup); Store.Save(next); }
             catch { if(LeoStartup.Enabled!=wasStartup)LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
-        prefs.EntryDisplayModes=new(next.EntryDisplayModes);prefs.ShortcutOrder=(next.ShortcutOrder??[]).Distinct().ToList();prefs.ApplicationModules=(next.ApplicationModules??[]).ToList();prefs.ModuleIcons=new(next.ModuleIcons??new());prefs.MediaModule=next.MediaModule;prefs.DisabledExtensions=next.DisabledExtensions.ToList();prefs.SkinThemes=next.SkinThemes.ToDictionary();
+        prefs.AutoUpdateNotifications=next.AutoUpdateNotifications;updateNotifications?.Configure(next.AutoUpdateNotifications);prefs.EntryDisplayModes=new(next.EntryDisplayModes);prefs.ShortcutOrder=(next.ShortcutOrder??[]).Distinct().ToList();prefs.ApplicationModules=(next.ApplicationModules??[]).ToList();prefs.ModuleIcons=new(next.ModuleIcons??new());prefs.MediaModule=next.MediaModule;prefs.DisabledExtensions=next.DisabledExtensions.ToList();prefs.SkinThemes=next.SkinThemes.ToDictionary();
         prefs.DisplayName=UiTheme.ValidateName(next.DisplayName);prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;

@@ -27,12 +27,12 @@ sealed class ClientOperationHub
                 var previous=resources.GetValueOrDefault(resource)??Task.CompletedTask;resources[resource]=task;
                 long id=++sequence;
                 _=Task.Run(async()=>{
-                    var context=new ClientOperation(notice=>{lock(gate)if(id==sequence)Emit(notice);});
+                    long statusTicket=ModuleActivity.Begin(resource);var context=new ClientOperation(notice=>{ModuleActivity.Set(resource,ModuleState.Waiting,notice.Text);lock(gate)if(id==sequence)Emit(notice);});
                     using var linked=caller.Register(context.Cancel);_=context.OfferCancel();
                     try{context.Report("正在等待前一个操作…");try{await previous.WaitAsync(context.Token);}catch(Exception)when(!context.Token.IsCancellationRequested){}
-                    context.Token.ThrowIfCancellationRequested();string result=await work(context);context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(result));}completion.TrySetResult(result);}
-                    catch(OperationCanceledException){context.Finish();lock(gate)if(id==sequence)Emit(new("已停止后续操作，已启动的软件保留"));completion.TrySetCanceled();}
-                    catch(Exception e){context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(e.Message,true,()=>Run(resource,request,work),ActionLabel:"重试"));}completion.TrySetException(e);}
+                    context.Token.ThrowIfCancellationRequested();string result=await work(context);ModuleActivity.Complete(resource,statusTicket,ModuleState.Ready,result);context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(result));}completion.TrySetResult(result);}
+                    catch(OperationCanceledException){ModuleActivity.Complete(resource,statusTicket,ModuleState.Ready,"已取消，可重新操作。");context.Finish();lock(gate)if(id==sequence)Emit(new("已停止后续操作，已启动的软件保留"));completion.TrySetCanceled();}
+                    catch(Exception e){ModuleActivity.Complete(resource,statusTicket,ModuleState.Failed,e.Message);context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(e.Message,true,()=>Run(resource,request,work),ActionLabel:"重试"));}completion.TrySetException(e);}
                     finally{lock(gate){if(pending.GetValueOrDefault(key)==task)pending.Remove(key);if(resources.GetValueOrDefault(resource)==task)resources.Remove(resource);}}
                 });
             }

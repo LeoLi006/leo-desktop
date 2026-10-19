@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>LeoLauncher</AssemblyName><ApplicationIcon>leo.ico</ApplicationIcon>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>1.00.1</Version><InformationalVersion>1.00.1</InformationalVersion><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers><Version>1.00.2</Version><InformationalVersion>1.00.2</InformationalVersion><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets/**/*" Link="assets/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

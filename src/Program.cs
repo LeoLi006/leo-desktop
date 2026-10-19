@@ -15,6 +15,8 @@ sealed class Preferences
     public List<string> ShortcutOrder {get;set;}=[];
     public Dictionary<string,string> EntryDisplayModes {get;set;}=new();
     public Dictionary<string,string> ModuleIcons {get;set;}=new();
+    public bool AutoUpdateNotifications {get;set;}=true;
+    public string LastNotifiedUpdate {get;set;}="";
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
     public int PetSize { get; set; } = 130;
@@ -197,6 +199,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--release100-test"){Release100Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform53-test"){Platform53Tests.Run(args[1]);return;}
@@ -529,7 +532,7 @@ sealed partial class PetForm : Form
                 if (launcherVisibleOnPress) launcher.Hide(); else ShowLauncher();
             }
         };
-        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();};
+        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();};
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; if(!hit.Visible)hit.Show(this); PositionFoot(); if(!foot.Visible)foot.Show(this); };
         LocationChanged += (_, _) => OnDockLocationChanged();
         ClientSizeChanged += (_, _) => { SyncDockHit(); PositionFoot(); };
@@ -850,7 +853,7 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
-        companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
+        updateNotifications?.Dispose();companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         commands.Dispose();if(!previewMode)OwnedHelpers.Shutdown();

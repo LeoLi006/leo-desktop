@@ -86,7 +86,7 @@ sealed class DockSprites:IDisposable
         float inset=Math.Max(2,size.Width*.025f),scale=Math.Min((size.Width-inset*2)/sources.Max(r=>r.Width),(size.Height-inset*2)/sources.Max(r=>r.Height));
         scale=Math.Min(scale,size.Width*(138f/192)/sources.Max(r=>r.Width));
         float w=source.Width*scale,h=source.Height*scale,x=(size.Width-w)/2,y=size.Height-h-inset;
-        float edgeX=side==DockSide.Left?inset:side==DockSide.Right?size.Width-w-inset:x;
+        float edgeX=side==DockSide.Left?0:side==DockSide.Right?size.Width-w:x;
         float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:(size.Height-h)/2;
         float t=progress*progress*(3-2*progress);return new(x+(edgeX-x)*t,y+(edgeY-y)*t,w,h);
     }
@@ -108,7 +108,7 @@ sealed partial class PetForm
     bool movingDock;
     long dockFootShownAt;
     bool dockAwaitExit,dockClickReveal;
-    void BeginDockTuck(){var side=DesktopDock.Detect(Bounds,foot.ReservedSpace,dockSide);if(!prefs.EdgeDocking||side==DockSide.None)return;dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
+    void BeginDockTuck(){var side=DesktopDock.Detect(Bounds,foot.ReservedSpace,dockSide);if(!prefs.EdgeDocking||side==DockSide.None)return;movingDock=true;try{Location=DesktopDock.Snap(Bounds,DesktopDock.Area(Bounds,DesktopDock.Displays()),foot.ReservedSpace,side);}finally{movingDock=false;}dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
     void StartDockAnimation(){if(previewMode)return;dockMotion.Reset(clock.ElapsedMilliseconds);dockTimer.Tick+=(_,_)=>UpdateDockAnimation();dockTimer.Start();}
     void RevealDock(bool immediate=false)
     {
@@ -142,7 +142,7 @@ sealed partial class PetForm
         var side=prefs.EdgeDocking?DesktopDock.Detect(anchor,foot.ReservedSpace,dockSide):DockSide.None;
         if(dockAwaitExit&&dockMotion.Progress>.995f&&!hit.Bounds.Contains(pointer))dockAwaitExit=false;
         bool engaged=!dockAwaitExit&&hit.Bounds.Contains(pointer)||foot.Visible&&(foot.Bounds.Contains(pointer)||foot.IsSearchOpen)||dragging||launcher.Visible||feedback?.IsBusy==true||ContextMenuStrip?.Visible==true;
-        if(side!=DockSide.None)dockSide=side;
+        if(side!=DockSide.None){dockSide=side;var snapped=DesktopDock.Snap(anchor,area,foot.ReservedSpace,side);if(snapped!=anchor.Location){movingDock=true;try{Location=new Point(snapped.X+dockShift.X,snapped.Y+dockShift.Y);}finally{movingDock=false;}}}
         float before=dockMotion.Progress;dockMotion.Tick(now,side!=DockSide.None,engaged);
         int shiftY=dockSide==DockSide.Bottom?(int)Math.Round(dockMotion.Progress*foot.ReservedSpace):0;
         if(shiftY!=dockShift.Y){movingDock=true;try{Location=new Point(Left,Top+shiftY-dockShift.Y);dockShift=new Point(0,shiftY);}finally{movingDock=false;}}
@@ -159,7 +159,7 @@ sealed partial class PetForm
     bool DrawDockPet(Graphics graphics,RectangleF target)
     {
         if(dockMotion.Progress<=.001f)return false;
-        var sprites=CurrentDock();var state=graphics.Save();graphics.TranslateTransform(target.Left,target.Top);
+        target=new RectangleF(Point.Empty,ClientSize);var sprites=CurrentDock();var state=graphics.Save();graphics.TranslateTransform(target.Left,target.Top);
         graphics.SetClip(new Rectangle(Point.Empty,new Size((int)target.Width,(int)target.Height)));
         var size=new Size((int)target.Width,(int)target.Height);
         if(dockMotion.Progress<DockBridge.End)CurrentBridge().Draw(graphics,size,dockMotion.Progress,dockSide,sprites);
