@@ -210,6 +210,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--q5-brain-test"){Q5BrainTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q4-workflow-test"){Q4WorkflowTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q3-notes-test"){Q3NotesTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q2-capability-test"){Q2CapabilityTests.Run(args[1]);return;}
@@ -590,7 +591,7 @@ sealed partial class PetForm : Form
     {
         RevealDock(true);
         launcher.Hide(); foot.CollapseSearch();
-        if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction){RecognizesExtension=commands.RecognizesExtension,OriginDispatcher=(a,v,s,t)=>commands.ExecuteAsync(new(a,v,s),t)}, clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
+        if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction){Brain=CreateBrainSession(),RecognizesExtension=commands.RecognizesExtension,OriginDispatcher=(a,v,s,t)=>commands.ExecuteAsync(new(a,v,s),t)}, clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
         if (!chat.Visible) WindowPositions.Prepare(chat,"chat",Bounds,previewMode);
         chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; WindowInteraction.Show(chat);
     }

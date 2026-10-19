@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "checks": {
+    "key_encryption_roundtrip": true,
+    "settings_do_not_contain_plaintext_key": true,
+    "root_url_normalized_to_v1_once": true,
+    "credentials_in_base_url_rejected": true,
+    "utf8_fragmented_sse_is_incremental": true,
+    "responses_protocol_stream_supported": true,
+    "http_chat_route_auth_model_stream_payload": true,
+    "model_discovery_route_and_auth": true,
+    "model_list_sorted_and_deduplicated": true,
+    "nonstreaming_gateway_fallback": true,
+    "auth_error_does_not_echo_key": true,
+    "request_cancellation_works": true,
+    "truncated_connection_is_not_success": true,
+    "failed_turns_not_sent_as_complete_context": true,
+    "tool_result_id_round_1": true,
+    "tool_result_id_round_2": true,
+    "streamed_search_open_reply_roundtrip": true,
+    "duplicate_open_is_idempotent": true,
+    "invalid_tools_and_arguments_never_launch": true,
+    "canceled_tools_never_launch": true,
+    "speech_strips_code_and_markdown": true
+  },
+  "external_requests": 0
+}

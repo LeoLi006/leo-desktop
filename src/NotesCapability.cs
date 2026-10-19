@@ -1,7 +1,7 @@
 using System.Text.Json;
 namespace LeoLauncher;
 
-sealed class NotesCapability(Func<NoteStore> store,Func<string,string,CancellationToken,Task> show):IStructuredLeoModule,IActionRequestAdapter
+sealed class NotesCapability(Func<NoteStore> store,Func<string,string,CancellationToken,Task> show):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
 {
     readonly object gate=new();
     readonly Dictionary<string,(string Action,string Value,ActionPayload Payload)> completed=new();
@@ -13,6 +13,11 @@ sealed class NotesCapability(Func<NoteStore> store,Func<string,string,Cancellati
         var value=request.ActionId is "notes_open" or "note_add" or "note_quick_open"?(p.TryGetProperty("text",out var text)?text.GetString()??"":""):p.GetRawText();
         return new(request.ActionId,value,request.Source,request.RequestId,request.TraceId,request.Deadline);
     }
+    public IReadOnlyList<BrainAction> BrainActions=>[
+        new("note_query","查询便签","notes-query",true,"value为JSON {text,scope}；scope为active、linked或all",Check:value=>{using var doc=JsonDocument.Parse(value);var p=doc.RootElement;if(p.ValueKind!=JsonValueKind.Object||p.EnumerateObject().Any(x=>x.Name is not("text" or "scope"))||p.TryGetProperty("scope",out var scope)&&scope.GetString() is not("active" or "linked" or "all"))throw new ArgumentException("便签查询参数无效");}),
+        new("note_add","保存新便签","text",Hint:"1～2000字符；只记下用户明确提供的内容",Check:value=>{if(value.Trim().Length is <1 or >2000)throw new ArgumentException("便签内容须为1～2000字符");}),
+        new("notes_open","打开便签","text",Hint:"可用空字符串，非空文字只作为草稿",Check:value=>{if(value.Length>2000)throw new ArgumentException("草稿过长");}),
+        new("note_quick_open","打开一句话速记","none",Check:value=>{if(value.Length!=0)throw new ArgumentException("速记入口不接受额外参数");})];
     public string Id=>"notes";public string Name=>"临时便签";public string Version=>"1";public bool Enabled=>true;
     public bool ConfigurationIsCurrent=>true;
     public IReadOnlyList<string> Actions=>["notes_open","note_quick_open","note_add","note_save","note_query","note_remove","note_pin","note_link"];

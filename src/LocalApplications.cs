@@ -3,11 +3,14 @@ using System.Text.Json;
 namespace LeoLauncher;
 
 sealed record LocalApplication(string Id,string Name,string Path,bool Enabled=true,string Icon="",string Arguments="",string WorkingDirectory="",bool Administrator=false);
-sealed class LocalApplicationModule:IStructuredLeoModule
+sealed class LocalApplicationModule:IStructuredLeoModule,IBrainContributor
 {
     readonly LocalApplication app;readonly Func<string,string,CancellationToken,Task<string>> execute;readonly ApplicationCapabilityHost? host;readonly Func<LocalApplication?>? current;
     LocalApplication configuration;
     public LocalApplicationModule(LocalApplication app,Func<string,string,CancellationToken,Task<string>> execute,ApplicationCapabilityHost? host=null,Func<LocalApplication?>? current=null){this.app=app;this.execute=execute;this.host=host;this.current=current;configuration=app;}
+    public bool BrainAvailable=>File.Exists(configuration.Path)&&(configuration.WorkingDirectory.Length==0||Directory.Exists(configuration.WorkingDirectory));
+    public string BrainStamp=>BrainCatalog.Hash(JsonSerializer.Serialize(configuration));
+    public IReadOnlyList<BrainAction> BrainActions=>[new(Id,"启动应用 · "+Name,"none",Hint:"只按已保存配置启动，不接受路径或启动参数",Check:value=>{if(value.Length!=0)throw new ArgumentException("应用启动不接受外来参数");},Preview:_=>"启动应用 · "+Name+(configuration.Administrator?"（管理员）":"")+"\r\n程序："+configuration.Path+"\r\n参数："+configuration.Arguments+"\r\n工作目录："+configuration.WorkingDirectory)];
     public LocalApplication Configuration=>configuration;
     public bool ConfigurationIsCurrent=>current==null||current()==configuration;
     public CapabilityDefinition Describe(string action)=>new(action,Id,"application-adapter","application-id/v1","external","coalesce-inflight",15000);
