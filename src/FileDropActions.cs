@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 namespace LeoLauncher;
 
 static class FileDropActions
@@ -13,6 +13,8 @@ static class FileDropActions
         if (start.ArgumentList.Count == 0) throw new IOException("文件已不存在");
         return start;
     }
+    public static string QuoteArgument(string value){var output=new System.Text.StringBuilder("\"");int slashes=0;foreach(char c in value){if(c=='\\'){slashes++;continue;}if(c=='"'){output.Append('\\',slashes*2+1).Append(c);slashes=0;continue;}output.Append('\\',slashes).Append(c);slashes=0;}return output.Append('\\',slashes*2).Append('"').ToString();}
+    public static ProcessStartInfo ConfiguredStart(Preferences prefs,string module,IEnumerable<string> paths){var app=prefs.ApplicationModules.FirstOrDefault(a=>a.Id==module)??throw new ArgumentException("应用模块不存在。");if(!app.Enabled)throw new InvalidOperationException("应用模块已停用。");var valid=ValidPaths(paths);if(valid.Length==0)throw new IOException("文件已不存在。");var start=LocalApplications.Start(app);start.Arguments=(app.Arguments+" "+string.Join(" ",valid.Select(QuoteArgument))).Trim();return start;}
     public static ProcessStartInfo FolderStart(string path)
     {
         var start = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };

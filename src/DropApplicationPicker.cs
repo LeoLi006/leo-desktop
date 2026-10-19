@@ -1,0 +1,6 @@
+namespace LeoLauncher;
+sealed class DropApplicationPicker:BarcaWindow
+{
+    public string ModuleId{get;private set;}="";public string Executable{get;private set;}="";
+    public DropApplicationPicker(Preferences prefs){Text="选择打开方式";ClientSize=new(590,420);Controls.Add(BarcaUi.Chrome(this,"用哪个应用打开？","已配置应用会沿用启动参数、工作目录与管理员选项。"));var apps=new ListBox{Bounds=new(24,108,542,203),BackColor=BarcaUi.Surface,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.None};foreach(var app in prefs.ApplicationModules.Where(a=>a.Enabled))apps.Items.Add(new ComboChoice(app.Name+(app.Administrator?" · 管理员":""),app.Id));if(apps.Items.Count>0)apps.SelectedIndex=0;else apps.Items.Add(new ComboChoice("还没有已启用的自定义应用，请浏览其他程序。",""));var open=new BarcaButton{Text="使用所选应用",Bounds=new(386,344,180,34),Enabled=prefs.ApplicationModules.Any(a=>a.Enabled)};open.Click+=(_,_)=>{if(apps.SelectedItem is ComboChoice{Value.Length:>0} choice){ModuleId=choice.Value;DialogResult=DialogResult.OK;}};var browse=new BarcaButton{Text="浏览其他程序…",Bounds=new(24,344,180,34)};browse.Click+=(_,_)=>{using var picker=new OpenFileDialog{Filter="桌面应用|*.exe",CheckFileExists=true};if(picker.ShowDialog(this)==DialogResult.OK){Executable=picker.FileName;DialogResult=DialogResult.OK;}};Controls.AddRange([apps,open,browse]);MinimumSize=MaximumSize=Size;}
+}

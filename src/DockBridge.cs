@@ -8,14 +8,14 @@ sealed class DockBridge:IDisposable
     public const int Count=9;
     readonly Bitmap sheet,idle,mirroredSheet;readonly string? kit;
     readonly Rectangle[] sources=new Rectangle[32];
-    readonly Rectangle idleSource;
+    readonly Rectangle idleSource;readonly Size referenceHead;readonly Size[] heads=new Size[32];
     public DockBridge(string path,Bitmap main,string? kit=null)
     {
         this.kit=kit;sheet=new(path);idle=new Bitmap(main.Width/8,main.Height/11);
         using(var g=Graphics.FromImage(idle))g.DrawImage(main,new Rectangle(Point.Empty,idle.Size),new Rectangle(Point.Empty,idle.Size),GraphicsUnit.Pixel);
         idleSource=Visible(idle,new Rectangle(Point.Empty,idle.Size));
         var parts=Parts(sheet);if(parts.Length!=32)throw new IOException("起步动画必须包含四个方向各八帧");
-        Array.Copy(parts,sources,32);
+        Array.Copy(parts,sources,32);referenceHead=HeadGeometry.Measure(idle,new Rectangle(Point.Empty,idle.Size));for(int i=0;i<32;i++)heads[i]=HeadGeometry.Measure(sheet,sources[i]);
         mirroredSheet=(Bitmap)sheet.Clone();mirroredSheet.RotateFlip(RotateFlipType.RotateNoneFlipX);
     }
     static Rectangle[] Parts(Bitmap image)
@@ -68,7 +68,8 @@ sealed class DockBridge:IDisposable
         var start=new RectangleF(idleSource.X*startScale,(size.Height-idle.Height*startScale)+idleSource.Y*startScale,idleSource.Width*startScale,idleSource.Height*startScale);
         float sx=start.Width/first.Width+(end.Width/last.Width-start.Width/first.Width)*t;
         float sy=start.Height/first.Height+(end.Height/last.Height-start.Height/first.Height)*t;
-        float w=frame==0?start.Width:source.Width*sx,h=frame==0?start.Height:source.Height*sy;
+        float uniform=frame==0?startScale:Math.Min(Math.Min(sx,sy),startScale*HeadGeometry.Fit(referenceHead,heads[direction*8+frame-1]));
+        float w=source.Width*uniform,h=source.Height*uniform;
         float fit=Math.Min(1,Math.Min(size.Width*(138f/192)/w,size.Height/h));w*=fit;h*=fit;
         float cx=start.Left+start.Width/2+(end.Left+end.Width/2-start.Left-start.Width/2)*t;
         float bottom=start.Bottom+(end.Bottom-start.Bottom)*t;

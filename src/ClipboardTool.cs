@@ -77,9 +77,10 @@ sealed class ClipboardHistoryService : IDisposable
         History.Expire(p.ClipboardExpireDays,DateTimeOffset.Now);
         timer.Tick += (_, _) => Capture();
         ClipboardPrivacy.Changed+=RefreshPrivacy;
-        if (!preview) timer.Start();
+        ConfigureActivity();
     }
-    public bool Enabled { get => prefs.ClipboardHistory; set { prefs.ClipboardHistory = value; lastSequence = GetClipboardSequenceNumber(); Store.Save(prefs); } }
+    public void ConfigureActivity(){lastSequence=GetClipboardSequenceNumber();if(!preview&&prefs.ClipboardHistory)timer.Start();else timer.Stop();}
+    public bool Enabled { get => prefs.ClipboardHistory; set { prefs.ClipboardHistory = value; ConfigureActivity(); Store.Save(prefs); } }
     public void Capture()
     {
         if (preview) return;

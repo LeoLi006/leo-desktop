@@ -17,6 +17,8 @@ sealed class Preferences
     public Dictionary<string,string> ModuleIcons {get;set;}=new();
     public bool AutoUpdateNotifications {get;set;}=true;
     public string LastNotifiedUpdate {get;set;}="";
+    public bool ApplicationIndexing {get;set;}=true;
+    public string ActiveProfile {get;set;}="";
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
     public int PetSize { get; set; } = 130;
@@ -88,11 +90,11 @@ static class Store
 
 static class Catalog
 {
-    public static List<AppEntry> Scan()
+    public static List<AppEntry> Scan(CancellationToken token=default)
     {
         var result = new List<AppEntry>();
         var roots = new[] { Environment.GetFolderPath(Environment.SpecialFolder.Programs), Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory) };
-        foreach (var root in roots.Distinct()) Walk(root, result);
+        foreach (var root in roots.Distinct()) Walk(root, result,token);
         // Windows applications without Start Menu shortcuts.
         try
         {
@@ -108,6 +110,7 @@ static class Catalog
                         dynamic items = folder.Items();
                         foreach (dynamic item in items)
                         {
+                            token.ThrowIfCancellationRequested();
                             try
                             {
                                 string name = item.Name;
@@ -128,7 +131,8 @@ static class Catalog
             }
         }
         catch { /* Ordinary shortcuts remain available when the shell catalog is unavailable. */ }
-        return result.GroupBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).Select(g => g.First()).Select(ResolveExecutable)
+        token.ThrowIfCancellationRequested();
+        return result.GroupBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase).Select(g => g.First()).Select(x=>{token.ThrowIfCancellationRequested();return ResolveExecutable(x);})
             .Where(x => !Path.GetExtension(x.Target).Equals(".lnk", StringComparison.OrdinalIgnoreCase) || (x.ExePath.Length > 0 && !new[] { "help", "uninstall", "readme", "帮助", "卸载", "官网", "参考文档" }.Any(word => x.Name.Contains(word, StringComparison.OrdinalIgnoreCase))))
             .OrderBy(x => x.Name).ToList();
     }
@@ -152,8 +156,9 @@ static class Catalog
         }
         return entry;
     }
-    static void Walk(string root, List<AppEntry> result)
+    static void Walk(string root, List<AppEntry> result,CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root)) return;
         try
         {
@@ -161,7 +166,7 @@ static class Catalog
                 if (new[] { ".lnk", ".appref-ms" }.Contains(Path.GetExtension(file).ToLowerInvariant()))
                     result.Add(new(Path.GetFileNameWithoutExtension(file), file));
             foreach (var dir in Directory.GetDirectories(root))
-                if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) == 0) Walk(dir, result);
+                if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) == 0) Walk(dir, result,token);
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
@@ -199,6 +204,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--release100-test"){Release100Tests.Run(args[1]);return;}
@@ -491,7 +497,8 @@ sealed partial class PetForm : Form
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
         if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}
         foot = new FootTools(p.PetSize, preview);
-        foot.ConfigureModules(prefs);
+        if(!preview)ConfigureClientActivity();
+        foot.ManageShortcut=ManageQuickEntry;launcher.ManageShortcut=ManageQuickEntry;foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;
         foot.TodosRequested+=()=>ShowTodos();
         foot.VoiceRequested+=ShowVoice;
@@ -541,7 +548,7 @@ sealed partial class PetForm : Form
         animation.Start();
         fullscreenTimer.Tick += (_, _) => PollFullscreen();
         if (!preview) fullscreenTimer.Start();
-        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();matchSyncTimer.Start();}
+        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();if(prefs.FootballModule)matchSyncTimer.Start();}
     }
     protected override bool ShowWithoutActivation => true;
     void ShowChat()

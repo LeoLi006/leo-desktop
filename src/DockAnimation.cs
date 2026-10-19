@@ -30,6 +30,7 @@ sealed class DockMotion
 sealed class DockSprites:IDisposable
 {
     readonly Bitmap[] frames;readonly Rectangle[] sources;readonly string? kit;
+    readonly float[] headScales=new float[24];internal readonly Size ReferenceHead;internal Size HeadAt(int index)=>HeadGeometry.Measure(frames[index],new Rectangle(Point.Empty,frames[index].Size));
     public const int FramesPerDirection=6;
     public DockSprites(string? path=null,string? kit=null)
     {
@@ -73,6 +74,7 @@ sealed class DockSprites:IDisposable
             frames[FramesPerDirection+i].Dispose();frames[FramesPerDirection+i]=mirrored;
             sources[FramesPerDirection+i]=new Rectangle(sources[FramesPerDirection+i].Location,mirrored.Size);
         }
+        using var main=new Bitmap(Path.Combine(Store.Root,"assets","leo.png"));var cell=new Rectangle(0,0,main.Width/8,main.Height/11);ReferenceHead=HeadGeometry.Measure(main,cell);for(int i=0;i<24;i++)headScales[i]=HeadGeometry.Fit(ReferenceHead,HeadAt(i))*192f/cell.Width;
     }
     internal bool RightGazeMatchesLeftMirror()
     {
@@ -85,6 +87,9 @@ sealed class DockSprites:IDisposable
     {
         float inset=Math.Max(2,size.Width*.025f),scale=Math.Min((size.Width-inset*2)/sources.Max(r=>r.Width),(size.Height-inset*2)/sources.Max(r=>r.Height));
         scale=Math.Min(scale,size.Width*(138f/192)/sources.Max(r=>r.Width));
+        int index=Array.IndexOf(sources,source);if(index>=0)scale=Math.Min(scale,Math.Min(size.Width/192f,size.Height/208f)*headScales[index]);
+        // A slightly smaller tucked silhouette avoids a head-only pose feeling magnified.
+        float tuck=progress*progress*(3-2*progress);scale*=1-.14f*tuck;
         float w=source.Width*scale,h=source.Height*scale,x=(size.Width-w)/2,y=size.Height-h-inset;
         float edgeX=side==DockSide.Left?0:side==DockSide.Right?size.Width-w:x;
         float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:(size.Height-h)/2;

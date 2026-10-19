@@ -1,0 +1,14 @@
+namespace LeoLauncher;
+static class ShortcutManagement
+{
+    public static void Wire(Button button,string id,Action<string> manage){if(button.ContextMenuStrip!=null)return;var menu=new ContextMenuStrip();BarcaMenus.Apply(menu);var edit=new ToolStripMenuItem("管理此快捷按钮…");edit.Click+=(_,_)=>manage(id);menu.Items.Add(edit);button.ContextMenuStrip=menu;button.Disposed+=(_,_)=>menu.Dispose();}
+}
+sealed class QuickEntrySettingsForm:BarcaWindow
+{
+    public Preferences Result{get;}
+    public QuickEntrySettingsForm(Preferences current,string id){Result=LocalApplications.Clone(current);var entry=EntryDisplay.Entries(current).FirstOrDefault(e=>e.Id==id)??throw new ArgumentException("该按钮没有可管理的模块。");Text="管理快捷按钮";ClientSize=new(580,365);Controls.Add(BarcaUi.Chrome(this,entry.Name,"显示位置单独保存；程序配置只保存在本机。"));var mode=new ComboBox{Bounds=new(170,118,370,30),DropDownStyle=ComboBoxStyle.DropDownList};CompanionUi.ThemeCombo(mode);foreach(var value in EntryDisplay.Modes)mode.Items.Add(new ComboChoice(value.Label,value.Value));mode.SelectedItem=mode.Items.Cast<ComboChoice>().Single(x=>x.Value==EntryDisplay.Mode(current,id));Controls.Add(new Label{Text="入口位置",Bounds=new(24,120,130,25),ForeColor=BarcaUi.Muted});var hint=new Label{Text=Result.ApplicationModules.Any(a=>a.Id==id)?"自定义应用可修改名称、图标、启动参数及工作目录。":"内置模块保留功能名称；仅提供适用的图标、路径和开关配置。",Bounds=new(24,168,530,52),ForeColor=BarcaUi.Muted};var configure=new BarcaButton{Text=id=="football"?"修改足球图标…":"编辑模块配置…",Bounds=new(24,235,220,34)};configure.Click+=(_,_)=>{if(id=="football"){using var picker=new OpenFileDialog{Filter="图片或图标|*.png;*.jpg;*.ico;*.exe",CheckFileExists=true};if(picker.ShowDialog(this)==DialogResult.OK)Result.ModuleIcons[id]=picker.FileName;return;}var app=Result.ApplicationModules.FirstOrDefault(a=>a.Id==id);using var editor=new ApplicationEditor(app,app==null?id:null,Result);if(editor.ShowDialog(this)!=DialogResult.OK)return;if(app!=null)Result.ApplicationModules[Result.ApplicationModules.IndexOf(app)]=editor.Result!;else{if(editor.Result!.Path.Length==0)Result.ModuleExecutables.Remove(id);else Result.ModuleExecutables[id]=editor.Result.Path;Result.ModuleIcons[id]=editor.Result.Icon;}};var save=new BarcaButton{Text="保存",Bounds=new(430,300,125,34)};save.Click+=(_,_)=>{Result.EntryDisplayModes[id]=((ComboChoice)mode.SelectedItem!).Value;DialogResult=DialogResult.OK;};var cancel=new BarcaButton{Text="取消",Bounds=new(290,300,125,34),DialogResult=DialogResult.Cancel};CancelButton=cancel;Controls.AddRange([mode,hint,configure,save,cancel]);MinimumSize=MaximumSize=Size;}
+}
+sealed partial class PetForm
+{
+    void ManageQuickEntry(string id){RevealDock(true);using var form=new QuickEntrySettingsForm(prefs,id);WindowPositions.Prepare(form,"quick-entry",Bounds,previewMode);if(form.ShowDialog()!=DialogResult.OK)return;try{ApplySettings(form.Result,!previewMode&&LeoStartup.Enabled);OperationFeedback.Show("快捷按钮已更新");}catch(Exception e){OperationFeedback.Error(e.Message);}}
+}

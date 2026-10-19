@@ -143,3 +143,14 @@ Leo以当前用户权限启动包内程序，附加固定参数`--leo-module`，
 `ActionDispatcher` 与 `ClientOperationHub` 将等待、成功、失败和取消写入 `ModuleActivity`。递增操作票据阻止旧请求完成时覆盖新请求；取消恢复可用状态。已安装只表示依赖有效，不要求软件已运行。状态页提供对应设置入口；重新检测只确认失败记录，不重放动作。
 
 设置字段 `AutoUpdateNotifications` 默认true，`LastNotifiedUpdate` 记录已提醒的版本。自动检查只访问公开正式发布信息，不消费模型API；失败静默，下载和安装仍由手动更新窗口完成。
+
+
+## v1.01.0：使用方案与活动释放
+
+`UsageProfile`使用`leo-profile-1`白名单格式；不复用`Preferences`作为导出载体。`UsageProfiles.Prepare`在当前本机配置副本上只变更能力、布局、快捷键和后台选项，不修改本机路径或个人记录。导入拒绝未知字段并分配新ID，切换经预览确认后调用统一设置路径。`ProfileTransition`保留切换前副本，失败时恢复并报告错误。
+
+`Preferences.ApplicationIndexing`默认true以兼容旧配置。关闭后取消STA扫描、丢弃过期结果并停止上下文观察；`ClipboardHistoryService.ConfigureActivity`根据开关停止轮询；足球开关控制同步定时器和请求生命周期。
+
+`ClientOperationHub.Configure`按资源取消排队与等待中的动作，并在停用时拒绝新请求。它不退出本机软件，也不回滚已完成的代理或播放操作。独立扩展使用`module:<id>`资源名。
+
+`FileDropActions.ConfiguredStart`按模块ID解析当前已启用应用，沿用`LocalApplications.Start`的参数、工作目录和提权设置，通过Windows引号规则追加有效文件路径。拖放请求不接受外部传入的管理员标记或任意启动参数。

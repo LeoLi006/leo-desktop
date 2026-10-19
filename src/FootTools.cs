@@ -27,6 +27,7 @@ sealed class FootTools : Form
     readonly GlyphButton proxyButton = new("proxy");
     readonly GlyphButton chatButton = new("chat");
     readonly GlyphButton todoButton = new("todo");
+    public Action<string>? ManageShortcut;
     public event Action? ChatRequested;
     public event Action? TodosRequested;
     public event Action? VoiceRequested;
@@ -70,6 +71,7 @@ sealed class FootTools : Form
         Font = Appearance.Body(9);
         terminal = new GlyphButton("terminal") { AccessibleName = "打开管理员终端", FlatStyle = FlatStyle.Flat, Bounds = new Rectangle(3, 2, 28, 24), BackColor = Appearance.Background, ForeColor = Appearance.Accent };
         terminal.FlatAppearance.BorderSize = 0;
+        foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)})ShortcutManagement.Wire(pair.Item2,pair.Item1,id=>ManageShortcut?.Invoke(id));
         terminal.FlatAppearance.MouseOverBackColor = Appearance.Hover;
         var tip = new ToolTip(); tip.SetToolTip(terminal, "管理员终端");
         moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / Edge");

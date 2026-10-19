@@ -131,6 +131,8 @@ sealed class SettingsForm : BarcaWindow
         var privacy=new BarcaButton{Text="剪贴板保护…",Bounds=new Rectangle(242,362,150,34)};privacy.Click+=(_,_)=>{using var dialog=new ClipboardPrivacyForm(p,()=>{},preview);dialog.ShowDialog(this);};general.Controls.Add(privacy);
         var update=new BarcaButton{Text="检查更新…",Bounds=new Rectangle(404,362,146,34)};update.Click+=(_,_)=>{using var dialog=new UpdateForm(preview);dialog.ShowDialog(this);};general.Controls.Add(update);
         var themeButton=new BarcaButton{Text="主题与自定义球衣…",Bounds=new Rectangle(8,408,245,34)};themeButton.Click+=(_,_)=>{using var editor=new ThemeEditor(p,next=>apply(next,!preview&&LeoStartup.Enabled),preview);editor.ShowDialog(this);};general.Controls.Add(themeButton);
+        var indexApps=Check("启用本机应用索引", 452, p.ApplicationIndexing);
+        var profiles=new BarcaButton{Text="使用方案…",Bounds=new Rectangle(267,408,283,34)};profiles.Click+=(_,_)=>{bool changed=false;using var dialog=new UsageProfilesForm(p,next=>{ProfileTransition.Apply(p,next,value=>apply(value,!preview&&LeoStartup.Enabled));changed=true;},preview);dialog.ShowDialog(this);if(changed)Close();};general.Controls.Add(profiles);
         var fields = new[]{p.SearchHotkey,p.VoiceHotkey,p.LyricsHotkey}.Select(k => new HotkeyField(k)).ToArray();
         foreach(var field in fields){field.Enter+=(_,_)=>capture?.Invoke(true);field.Leave+=(_,_)=>capture?.Invoke(false);}
         Deactivate+=(_,_)=>capture?.Invoke(false);
@@ -142,7 +144,7 @@ sealed class SettingsForm : BarcaWindow
         shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 250, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
         var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(405, 8, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < 3; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
         var apiEditor = new ApiSettingsForm(preview ? new ChatSettings() : ChatSettings.Load(), preview, true, apiChanged); api.Controls.Add(apiEditor); apiEditor.Show();
-        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.AutoUpdateNotifications=autoUpdates.Checked;next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
+        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.ApplicationIndexing=indexApps.Checked;next.AutoUpdateNotifications=autoUpdates.Checked;next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
         Controls.Add(host); Controls.Add(footer); Controls.Add(navigation); Controls.Add(header); MinimumSize = MaximumSize = Size; Select(0);
     }
 }
@@ -171,14 +173,17 @@ sealed partial class PetForm
         {
             bool wasStartup = LeoStartup.Enabled;
             LeoHotkeys.Replace(previousKeys, nextKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord));
-            try { if(startup!=wasStartup)LeoStartup.SetEnabled(startup); Store.Save(next); }
+            try { if(startup!=wasStartup)LeoStartup.SetEnabled(startup); ConfigMigration.Write(Store.FilePath,JsonSerializer.Serialize(next)); }
             catch { if(LeoStartup.Enabled!=wasStartup)LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
+        prefs.ApplicationIndexing=next.ApplicationIndexing;prefs.ActiveProfile=next.ActiveProfile;prefs.ContextAware=next.ContextAware;prefs.ClipboardHistory=next.ClipboardHistory;
         prefs.AutoUpdateNotifications=next.AutoUpdateNotifications;updateNotifications?.Configure(next.AutoUpdateNotifications);prefs.EntryDisplayModes=new(next.EntryDisplayModes);prefs.ShortcutOrder=(next.ShortcutOrder??[]).Distinct().ToList();prefs.ApplicationModules=(next.ApplicationModules??[]).ToList();prefs.ModuleIcons=new(next.ModuleIcons??new());prefs.MediaModule=next.MediaModule;prefs.DisabledExtensions=next.DisabledExtensions.ToList();prefs.SkinThemes=next.SkinThemes.ToDictionary();
         prefs.DisplayName=UiTheme.ValidateName(next.DisplayName);prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
         if(!prefs.MediaModule)mediaWindow?.Close();
+        if(!previewMode){if(prefs.FootballModule)matchSyncTimer.Start();else matchSyncTimer.Stop();}
+        if(!previewMode)ConfigureClientActivity();
         Modules.SetFootball(prefs.FootballModule);foot.ConfigureModules(prefs);launcher.RefreshModules();
         prefs.PetSize = next.PetSize; prefs.RememberHistory = next.RememberHistory; prefs.ContextAware = next.ContextAware; prefs.HideInFullscreen = next.HideInFullscreen; prefs.ClipboardHistory = next.ClipboardHistory;
         prefs.SearchHotkey = next.SearchHotkey; prefs.VoiceHotkey = next.VoiceHotkey; prefs.LyricsHotkey = next.LyricsHotkey; lyricsHotkeyRegistered = next.MusicModule&&next.LyricsHotkey != Keys.None;

@@ -6,6 +6,7 @@ sealed partial class LauncherForm : Form
     internal Func<string,CancellationToken,Task<string>>? CommandRequested;
     internal Func<string,bool>? RecognizesCommand;
     internal Action? MediaRequested;
+    internal Action<string>? ManageShortcut;
     internal Func<LocalApplication,LocalApplication>? RepairApplication;internal Action<string[]>? ApplicationsDropped;
     Action openFootball=null!;
     FlowLayoutPanel shortcutRow=null!;GlyphButton footballShortcut=null!;
@@ -29,7 +30,8 @@ sealed partial class LauncherForm : Form
     readonly System.Windows.Forms.Timer observer = new() { Interval = 1500 };
     readonly System.Windows.Forms.Timer debounce = new() { Interval = 140 };
     List<AppEntry> apps = new(), filtered = new();
-    bool loading;
+    void CancelCatalog(){try{catalogRequest?.Cancel();}catch(ObjectDisposedException){}}
+    bool loading;CancellationTokenSource? catalogRequest;int catalogGeneration;bool catalogStarted;
     FootballForm? football;
     MusicForm? music;
     public bool VerifyFootballEntry()
@@ -174,7 +176,7 @@ sealed partial class LauncherForm : Form
         Deactivate += (_, _) => { if (!preview) ProcessDeactivation(PointerOverPet?.Invoke() == true); };
         Disposed+=(_,_)=>{shortcutTips.Dispose();shortcutOverflowMenu.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
         observer.Tick += (_, _) => Observe();
-        LoadCatalog();
+        ConfigureActivity();
     }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -191,16 +193,17 @@ sealed partial class LauncherForm : Form
     }
     void LoadCatalog()
     {
+        catalogStarted=true;CancelCatalog();var pending=new CancellationTokenSource();catalogRequest=pending;int generation=++catalogGeneration;
         loading = true; status.Text = "正在读取本机应用…";
         // Create the handle before the STA worker posts its completion callback.
         _ = Handle;
         var thread = new Thread(() => {
             try
             {
-                var scanned = Catalog.Scan();
+                var scanned = Catalog.Scan(pending.Token);
                 scanned.Add(ClipboardTool.Entry);
                 if (!IsDisposed) BeginInvoke((Action)(() => {
-                    apps = scanned; loading = false;
+                    if(generation!=catalogGeneration||!prefs.ApplicationIndexing||pending.IsCancellationRequested)return;apps = scanned; loading = false;
                     if (demo)
                     {
                         var sample = apps.Where(x => x.ExePath.Length > 0).Take(14).ToArray();
@@ -208,13 +211,15 @@ sealed partial class LauncherForm : Form
                         if (sample.Length > 0 && !prefs.Favorites.Contains(sample[0].Target)) prefs.Favorites.Insert(0, sample[0].Target);
                     }
                     Observe(); Filter();
-                    if (!preview) observer.Start();
+                    if (!preview&&prefs.ContextAware&&prefs.ApplicationIndexing) observer.Start();
                 }));
             }
+            catch(OperationCanceledException){}
             catch (Exception e)
             {
-                if (!IsDisposed && IsHandleCreated) BeginInvoke((Action)(() => { loading = false; status.Text = "应用索引失败：" + e.Message; }));
+                if (!IsDisposed && IsHandleCreated) BeginInvoke((Action)(() => { if(generation==catalogGeneration){loading = false; status.Text = "应用索引失败：" + e.Message;} }));
             }
+            finally{pending.Dispose();}
         }) { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA); thread.Start();
     }
@@ -231,7 +236,8 @@ sealed partial class LauncherForm : Form
         lastExternal = match?.Name ?? active.Process;
         if (match != null && prefs.RememberHistory) memory.Record(match, previous, DateTimeOffset.UtcNow);
     }
-    public void RefreshModules(){RefreshShortcuts();
+    public void ConfigureActivity(){clipboard?.ConfigureActivity();if(!prefs.ApplicationIndexing){CancelCatalog();catalogGeneration++;catalogStarted=false;loading=false;apps=[ClipboardTool.Entry];observer.Stop();Filter();}else{if(!catalogStarted)LoadCatalog();if(!preview&&prefs.ContextAware)observer.Start();else observer.Stop();}}
+    public void RefreshModules(){RefreshShortcuts();ConfigureActivity();
         if(!prefs.FootballModule){football?.Close();football=null;}
         if(!prefs.MusicModule){music?.Dispose();music=null;}
         music?.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));if(football!=null)SetWatchVisibility(football);
@@ -388,7 +394,7 @@ sealed partial class LauncherForm : Form
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { music?.Dispose();football?.Dispose(); observer.Dispose(); debounce.Dispose(); icons.Dispose(); clipboard?.Dispose(); }
+        if (disposing) { CancelCatalog();music?.Dispose();football?.Dispose(); observer.Dispose(); debounce.Dispose(); icons.Dispose(); clipboard?.Dispose(); }
         base.Dispose(disposing);
     }
 }

@@ -28,7 +28,7 @@ sealed partial class PetForm
     Task<string> ExecuteLeoAction(string action,string value,CancellationToken token)=>commands.ExecuteAsync(new(action,value,"chat"),token);
     async Task<string> ExecuteLeoActionCore(string action,string value,CancellationToken token){token.ThrowIfCancellationRequested();if(!LeoActions.Names.Contains(action))throw new ArgumentException("不支持的功能");Modules.Require(prefs,Modules.ForAction(action));
         switch(action){
-            case "files_with_app":{using var doc=JsonDocument.Parse(value);var root=doc.RootElement;string app=root.GetProperty("application").GetString()??"";var paths=root.GetProperty("paths").EnumerateArray().Select(e=>e.GetString()??"").ToArray();if(!previewMode)Process.Start(FileDropActions.AppStart(app,paths));return "已交给所选应用。";}
+            case "files_with_app":{using var doc=JsonDocument.Parse(value);var root=doc.RootElement;string app=root.TryGetProperty("application",out var application)?application.GetString()??"":"";var paths=root.GetProperty("paths").EnumerateArray().Select(e=>e.GetString()??"").ToArray();var start=root.TryGetProperty("module",out var module)&&module.GetString() is {Length:>0} moduleId?FileDropActions.ConfiguredStart(prefs,moduleId,paths):FileDropActions.AppStart(app,paths);if(!previewMode)Process.Start(start);return "已交给所选应用。";}
             case "notes_open":ShowNotes(value);return "已打开临时便签。";
             case "note_add":{var note=Notes.Save(null,value);return "已记下便签。";}
             case "path_reveal":{string path=LocalPath.Resolve(value);if(!previewMode)Process.Start(FileDropActions.FolderStart(path));return "已打开所在文件夹。";}

@@ -17,18 +17,20 @@ sealed class ClientOperationHub
 {
     readonly object gate=new();readonly Dictionary<string,Task<string>> pending=new();readonly Dictionary<string,Task> resources=new();
     readonly Action<LeoNotice> notify;long sequence;
+    readonly Dictionary<string,CancellationTokenSource> resourceLife=new();readonly HashSet<string> disabledResources=new();
+    public void Configure(string resource,bool enabled){CancellationTokenSource? previous=null;lock(gate){if(enabled){disabledResources.Remove(resource);return;}disabledResources.Add(resource);resourceLife.Remove(resource,out previous);}if(previous!=null){previous.Cancel();previous.Dispose();}}
     public ClientOperationHub(Action<LeoNotice> feedback){notify=feedback;}
     public Task<string> Run(string resource,string request,Func<ClientOperation,Task<string>> work,CancellationToken caller=default)
     {
         void Emit(LeoNotice notice)=>notify(notice with{Module=resource=="music"?"music":resource=="clash"?"clash":notice.Module,OperationId=resource+":"+request});
-        Task<string> task;lock(gate){string key=resource+"\n"+request;
+        Task<string> task;lock(gate){if(disabledResources.Contains(resource))throw new InvalidOperationException("此模块已停用。");if(!resourceLife.TryGetValue(resource,out var life)){life=new();resourceLife[resource]=life;}var resourceToken=life.Token;string key=resource+"\n"+request;
             if(!pending.TryGetValue(key,out task!)){
                 var completion=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);task=completion.Task;pending[key]=task;
                 var previous=resources.GetValueOrDefault(resource)??Task.CompletedTask;resources[resource]=task;
                 long id=++sequence;
                 _=Task.Run(async()=>{
                     long statusTicket=ModuleActivity.Begin(resource);var context=new ClientOperation(notice=>{ModuleActivity.Set(resource,ModuleState.Waiting,notice.Text);lock(gate)if(id==sequence)Emit(notice);});
-                    using var linked=caller.Register(context.Cancel);_=context.OfferCancel();
+                    using var linked=caller.Register(context.Cancel);using var moduleCancellation=resourceToken.Register(context.Cancel);_=context.OfferCancel();
                     try{context.Report("正在等待前一个操作…");try{await previous.WaitAsync(context.Token);}catch(Exception)when(!context.Token.IsCancellationRequested){}
                     context.Token.ThrowIfCancellationRequested();string result=await work(context);ModuleActivity.Complete(resource,statusTicket,ModuleState.Ready,result);context.Finish();lock(gate){pending.Remove(key);if(id==sequence)Emit(new(result));}completion.TrySetResult(result);}
                     catch(OperationCanceledException){ModuleActivity.Complete(resource,statusTicket,ModuleState.Ready,"已取消，可重新操作。");context.Finish();lock(gate)if(id==sequence)Emit(new("已停止后续操作，已启动的软件保留"));completion.TrySetCanceled();}
