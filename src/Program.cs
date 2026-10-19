@@ -15,6 +15,7 @@ sealed class Preferences
     public List<string> ShortcutOrder {get;set;}=[];
     public Dictionary<string,string> EntryDisplayModes {get;set;}=new();
     public Dictionary<string,string> ModuleIcons {get;set;}=new();
+    public string[]? PlannerQuotes {get;set;}
     public bool AutoUpdateNotifications {get;set;}=true;
     public string LastNotifiedUpdate {get;set;}="";
     public bool ApplicationIndexing {get;set;}=true;
@@ -66,7 +67,7 @@ static class Store
         try {return AtomicJson.Read(FilePath,Validate);}
         catch { LoadFailed=File.Exists(FilePath)||File.Exists(FilePath+".bak");return new(); }
     }
-    internal static Preferences Validate(string text){using var document=JsonDocument.Parse(text);var result=document.RootElement.Deserialize<Preferences>()??throw new IOException("设置内容为空");if(result.PetSize is <80 or >230||result.Favorites==null||result.Aliases==null||result.ModuleExecutables==null||result.SkinThemes==null||result.DisabledExtensions==null)throw new IOException("设置内容不完整");QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
+    internal static Preferences Validate(string text){using var document=JsonDocument.Parse(text);var result=document.RootElement.Deserialize<Preferences>()??throw new IOException("设置内容为空");if(result.PetSize is <80 or >230||result.Favorites==null||result.Aliases==null||result.ModuleExecutables==null||result.SkinThemes==null||result.DisabledExtensions==null)throw new IOException("设置内容不完整");PlannerPhrases.Validate(result.PlannerQuotes);QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
     static void Migrate()
     {
         var parent = Directory.GetParent(Root.TrimEnd(Path.DirectorySeparatorChar))?.FullName;
@@ -209,6 +210,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--quiet-planner-test"){QuietPlannerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--soak-test"){SoakProbe.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--robustness-test"){RobustnessTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--performance-test"){PerformanceProbe.Run(args[1]);return;}
@@ -493,7 +495,7 @@ sealed partial class PetForm : Form
     {
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
-        prefs = p;p.EntryDisplayModes??=new();p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        PlannerPhrases.Configure(p.PlannerQuotes);prefs = p;p.EntryDisplayModes??=new();p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -526,9 +528,10 @@ sealed partial class PetForm : Form
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
         WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
-        PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
+        PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{launcher.Hide();using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
         var quickNoteItem=new ToolStripMenuItem("一句话速记…");quickNoteItem.Click+=(_,_)=>ShowQuickNote();menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="清单与记录").DropDownItems.Insert(0,quickNoteItem);
         WireOptionalEntryMenus(menu);
+        menu.Opening+=(_,_)=>{CancelPetPress();hit.Capture=false;launcher.Hide();};
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
@@ -555,7 +558,7 @@ sealed partial class PetForm : Form
             }
         };
         hit.MouseCaptureChanged+=(_,_)=>{if(!hit.Capture)CancelPetPress();};
-        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();if(!previewMode&&Store.LoadFailed)PresentFeedback(new("设置文件无法读取，已使用默认设置；损坏原文件仍保留。",true));else if(!previewMode&&AtomicJson.Recovered.Count>0)PresentFeedback(new("已从本地备份恢复数据，损坏原文件已保留。请核对最近的设置和记录。"));};
+        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();if(!previewMode&&Store.LoadFailed)PresentFeedback(new("设置文件无法读取，已使用默认设置；损坏原文件仍保留。",true));else if(!previewMode&&AtomicJson.Recovered.Count>0)PresentFeedback(new("已从本地备份恢复数据，损坏原文件已保留。请核对最近的设置和记录。",Attention:true));};
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; if(!hit.Visible)hit.Show(this); PositionFoot(); if(!foot.Visible)foot.Show(this); };
         LocationChanged += (_, _) => OnDockLocationChanged();
         ClientSizeChanged += (_, _) => { SyncDockHit(); PositionFoot(); };

@@ -1,6 +1,7 @@
 namespace LeoLauncher;
 
-sealed record LeoNotice(string Text, bool Error = false, Func<Task>? Retry = null, bool Busy = false, string ActionLabel = "重试",string? Module=null,string? OperationId=null);
+sealed record LeoNotice(string Text, bool Error = false, Func<Task>? Retry = null, bool Busy = false, string ActionLabel = "重试",string? Module=null,string? OperationId=null,bool Attention=false);
+static class FeedbackPolicy{public static bool ShouldPopup(LeoNotice notice)=>notice.Error||notice.Attention||notice.Retry!=null;}
 static class OperationFeedback
 {
     public static Action<LeoNotice>? Sink;
@@ -58,6 +59,7 @@ sealed class LeoToast : Form
         using var stripe=new System.Drawing.Drawing2D.LinearGradientBrush(new Rectangle(12,3,Width-24,4),Appearance.Blue,Appearance.Red,0f);e.Graphics.FillRectangle(stripe,12,3,Width-24,4);
     }
     internal bool IsBusy=>current?.Busy==true;
+    internal bool Matches(LeoNotice notice)=>current?.OperationId==notice.OperationId;
     public bool PreviewHasRetry => retry.Visible;
     internal bool PreviewTextFits=>messageBounds.Height>=TextRenderer.MeasureText(messageText,noticeFont,new Size(messageBounds.Width,int.MaxValue),NoticeFlags).Height&&messageBounds.Bottom<(retry.Visible?retry.Top:ClientSize.Height)&&!messageBounds.IntersectsWith(close.Bounds)&&ClientRectangle.Contains(messageBounds)&&ClientRectangle.Contains(retry.Visible?retry.Bounds:close.Bounds);
     public void Follow() { if(Visible){var pet=anchor();Location=PopupPlacement.Place(pet,Size,Screen.FromRectangle(pet).WorkingArea);} }
@@ -73,7 +75,8 @@ sealed partial class PetForm
         if (IsDisposed || Disposing || previewMode) return;
         if (InvokeRequired) { BeginInvoke(() => PresentFeedback(notice)); return; }
         if(!notice.Busy&&notice.Retry!=null&&notice.Module!=null){var retryAction=notice.Retry;string module=notice.Module;notice=notice with{Retry=()=>{Modules.Require(prefs,module);return retryAction();}};}
-        if(!notice.Busy)notices.Add(notice.Text,notice.Error?"error":"operation",unique:notice.OperationId==null?"":(notice.Error?"error:":"result:")+notice.OperationId+":"+DateTime.Now.ToString("yyyyMMddHHmm"),action:notice.Retry,label:notice.ActionLabel);
+        if(!notice.Busy)notices.Add(notice.Text,notice.Error?"error":notice.Attention?"attention":"operation",unique:notice.OperationId==null?"":(notice.Error?"error:":"result:")+notice.OperationId+":"+DateTime.Now.ToString("yyyyMMddHHmm"),action:notice.Retry,label:notice.ActionLabel);
+        if(!FeedbackPolicy.ShouldPopup(notice)){if(!notice.Busy&&feedback?.IsBusy==true&&feedback.Matches(notice))feedback.Hide();return;}
         if (hiddenForFullscreen||focus.Active(DateTimeOffset.Now)&&!notice.Busy&&!notice.Error) return;
         feedback ??= new LeoToast(() => Bounds);
         feedback.Present(notice);

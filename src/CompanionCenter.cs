@@ -4,12 +4,13 @@ sealed record InboxItem(string Id,DateTimeOffset Time,string Title,string Kind,b
 sealed class NoticeInbox
 {
     readonly string? path;readonly Dictionary<string,(string Label,Func<Task> Run)> actions=new();bool corrupt;
-    public List<InboxItem> Items{get;private set;}=[];public string? Error{get;private set;}public int Unread=>Items.Count(i=>!i.Read);public event Action? Changed;
-    public NoticeInbox(string? file){path=file;try{if(file!=null&&File.Exists(file))Items=(JsonSerializer.Deserialize<List<InboxItem>>(File.ReadAllText(file))??[]).Take(200).ToList();}catch{corrupt=true;Error="通知记录无法读取，原文件已保留。";}}
+    public List<InboxItem> Items{get;private set;}=[];public string? Error{get;private set;}public int Unread=>Items.Count(i=>!i.Read&&Attention(i.Kind));public event Action? Changed;
+    internal static bool Attention(string kind)=>kind is "error" or "reminder" or "focus" or "update" or "attention";
+    public NoticeInbox(string? file){path=file;try{if(file!=null&&File.Exists(file))Items=(JsonSerializer.Deserialize<List<InboxItem>>(File.ReadAllText(file))??[]).Take(200).Select(i=>Attention(i.Kind)?i:i with{Read=true}).ToList();}catch{corrupt=true;Error="通知记录无法读取，原文件已保留。";}}
     public InboxItem Add(string title,string kind="operation",string taskId="",string unique="",Func<Task>? action=null,string label="重试",DateTimeOffset? time=null)
     {
-        var now=time??DateTimeOffset.Now;var existing=Items.FirstOrDefault(i=>unique.Length>0?i.UniqueKey==unique:i.Title==title&&i.Kind==kind&&now-i.Time<TimeSpan.FromSeconds(30));if(existing!=null){if(action!=null&&(unique.Length>0||existing.UniqueKey.Length==0))actions[existing.Id]=(label,action);var refreshed=existing with{Read=false,Time=now};Items.RemoveAll(i=>i.Id==existing.Id);Items.Insert(0,refreshed);Save();return refreshed;}
-        title=System.Text.RegularExpressions.Regex.Replace(title,@"(?i)(Bearer\s+|(?:api[_ -]?key|token)\s*[:=]\s*)\S+","$1[已隐藏]");if(title.Length>1200)title=title[..1200];var item=new InboxItem(Guid.NewGuid().ToString("N"),now,title,kind,TaskId:taskId,UniqueKey:unique);Items.Insert(0,item);Items=Items.Take(200).ToList();foreach(string key in actions.Keys.Where(k=>Items.All(i=>i.Id!=k)).ToArray())actions.Remove(key);if(action!=null)actions[item.Id]=(label,action);Save();return item;
+        var now=time??DateTimeOffset.Now;var existing=Items.FirstOrDefault(i=>unique.Length>0?i.UniqueKey==unique:i.Title==title&&i.Kind==kind&&now-i.Time<TimeSpan.FromSeconds(30));if(existing!=null){if(action!=null&&(unique.Length>0||existing.UniqueKey.Length==0))actions[existing.Id]=(label,action);var refreshed=existing with{Read=!Attention(kind),Time=now};Items.RemoveAll(i=>i.Id==existing.Id);Items.Insert(0,refreshed);Save();return refreshed;}
+        title=System.Text.RegularExpressions.Regex.Replace(title,@"(?i)(Bearer\s+|(?:api[_ -]?key|token)\s*[:=]\s*)\S+","$1[已隐藏]");if(title.Length>1200)title=title[..1200];var item=new InboxItem(Guid.NewGuid().ToString("N"),now,title,kind,Read:!Attention(kind),TaskId:taskId,UniqueKey:unique);Items.Insert(0,item);Items=Items.Take(200).ToList();foreach(string key in actions.Keys.Where(k=>Items.All(i=>i.Id!=k)).ToArray())actions.Remove(key);if(action!=null)actions[item.Id]=(label,action);Save();return item;
     }
     public (string Label,Func<Task> Run)? ActionFor(string id)=>actions.TryGetValue(id,out var value)?value:null;
     public void Read(string id){Items=Items.Select(i=>i.Id==id?i with{Read=true}:i).ToList();Save();}
@@ -19,20 +20,29 @@ sealed class NoticeInbox
 }
 sealed class NoticeInboxForm:BarcaWindow
 {
-    readonly NoticeInbox inbox;readonly Action<string> openTask;readonly FlowLayoutPanel list=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(18,8,14,8)};readonly Label state=new(){Dock=DockStyle.Bottom,Height=32,Padding=new Padding(20,5,0,0),ForeColor=BarcaUi.Muted};bool queued;
+    readonly NoticeInbox inbox;readonly Action<string> openTask;readonly FlowLayoutPanel list=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(18,8,14,8)};readonly Label state=new(){Dock=DockStyle.Bottom,Height=32,Padding=new Padding(20,5,0,0),ForeColor=BarcaUi.Muted};readonly ToolTip tips=new(){AutoPopDelay=15000};bool queued;
     public NoticeInboxForm(NoticeInbox data,Action<string> task)
     {
-        inbox=data;openTask=task;Text="Leo · 通知收纳盒";ClientSize=new(620,550);StartPosition=FormStartPosition.CenterParent;var chrome=BarcaUi.Chrome(this,"通知收纳盒","提醒、失败与操作结果，留在这里慢慢看。");
+        inbox=data;openTask=task;Text="Leo · 通知收纳盒";ClientSize=new(620,550);StartPosition=FormStartPosition.CenterParent;var chrome=BarcaUi.Chrome(this,"通知收纳盒","错误与提醒需要关注，普通操作仅作日志。");
         var tools=new FlowLayoutPanel{Dock=DockStyle.Top,Height=47,Padding=new Padding(17,6,0,0)};var read=new BarcaButton{Text="全部已读",Size=new(105,31)};var clear=new BarcaButton{Text="清理已读",Size=new(105,31)};read.Click+=(_,_)=>inbox.ReadAll();clear.Click+=(_,_)=>inbox.ClearRead();tools.Controls.AddRange([read,clear]);Controls.AddRange([list,state,tools,chrome]);inbox.Changed+=Changed;Render();MinimumSize=MaximumSize=Size;
     }
     void Changed(){if(IsDisposed||Disposing||queued)return;if(!IsHandleCreated){Render();return;}queued=true;BeginInvoke((Action)(()=>{queued=false;if(!IsDisposed)Render();}));}
     void Render()
     {
-        list.SuspendLayout();foreach(Control c in list.Controls.Cast<Control>().ToArray())c.Dispose();foreach(var item in inbox.Items){var row=new RoundedSurface{Size=new(560,117),Margin=new Padding(0,0,0,9),BackColor=item.Read?BarcaUi.Surface:BarcaUi.Raised};var title=new Label{Text=(item.Read?"":"● ")+item.Title,Bounds=new(13,12,532,52),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(9.5f),AutoEllipsis=true};title.Click+=(_,_)=>inbox.Read(item.Id);row.Controls.Add(title);row.Controls.Add(new Label{Text=item.Time.ToLocalTime().ToString("MM.dd HH:mm")+" · "+(item.Kind=="reminder"?"清单提醒":item.Kind=="error"?"操作未完成":item.Kind=="focus"?"专注":"操作结果"),Bounds=new(14,81,310,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
-            var action=inbox.ActionFor(item.Id);if(item.TaskId.Length>0||action!=null){var button=new BarcaButton{Text=item.TaskId.Length>0?"查看清单":action!.Value.Label,Bounds=new(435,76,110,29)};button.Click+=async(_,_)=>{button.Enabled=false;try{if(item.TaskId.Length>0)openTask(item.TaskId);else await action!.Value.Run();inbox.Read(item.Id);}catch(Exception e){state.Text=e.Message;}finally{if(!button.IsDisposed)button.Enabled=true;}};row.Controls.Add(button);}else if(!item.Read){var mark=new BarcaButton{Text="已读",Bounds=new(465,76,80,29)};mark.Click+=(_,_)=>inbox.Read(item.Id);row.Controls.Add(mark);}list.Controls.Add(row);}
-        if(inbox.Items.Count==0)list.Controls.Add(new Label{Text="还没有通知，Leo 会替你收好错过的提醒。",Size=new(550,60),ForeColor=BarcaUi.Muted,Padding=new Padding(8,20,0,0)});state.Text=inbox.Error??$"未读 {inbox.Unread} · 最近 {inbox.Items.Count} 条 · 重试仅在当前运行会话可用";list.ResumeLayout();
+        list.SuspendLayout();tips.RemoveAll();foreach(Control c in list.Controls.Cast<Control>().ToArray())c.Dispose();
+        foreach(var item in inbox.Items){
+            var action=inbox.ActionFor(item.Id);bool buttonNeeded=item.TaskId.Length>0||action!=null||!item.Read;
+            var row=new Panel{Size=new(560,38),Margin=new Padding(0,0,0,2),BackColor=item.Read?BarcaUi.Canvas:BarcaUi.Raised};
+            row.Controls.Add(new Label{Text=item.Time.ToLocalTime().ToString("MM.dd HH:mm"),Bounds=new(5,10,83,20),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8)});
+            var title=new Label{Text=(item.Read?"":"● ")+item.Title,Bounds=new(92,8,buttonNeeded?374:460,24),ForeColor=item.Kind=="error"?Color.LightSalmon:BarcaUi.Text,Font=BarcaUi.Font(9),UseMnemonic=false,AutoEllipsis=true};
+            tips.SetToolTip(title,item.Title);title.Click+=(_,_)=>inbox.Read(item.Id);row.Controls.Add(title);
+            if(buttonNeeded){var button=new BarcaButton{Text=item.TaskId.Length>0?"查看清单":action?.Label??"已读",Bounds=new(474,5,80,28)};button.Click+=async(_,_)=>{button.Enabled=false;try{if(item.TaskId.Length>0)openTask(item.TaskId);else if(action!=null)await action.Value.Run();inbox.Read(item.Id);}catch(Exception e){if(!IsDisposed)state.Text=e.Message;}finally{if(!button.IsDisposed)button.Enabled=true;}};row.Controls.Add(button);}
+            list.Controls.Add(row);
+        }
+        if(inbox.Items.Count==0)list.Controls.Add(new Label{Text="暂无记录",Size=new(550,40),ForeColor=BarcaUi.Muted});state.Text=inbox.Error??$"待处理 {inbox.Unread} · 日志 {inbox.Items.Count} 条 · 悬停查看完整内容";list.ResumeLayout();
     }
-    protected override void Dispose(bool disposing){if(disposing)inbox.Changed-=Changed;base.Dispose(disposing);}
+
+    protected override void Dispose(bool disposing){if(disposing){inbox.Changed-=Changed;tips.Dispose();}base.Dispose(disposing);}
 }
 sealed class FocusSession
 {
@@ -82,7 +92,7 @@ sealed partial class PetForm
     void WireCompanionMenu(ContextMenuStrip menu)
     {
         var inbox=new ToolStripMenuItem("通知收纳盒");inbox.Click+=(_,_)=>ShowNotices();var concentrate=new ToolStripMenuItem("临时专注");concentrate.Click+=(_,_)=>{RevealDock(true);if(focusWindow==null||focusWindow.IsDisposed)focusWindow=new FocusForm(focus,()=>{Invalidate();CheckReminders();});if(!focusWindow.Visible)WindowPositions.Prepare(focusWindow,"focus",Bounds,previewMode);WindowInteraction.Show(focusWindow);};menu.Items.Insert(0,inbox);menu.Items.Insert(1,concentrate);menu.Opening+=(_,_)=>{inbox.Text="通知收纳盒"+(notices.Unread>0?" · "+notices.Unread:"");concentrate.Text=focus.Active(DateTimeOffset.Now)?"专注中 · "+focus.Remaining(DateTimeOffset.Now):"临时专注";};
-        notices.Changed+=()=>{if(!IsDisposed)Invalidate();};companionTimer.Tick+=(_,_)=>{try{if(focus.Complete(DateTimeOffset.Now)){if(QuietHours.Load().Contains(DateTime.Now))notices.Add("这段专注完成了，休息一下吧。","focus");else PresentFeedback(new("这段专注完成了，休息一下吧。"));CheckReminders();}if(focus.Active(DateTimeOffset.Now))Invalidate();}catch(Exception e){companionTimer.Stop();PresentFeedback(new("专注状态未能保存："+e.Message,true));}};if(!previewMode)companionTimer.Start();
+        notices.Changed+=()=>{if(!IsDisposed)Invalidate();};companionTimer.Tick+=(_,_)=>{try{if(focus.Complete(DateTimeOffset.Now)){if(QuietHours.Load().Contains(DateTime.Now))notices.Add("这段专注完成了，休息一下吧。","focus");else PresentFeedback(new("这段专注完成了，休息一下吧。",Attention:true));CheckReminders();}if(focus.Active(DateTimeOffset.Now))Invalidate();}catch(Exception e){companionTimer.Stop();PresentFeedback(new("专注状态未能保存："+e.Message,true));}};if(!previewMode)companionTimer.Start();
     }
     void ShowNotices(){RevealDock(true);launcher.Hide();if(noticeWindow==null||noticeWindow.IsDisposed)noticeWindow=new(notices,id=>{var task=todoStore.Items.FirstOrDefault(t=>t.Id==id);if(task==null)throw new InvalidOperationException("这条事项已经删除。");OpenReminderTask(task);});if(!noticeWindow.Visible)WindowPositions.Prepare(noticeWindow,"notifications",Bounds,previewMode);WindowInteraction.Show(noticeWindow);}
     void DrawCompanionBadges(Graphics g,RectangleF bounds)

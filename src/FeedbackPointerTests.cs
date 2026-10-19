@@ -36,7 +36,7 @@ sealed partial class PetForm
 {
     internal Dictionary<string,bool> VerifyNoticePointer(string folder)
     {
-        var checks=new Dictionary<string,bool>();notices.Add("系统代理已成功开启");
+        var checks=new Dictionary<string,bool>();notices.Add("示例错误", "error");
         foreach(int size in new[]{80,136,230}){
             prefs.PetSize=size;ResizePet();RevealDock(true);var before=Location;int opens=launcherOpens;int oldRow=row,oldFrame=frame;var badge=new Point(Width-18,18);
             FeedbackPointerTests.Mouse(hit,true,badge);
