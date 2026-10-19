@@ -108,16 +108,17 @@ sealed partial class PetForm
     WorkflowStep PlanComboStep(ComboStep step,int index)
     {
         var request=step.Kind=="command"?new ActionRequest("command_text",step.Value,"combo"):ComboRequest(step);
+        if(request.Action=="command_text"&&CommandTranslation.From(QuickRouter.Route(request.Value),"combo") is {} translated&&ModuleCatalog.Owner(translated.Action) is "clash" or "media")request=translated;
         if(request.Action=="watch_open"){
             var link=new WatchLinkStore(previewMode?null:Path.Combine(Store.Root,"leo-watch-links.json")).Items[int.Parse(request.Value)-1];
             request=new("web_open",link.Url,"combo"); // Pin the actual target into this plan's fingerprint.
         }
-        return new("step-"+(index+1),request,step.Label.Length>0?step.Label:step.Kind);
+        return new("step-"+(index+1),request,step.Label.Length>0?step.Label:step.Kind,TimeoutMs:commands.Registry.Describe(request.Action).TimeoutMs??30000);
     }
     async Task<WorkflowVerification> VerifyWorkflowStep(ActionRequest request,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if(request.Action is "proxy_on" or "proxy_off"){var status=await Task.Run(ClashProxy.ReadStatus,token);return (request.Action=="proxy_on"?status.Running&&status.Enabled==true:status.Enabled==false)?WorkflowVerification.Confirmed:WorkflowVerification.NotApplied;}
+        if(request.Action is "proxy_on" or "proxy_off"){var result=await commands.ExecuteDetailedAsync(new("proxy_status","","workflow-verify"),token);if(result.Status!="succeeded"||result.Data==null)return WorkflowVerification.Unknown;var status=result.Data.Value.Deserialize<ProxyStatus>()!;return (request.Action=="proxy_on"?status.Running&&status.Enabled==true:status.Enabled==false)?WorkflowVerification.Confirmed:WorkflowVerification.NotApplied;}
         if(request.Action=="music_client"){var processes=Process.GetProcessesByName("QQMusic");try{return processes.Length>0?WorkflowVerification.Confirmed:WorkflowVerification.Unknown;}finally{foreach(var process in processes)process.Dispose();}}
         if(request.Action=="match_add")return WorkflowVerification.NotApplied; // The bridge deduplicates by persisted provider/event identity.
         if(request.Action is "todos_open" or "football_open" or "chat_open" or "match_lookup")return WorkflowVerification.NotApplied;

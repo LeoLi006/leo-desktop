@@ -108,7 +108,7 @@ sealed partial class ActionDispatcher
             ticket=ModuleActivity.Begin(work.Module.Id);
             work.Token.ThrowIfCancellationRequested();if(!work.Module.Enabled)throw new OperationCanceledException();
             var payload=work.Module is IStructuredLeoModule structured?await structured.ExecuteStructuredAsync(work.Request,work.Token).ConfigureAwait(false):new ActionPayload(await work.Module.ExecuteAsync(work.Request,work.Token));
-            work.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,payload.Message);
+            work.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,payload.DiagnosticMessage??payload.Message);
             work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",payload.Message,null,payload.Data,payload.Evidence){PrivateData=payload.PrivateData,DiagnosticMessage=payload.DiagnosticMessage});
         }catch(OperationCanceledException e){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,"等待已结束，可确认状态后重新操作。");work.Completion.TrySetResult(Cancelled(work.Request,work.Module.Id,work.Id,e is ApplicationConfigurationChangedException?"configuration_changed":Reason(work)));}
         catch(Exception e)when(FeatureFaults.Recoverable(e)){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Failed,e.Message);work.Completion.TrySetResult(Failure(work.Request,work.Module.Id,work.Id,FailureCode(work.Module,e),e));}

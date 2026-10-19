@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 namespace LeoLauncher;
 
-sealed record BrainAction(string Id,string Label,string InputKind,bool ReadOnly=false,string Hint="",string? ResultProperty=null,string? ResultKind=null,Action<string>? Check=null,Func<string,string>? Preview=null);
+sealed record BrainAction(string Id,string Label,string InputKind,bool ReadOnly=false,string Hint="",string? ResultProperty=null,string? ResultKind=null,Action<string>? Check=null,Func<string,string>? Preview=null,int TimeoutMs=30000);
 interface IBrainContributor
 {
     IReadOnlyList<BrainAction> BrainActions{get;}
@@ -31,10 +31,11 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
     readonly Dictionary<string,(string Home,string Away,DateTimeOffset Kickoff)> matchTargets=new();string userPrompt="";
     readonly HashSet<string> matches=new(StringComparer.Ordinal);readonly Dictionary<string,string> knownCombos=new();
     readonly ReliableWorkflow workflow=new(new WorkflowJournal(null),execute,verify);
+    readonly Dictionary<string,string> mediaTargets=new();
     bool disposed,notesRequested;int calls;DateTimeOffset turnStarted;public BrainPlan? Pending{get;private set;}
     DateTimeOffset Now=>(clock??(()=>DateTimeOffset.UtcNow))();
-    public void BeginTurn(string prompt=""){userPrompt=prompt;notesRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"便签|笔记|随手记|记事|记录的|我的想法")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不需要|不用|别|不许|禁止|无需).{0,12}(便签|笔记|随手记|记录)|(便签|笔记).{0,8}(不要|不需要|不用|别|无需)");if(disposed)throw new ObjectDisposedException(nameof(BrainSession));Pending=null;matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();calls=0;turnStarted=Now;}
-    public void Clear(){userPrompt="";notesRequested=false;turnStarted=DateTimeOffset.MinValue;Pending=null;matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();}
+    public void BeginTurn(string prompt=""){userPrompt=prompt;notesRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"便签|笔记|随手记|记事|记录的|我的想法")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不需要|不用|别|不许|禁止|无需).{0,12}(便签|笔记|随手记|记录)|(便签|笔记).{0,8}(不要|不需要|不用|别|无需)");if(disposed)throw new ObjectDisposedException(nameof(BrainSession));Pending=null;mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();calls=0;turnStarted=Now;}
+    public void Clear(){userPrompt="";notesRequested=false;turnStarted=DateTimeOffset.MinValue;Pending=null;mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();}
     public void Dispose(){disposed=true;Clear();}
     public object[] Definitions(bool responses)
     {
@@ -58,6 +59,7 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
             bool next=System.Text.RegularExpressions.Regex.IsMatch(userPrompt,"下一场|最近一场");
             if(next?(candidates.Length==0||candidates[0]!=value):(candidates.Length!=1||candidates[0]!=value))throw new ArgumentException("找到多场比赛，请先询问用户具体球队及场次，不能任意选择");
         }
+        if(action.InputKind=="media-session"){if(!mediaTargets.ContainsKey(value))throw new ArgumentException("请先查询播放器，再使用实际返回的身份");if(mediaTargets.Count>1&&!userPrompt.Contains(value,StringComparison.Ordinal)){var candidates=mediaTargets.Where(x=>userPrompt.Contains(x.Value,StringComparison.OrdinalIgnoreCase)).Select(x=>x.Key).ToArray();if(candidates.Length!=1||candidates[0]!=value)throw new ArgumentException("有多个播放器，请先询问用户选择哪个");}}
         if(action.InputKind=="combo-name"&&!knownCombos.ContainsKey(value))throw new ArgumentException("请先查询组合清单，再选用实际返回的名称");
     }
     public async Task<string> Tool(ToolCall call,CancellationToken token)
@@ -80,7 +82,7 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
                     else{if(property.Length>0)throw new ArgumentException("没有来源步骤，不能填写结果字段");Check(action,value);}
                     if(action.InputKind=="combo-name"){if(array.GetArrayLength()!=1)throw new ArgumentException("已保存组合只能作为单独计划执行，不能嵌套叠加");stamps["combo:"+value]=knownCombos[value];}
                     if(catalog.Read().Count(e=>e.Action.Label==action.Label)>1)throw new ArgumentException("存在同名目标，请先在本地选择或区分名称");
-                    stamps[id]=entry.Stamp;steps.Add(new("step-"+(steps.Count+1),new(id,value,"brain-plan:"+Origin),action.Label,FromStep:from.Length>0?from:null,ResultProperty:property.Length>0?property:null));
+                    stamps[id]=entry.Stamp;steps.Add(new("step-"+(steps.Count+1),new(id,value,"brain-plan:"+Origin),action.Label,TimeoutMs:action.TimeoutMs,FromStep:from.Length>0?from:null,ResultProperty:property.Length>0?property:null));
                     preview.Add(action.InputKind=="combo-name"&&comboPreview!=null?comboPreview(value):action.Preview!=null?action.Preview(value):action.Label+(from.Length>0?"：使用第 "+from.Replace("step-","")+" 步的实际结果":value.Length>0?"："+matchLabels.GetValueOrDefault(value,value):""));
                 }
                 Pending=new(Guid.NewGuid().ToString("N"),Now.AddMinutes(5),steps.ToArray(),stamps,preview.ToArray());return JsonSerializer.Serialize(new{status="awaiting_user_confirmation",plan_id=Pending.Id,note="尚未执行任何计划步骤"});
@@ -88,7 +90,7 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
             if(call.Name!="leo_action")throw new ArgumentException("模型请求了未提供的工具");Fields(p,"action","value");var requested=catalog.Require(Text(p,"action")).Action;string argument=Text(p,"value");if(!requested.ReadOnly)throw new ArgumentException("写操作必须生成计划，并由用户确认后执行");Check(requested,argument);
             var result=await execute(new(requested.Id,argument,"brain-query:"+Origin),token);result.ToLegacy(token);
             string raw=result.Data?.GetRawText()??result.Message;var node=JsonNode.Parse(raw);Shape(node,0);string answer=node?.ToJsonString(ToolJson)??"null";
-            if(answer.Length>10000)throw new InvalidOperationException("查询结果过多，请缩小范围");if(requested.Id=="football_facts")CollectMatches(node);return answer;
+            if(answer.Length>10000)throw new InvalidOperationException("查询结果过多，请缩小范围");if(requested.Id=="football_facts")CollectMatches(node);if(requested.Id=="media_status"){mediaTargets.Clear();if(node is JsonArray rows)foreach(var row in rows)if(row is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Provider"]?.ToString() is string provider)mediaTargets[id]=provider;}return answer;
         }catch(Exception e)when(e is ArgumentException or JsonException or InvalidOperationException or KeyNotFoundException){return JsonSerializer.Serialize(new{error=e.Message,note="没有执行本地写操作；请补充参数或重新选择目标"});}
     }
     void CollectMatches(JsonNode? node)

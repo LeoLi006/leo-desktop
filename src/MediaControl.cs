@@ -5,6 +5,7 @@ using System.Text.Json;
 namespace LeoLauncher;
 
 sealed record MediaSession(string Id,string Provider,string Title,string Artist,string Status){public override string ToString()=>Provider+" · "+(Title.Length>0?Title:"未提供曲目名");}
+sealed record MediaCommandReceipt(string SessionId,string Command,string Status,bool Observed,string Message);
 interface IMediaProvider
 {
     string Id{get;}Task<MediaSession[]> ReadAsync(CancellationToken token);Task<string> ControlAsync(MediaSession session,string command,CancellationToken token);
@@ -14,16 +15,27 @@ sealed class MediaService(IEnumerable<IMediaProvider> providers)
     public string? LastError{get;private set;}
     readonly IMediaProvider[] sources=providers.ToArray();public string SelectedId{get;set;}="";
     public async Task<MediaSession[]> ReadAsync(CancellationToken token){LastError=null;var list=new List<MediaSession>();foreach(var source in sources){try{list.AddRange(await source.ReadAsync(token));}catch(OperationCanceledException){throw;}catch(Exception e)when(e is IOException or JsonException or InvalidOperationException or System.ComponentModel.Win32Exception){LastError=e.Message;if(source.Id!="smtc")throw;}}if(list.Any(s=>s.Id.StartsWith("smtc:")&&s.Provider.Contains("PotPlayer",StringComparison.OrdinalIgnoreCase)))list.RemoveAll(s=>s.Id.StartsWith("potplayer:"));return list.ToArray();}
-    public async Task<string> ExecuteAsync(string command,string id,CancellationToken token){if(command is not("toggle" or "play" or "pause" or "next" or "previous" or "stop"))throw new ArgumentException("不支持的媒体指令");var sessions=await ReadAsync(token);var target=id.Length>0?sessions.FirstOrDefault(s=>s.Id==id):sessions.FirstOrDefault(s=>s.Id==SelectedId)??sessions.FirstOrDefault(s=>s.Status=="Playing")??sessions.FirstOrDefault(s=>s.Id.StartsWith("potplayer:"))??sessions.FirstOrDefault();if(target==null)throw new ArgumentException(id.Length>0?"所选播放器已关闭，请重新选择。":"没有可控制的播放器。请打开PotPlayer并选择媒体，或在QQ音乐中播放一首歌。");SelectedId=target.Id;var provider=sources.Single(s=>target.Id.StartsWith(s.Id+":"));return await provider.ControlAsync(target,command,token);}
+    public async Task<string> ExecuteAsync(string command,string id,CancellationToken token)=>(await ExecuteVerifiedAsync(command,id,token)).Message;
+    public async Task<MediaCommandReceipt> ExecuteVerifiedAsync(string command,string id,CancellationToken token)
+    {
+        if(command is not("toggle" or "play" or "pause" or "next" or "previous" or "stop"))throw new ArgumentException("不支持的媒体指令");
+        var sessions=await ReadAsync(token);token.ThrowIfCancellationRequested();
+        var target=id.Length>0?sessions.FirstOrDefault(s=>s.Id==id):sessions.FirstOrDefault(s=>s.Id==SelectedId)??sessions.FirstOrDefault(s=>s.Status=="Playing")??sessions.FirstOrDefault(s=>s.Id.StartsWith("potplayer:"))??sessions.FirstOrDefault();
+        if(target==null)throw new ArgumentException(id.Length>0?"所选播放器已关闭，请重新选择。":"没有可控制的播放器。请打开PotPlayer并选择媒体，或在QQ音乐中播放一首歌。");
+        SelectedId=target.Id;var provider=sources.Single(s=>target.Id.StartsWith(s.Id+":"));
+        token.ThrowIfCancellationRequested();await provider.ControlAsync(target,command,token);token.ThrowIfCancellationRequested();
+        MediaSession? after=null;try{after=(await ReadAsync(token)).SingleOrDefault(s=>s.Id==target.Id);}catch(OperationCanceledException){throw;}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Sending may already have succeeded; never resend because verification failed. */}
+        bool observed=after!=null&&(command switch{"play"=>after.Status=="Playing","pause"=>after.Status=="Paused","stop"=>after.Status=="Stopped","toggle"=>target.Status is "Playing" or "Paused"&&after.Status is "Playing" or "Paused"&&target.Status!=after.Status,"next" or "previous"=>target.Title.Length>0&&after.Title.Length>0&&target.Title!=after.Title,_=>false});
+        return new(target.Id,command,after?.Status??"Unknown",observed,observed?"已观察到播放器状态："+after!.Status:"媒体指令已发送，尚未确认状态变化，请以播放器为准。");
+    }
 }
 static class MediaControl
 {
     internal static Func<IEnumerable<AppEntry>>? Applications;
     internal static MediaService Service{get;set;}=new([new WindowsMediaProvider(),new PotPlayerProvider()]);
     public static Task<MediaSession[]> SessionsAsync(CancellationToken token=default)=>Service.ReadAsync(token);
-    public static Task<string> ExecuteAsync(string command,string id="",CancellationToken token=default)=>ClientOperations.Hub.Run("media",command+":"+id,op=>{op.Report("正在控制播放器…");return Service.ExecuteAsync(command,id,op.Token);},token);
     public static string? PotPlayerPath(){var roots=new[]{Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)};var selected=ModulePaths.Selected("media");string? path=selected??roots.SelectMany(r=>new[]{Path.Combine(r,"DAUM","PotPlayer","PotPlayerMini64.exe"),Path.Combine(r,"DAUM","PotPlayer","PotPlayerMini.exe"),Path.Combine(r,"PotPlayer","PotPlayerMini64.exe")}).FirstOrDefault(File.Exists);if(path==null){foreach(string key in new[]{"PotPlayerMini64.exe","PotPlayerMini.exe"}){using var app=Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\"+key);if(app?.GetValue("") is string candidate&&File.Exists(candidate)){path=candidate;break;}}}if(path==null)path=Applications?.Invoke().Where(a=>a.Name.Contains("PotPlayer",StringComparison.OrdinalIgnoreCase)).Select(a=>a.ExePath).FirstOrDefault(p=>File.Exists(p)&&new[]{"PotPlayerMini64.exe","PotPlayerMini.exe","PotPlayer64.exe","PotPlayer.exe"}.Contains(Path.GetFileName(p),StringComparer.OrdinalIgnoreCase));return path;}
-    public static void OpenPotPlayer(string? file=null){var path=PotPlayerPath();if(path==null)throw new IOException("未找到PotPlayer，请在设置 → 功能 → 应用模块与图标中指定程序。");var start=new ProcessStartInfo(path){UseShellExecute=true};if(file!=null){if(!File.Exists(file))throw new IOException("媒体文件不存在");start.ArgumentList.Add(file);}Process.Start(start);}
+    public static void OpenPotPlayer(string? file=null){var path=PotPlayerPath();if(path==null)throw new IOException("未找到PotPlayer，请在设置 → 功能 → 应用模块与图标中指定程序。");var start=new ProcessStartInfo(path){UseShellExecute=true};if(file!=null){if(!File.Exists(file))throw new IOException("媒体文件不存在");start.ArgumentList.Add(file);}using var launched=Process.Start(start);}
 }
 sealed class WindowsMediaProvider:IMediaProvider
 {

@@ -47,9 +47,4 @@ sealed class ClientOperationHub:IDisposable
 static class ClientOperations
 {
     internal static readonly ClientOperationHub Hub=new(notice=>OperationFeedback.Sink?.Invoke(notice));
-    public static Task<string> Proxy(bool? desired,CancellationToken token=default)=>Hub.Run("clash",desired?.ToString()??"toggle",async op=>{
-        op.Report("正在检查 Clash…");var before=ClashProxy.ReadStatus();bool target=desired??(before.Enabled!=true);
-        var after=await Task.Run(()=>ClashProxy.SetEnabled(target,op.Token,op.Report),op.Token);
-        if(after.Enabled!=target)throw new IOException("系统代理状态尚未确认");return target?"系统代理已开启":"系统代理已关闭";
-    },token);
 }

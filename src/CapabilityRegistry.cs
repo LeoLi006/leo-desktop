@@ -12,12 +12,17 @@ sealed class CapabilityRegistry
     readonly Dictionary<string,ILeoModule> registered=new(StringComparer.Ordinal);
     ILeoModule[]? remainingBuiltins;
     public void Register(ILeoModule module)
+        =>Register(module,false);
+    public void ReplaceBuiltin(ILeoModule module)=>Register(module,true);
+    void Register(ILeoModule module,bool replace)
     {
         lock(gate){
-            if(string.IsNullOrWhiteSpace(module.Id)||ModuleCatalog.Builtins.Any(m=>m.Id==module.Id)||registered.ContainsKey(module.Id)||module.Actions.Count==0||module.Actions.Any(string.IsNullOrWhiteSpace)||module.Actions.Distinct().Count()!=module.Actions.Count||registered.Values.Any(m=>m.Actions.Intersect(module.Actions).Any()))throw new InvalidOperationException("模块或动作重复或无效");
-            var replaced=registered.Values.Append(module).SelectMany(m=>m.Actions).ToHashSet();
-            var next=builtins.Value.Modules.Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>m.Enabled,m.Actions.Where(a=>!replaced.Contains(a)).ToArray(),legacy)).ToArray();
-            registered.Add(module.Id,module);remainingBuiltins=next;
+            if(replace&&(!ModuleCatalog.Builtins.Any(m=>m.Id==module.Id)||module.Actions.Any(a=>ModuleCatalog.Owner(a)!=module.Id)||!module.Actions.OrderBy(a=>a).SequenceEqual(LeoActions.Names.Where(a=>ModuleCatalog.Owner(a)==module.Id).OrderBy(a=>a))))throw new InvalidOperationException("只能替换该内置模块拥有的动作");
+            var others=registered.Values.Where(m=>!replace||m.Id!=module.Id).ToArray();
+            if(string.IsNullOrWhiteSpace(module.Id)||!replace&&(ModuleCatalog.Builtins.Any(m=>m.Id==module.Id)||registered.ContainsKey(module.Id))||module.Actions.Count==0||module.Actions.Any(string.IsNullOrWhiteSpace)||module.Actions.Distinct().Count()!=module.Actions.Count||others.Any(m=>m.Actions.Intersect(module.Actions).Any()))throw new InvalidOperationException("模块或动作重复或无效");
+            var all=others.Append(module).ToArray();var replaced=all.SelectMany(m=>m.Actions).ToHashSet();
+            var next=builtins.Value.Modules.Where(m=>!all.Any(r=>r.Id==m.Id)).Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>m.Enabled,m.Actions.Where(a=>!replaced.Contains(a)).ToArray(),legacy)).ToArray();
+            registered[module.Id]=module;remainingBuiltins=next;
         }
     }
     LocalApplication[] applications=[];ILeoModule[] locals=[];Dictionary<string,ILeoModule> localActions=new();

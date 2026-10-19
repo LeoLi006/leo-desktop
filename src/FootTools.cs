@@ -32,7 +32,9 @@ sealed class FootTools : Form
     public event Action? TodosRequested;
     public event Action? VoiceRequested;
     readonly System.Windows.Forms.Timer proxyTimer = new() { Interval = 1200 };
-    bool proxyBusy;
+    bool proxyBusy,proxyRefreshing,proxyReleased;
+    readonly CancellationTokenSource proxyLife=new();
+    public Func<string,CancellationToken,Task<string>>? ProxyAction;
     Rectangle petBounds, workArea;
     bool expanded;
     public bool IsSearchOpen=>expanded;
@@ -87,25 +89,22 @@ sealed class FootTools : Form
         todoButton.AccessibleName="每日清单";todoButton.FlatStyle=FlatStyle.Flat;todoButton.FlatAppearance.BorderSize=0;todoButton.Click+=(_,_)=>TodosRequested?.Invoke();tip.SetToolTip(todoButton,"每日清单");
         proxyButton.AccessibleName = "Clash Verge 系统代理";
         proxyButton.FlatStyle = FlatStyle.Flat; proxyButton.FlatAppearance.BorderSize = 0;
-        void RefreshProxy()
+        async Task<ProxyStatus> ReadProxy(){if(preview)return new(true,true,"Clash 系统代理已开启 · 示例");if(ProxyAction==null)throw new InvalidOperationException("代理入口尚未就绪");return System.Text.Json.JsonSerializer.Deserialize<ProxyStatus>(await ProxyAction("proxy_status",proxyLife.Token))??throw new IOException("代理状态无效");}
+        async Task RefreshProxy()
         {
-            if (proxyBusy || IsDisposed || !modules.ClashModule) return;
-            var state = preview ? new ProxyStatus(true, true, "Clash 系统代理已开启 · 示例") : ClashProxy.ReadStatus();
-            proxyButton.ActiveState = state.Enabled;
-            tip.SetToolTip(proxyButton, state.Description); proxyButton.Invalidate();
+            if(proxyBusy||proxyRefreshing||IsDisposed||!modules.ClashModule)return;proxyRefreshing=true;
+            try{var state=await ReadProxy();if(IsDisposed)return;proxyButton.ActiveState=state.Enabled;tip.SetToolTip(proxyButton,state.Description);proxyButton.Invalidate();}
+            catch(OperationCanceledException){}catch(Exception error){if(!IsDisposed)tip.SetToolTip(proxyButton,error.Message);}finally{proxyRefreshing=false;}
         }
         async Task ChangeProxy(bool? target=null) {
-            if (preview || proxyBusy || !modules.ClashModule) return;
-            proxyBusy = true; proxyButton.Enabled = false; tip.SetToolTip(proxyButton, "正在切换 Clash 系统代理…");
-            bool desired=target??(ClashProxy.ReadStatus().Enabled!=true);
-            OperationFeedback.Pending(desired?"正在开启系统代理…":"正在关闭系统代理…");
-            try { await ClientOperations.Proxy(desired);OperationFeedback.Show(desired?"系统代理已开启":"系统代理已关闭"); }
-            catch(OperationCanceledException){}
-            catch (Exception error) { if (!IsDisposed) OperationFeedback.Error(error.Message,()=>ChangeProxy(desired)); }
-            finally { if (!IsDisposed) { proxyBusy = false; proxyButton.Enabled = true; RefreshProxy(); } }
+            if(preview||proxyBusy||!modules.ClashModule)return;
+            proxyBusy=true;proxyButton.Enabled=false;bool? desired=target;
+            try{desired??=(await ReadProxy()).Enabled!=true;OperationFeedback.Pending(desired.Value?"正在开启系统代理…":"正在关闭系统代理…");string message=await ProxyAction!(desired.Value?"proxy_on":"proxy_off",proxyLife.Token);if(!IsDisposed)OperationFeedback.Show(message);}
+            catch(OperationCanceledException){}catch(Exception error){if(!IsDisposed)OperationFeedback.Error(error.Message,()=>ChangeProxy(desired));}
+            finally{if(!IsDisposed){proxyBusy=false;proxyButton.Enabled=true;await RefreshProxy();}}
         }
         proxyButton.Click+=async(_,_)=>await ChangeProxy();
-        FeatureFaults.Timer(proxyTimer,"代理状态检查",RefreshProxy,enabled:()=>modules.ClashModule);
+        FeatureFaults.Timer(proxyTimer,"代理状态检查",()=>{_ = RefreshProxy();},enabled:()=>modules.ClashModule);
         search.SetBounds(67, 6, 154, 21); search.PlaceholderText = "输入关键词，回车搜索";
         search.BorderStyle = BorderStyle.None; search.BackColor = Appearance.Background; search.ForeColor = Appearance.Ink;
         search.Visible = false;
@@ -124,9 +123,9 @@ sealed class FootTools : Form
         };
         Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, search]);
         ApplyScale(petSize);
-        Shown += (_, _) => { SetExpanded(false); RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
+        Shown += (_, _) => { SetExpanded(false); _ = RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
-        Disposed += (_, _) => { proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
+        Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true;proxyLife.Cancel();proxyLife.Dispose();proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
     }
     void SetExpanded(bool value)
     {

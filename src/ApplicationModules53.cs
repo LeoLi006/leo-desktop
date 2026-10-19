@@ -57,7 +57,8 @@ sealed class RepairPathForm:BarcaWindow
 }
 sealed partial class PetForm
 {
-    string? RepairBuiltinPath(string id,string old){if(InvokeRequired)return (string?)Invoke(()=>RepairBuiltinPath(id,old));string? repaired=ConfirmRepair(old,id);if(repaired!=null){ModulePaths.Validate(id,repaired);var settings=LocalApplications.Clone(prefs);settings.ModuleExecutables[id]=repaired;Store.Save(settings);prefs.ModuleExecutables[id]=repaired;}return repaired;}
+    string? RepairBuiltinPath(string id,string old){if(InvokeRequired)return (string?)Invoke(()=>RepairBuiltinPath(id,old));string? repaired=ConfirmRepair(old,id);if(repaired!=null)RememberBuiltinRepair(id,repaired);return repaired;}
+    void RememberBuiltinRepair(string id,string repaired){ModulePaths.Validate(id,repaired);var settings=LocalApplications.Clone(prefs);settings.ModuleExecutables[id]=repaired;if(!previewMode){if(id is "clash" or "media")ConfigMigration.Write(Store.FilePath,System.Text.Json.JsonSerializer.Serialize(settings));else Store.Save(settings);}prefs.ModuleExecutables[id]=repaired;if(id is "clash" or "media"){RegisterClientCapabilities();commands.CancelDisabled();}}
     string? ConfirmRepair(string old,string? builtin)
     {
         if(IsDisposed||Disposing)return null;if(InvokeRequired)return (string?)Invoke(()=>ConfirmRepair(old,builtin));
