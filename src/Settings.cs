@@ -35,7 +35,7 @@ static class LeoStartup
 
 static class LeoHotkeys
 {
-    public static Keys[] Values(Preferences p) => [p.SearchHotkey, p.VoiceHotkey, p.MusicModule?p.LyricsHotkey:Keys.None];
+    public static Keys[] Values(Preferences p) => [p.SearchHotkey, p.VoiceHotkey, p.MusicModule?p.LyricsHotkey:Keys.None,p.QuickNoteHotkey];
     public static string Display(Keys keys) => keys == Keys.None ? "未启用" : new KeysConverter().ConvertToString(keys) ?? "";
     public static void Validate(Keys[] keys)
     {
@@ -61,12 +61,12 @@ static class LeoHotkeys
     public static void Replace(Keys[] previous, Keys[] next, Action<int> unregister, Func<int, Keys, bool> register)
     {
         Validate(next);
-        for (int i = 1; i <= 3; i++) unregister(i);
-        for (int i = 0; i < 3; i++)
+        for (int i = 1; i <= Math.Max(previous.Length,next.Length); i++) unregister(i);
+        for (int i = 0; i < next.Length; i++)
         {
             if (register(i + 1, next[i])) continue;
-            for (int j = 1; j <= 3; j++) unregister(j);
-            for (int j = 0; j < 3; j++) register(j + 1, previous[j]);
+            for (int j = 1; j <= Math.Max(previous.Length,next.Length); j++) unregister(j);
+            for (int j = 0; j < previous.Length; j++) register(j + 1, previous[j]);
             throw new InvalidOperationException(Display(next[i]) + " 已被其他应用占用，请换一个组合");
         }
     }
@@ -133,18 +133,18 @@ sealed class SettingsForm : BarcaWindow
         var themeButton=new BarcaButton{Text="主题与自定义球衣…",Bounds=new Rectangle(8,408,245,34)};themeButton.Click+=(_,_)=>{using var editor=new ThemeEditor(p,next=>apply(next,!preview&&LeoStartup.Enabled),preview);editor.ShowDialog(this);};general.Controls.Add(themeButton);
         var indexApps=Check("启用本机应用索引", 452, p.ApplicationIndexing);
         var profiles=new BarcaButton{Text="使用方案…",Bounds=new Rectangle(267,408,283,34)};profiles.Click+=(_,_)=>{bool changed=false;using var dialog=new UsageProfilesForm(p,next=>{ProfileTransition.Apply(p,next,value=>apply(value,!preview&&LeoStartup.Enabled));changed=true;},preview);dialog.ShowDialog(this);if(changed)Close();};general.Controls.Add(profiles);
-        var fields = new[]{p.SearchHotkey,p.VoiceHotkey,p.LyricsHotkey}.Select(k => new HotkeyField(k)).ToArray();
+        var fields = new[]{p.SearchHotkey,p.VoiceHotkey,p.LyricsHotkey,p.QuickNoteHotkey}.Select(k => new HotkeyField(k)).ToArray();
         foreach(var field in fields){field.Enter+=(_,_)=>capture?.Invoke(true);field.Leave+=(_,_)=>capture?.Invoke(false);}
         Deactivate+=(_,_)=>capture?.Invoke(false);
         Activated+=(_,_)=>{if(fields.Any(field=>field.Focused))capture?.Invoke(true);};
         FormClosed+=(_,_)=>capture?.Invoke(false);
         shortcuts.Controls.Add(new Label { Text = "点击输入框，再按组合键", Bounds = new Rectangle(5, 12, 370, 30), ForeColor = BarcaUi.Gold, Font = BarcaUi.Font(11, true) });
-        var names = new[] { "应用搜索", "直接说话", "显示 / 隐藏歌词" };
-        for (int i = 0; i < 3; i++) { int y = 65 + i * 68; shortcuts.Controls.Add(new Label { Text = names[i], Bounds = new Rectangle(8, y + 5, 180, 27), ForeColor = BarcaUi.Text }); fields[i].SetBounds(210, y, 340, 31); fields[i].AccessibleName = names[i] + "快捷键"; shortcuts.Controls.Add(fields[i]); }
-        shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 250, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
-        var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(405, 8, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < 3; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
+        var names = new[] { "应用搜索", "直接说话", "显示 / 隐藏歌词", "一句话速记" };
+        for (int i = 0; i < 4; i++) { int y = 65 + i * 68; shortcuts.Controls.Add(new Label { Text = names[i], Bounds = new Rectangle(8, y + 5, 180, 27), ForeColor = BarcaUi.Text }); fields[i].SetBounds(210, y, 340, 31); fields[i].AccessibleName = names[i] + "快捷键"; shortcuts.Controls.Add(fields[i]); }
+        shortcuts.Controls.Add(new Label { Text = "使用 Ctrl / Alt，可配合 Shift。Backspace 或 Delete 停用。\n保存时检查占用；若冲突，将保留原来的快捷键。", Bounds = new Rectangle(8, 346, 550, 52), ForeColor = BarcaUi.Muted, Font = BarcaUi.Font(9) });
+        var reset = new BarcaButton { Text = "恢复默认按键", Bounds = new Rectangle(405, 8, 145, 32) }; reset.Click += (_, _) => { var defaults = LeoHotkeys.Values(new Preferences()); for (int i = 0; i < fields.Length; i++) fields[i].Chord = defaults[i]; }; shortcuts.Controls.Add(reset);
         var apiEditor = new ApiSettingsForm(preview ? new ChatSettings() : ChatSettings.Load(), preview, true, apiChanged); api.Controls.Add(apiEditor); apiEditor.Show();
-        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.ApplicationIndexing=indexApps.Checked;next.AutoUpdateNotifications=autoUpdates.Checked;next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
+        save.Click += (_, _) => { try { var next = JsonSerializer.Deserialize<Preferences>(JsonSerializer.Serialize(p))!; next.ApplicationIndexing=indexApps.Checked;next.AutoUpdateNotifications=autoUpdates.Checked;next.DisplayName=UiTheme.ValidateName(nameField.Text);next.PetSize = scale.Value; next.RememberHistory = history.Checked; next.ContextAware = context.Checked; next.HideInFullscreen = full.Checked; next.ClipboardHistory = clipboard.Checked; next.SearchHotkey = fields[0].Chord; next.VoiceHotkey = fields[1].Chord; next.LyricsHotkey = fields[2].Chord;next.QuickNoteHotkey=fields[3].Chord;modules.Apply(next); LeoHotkeys.Validate(LeoHotkeys.Values(next)); apply(next, startup.Checked); status.Text = "已保存，设置立即生效。";if(!preview)OperationFeedback.Show("设置已保存"); } catch (Exception e) { status.Text = e.Message; } };
         Controls.Add(host); Controls.Add(footer); Controls.Add(navigation); Controls.Add(header); MinimumSize = MaximumSize = Size; Select(0);
     }
 }
@@ -155,15 +155,15 @@ sealed partial class PetForm
     void SetHotkeyCapture(bool capture)
     {
         if(previewMode||IsDisposed)return;
-        for(int i=1;i<=3;i++)Native.UnregisterHotKey(Handle,i);
+        for(int i=1;i<=4;i++)Native.UnregisterHotKey(Handle,i);
         if(!capture)RegisterConfiguredHotkeys();
     }
-    readonly string[] hotkeyChecks=["待检查","待检查","待检查"];
-    string ShortcutStatus()=>"搜索 "+hotkeyChecks[0]+" / 语音 "+hotkeyChecks[1]+" / 歌词 "+hotkeyChecks[2];
+    readonly string[] hotkeyChecks=["待检查","待检查","待检查","待检查"];
+    string ShortcutStatus()=>"搜索 "+hotkeyChecks[0]+" / 语音 "+hotkeyChecks[1]+" / 歌词 "+hotkeyChecks[2]+" / 速记 "+hotkeyChecks[3];
     void RegisterConfiguredHotkeys()
     {
         var keys = LeoHotkeys.Values(prefs);
-        for (int i = 0; i < 3; i++) { Native.UnregisterHotKey(Handle,i+1);bool registered = LeoHotkeys.Register(Handle, i + 1, keys[i]); hotkeyChecks[i]=keys[i]==Keys.None?"未启用":registered?"正常":"被占用";if (i == 2) lyricsHotkeyRegistered = keys[i] != Keys.None && registered; }
+        for (int i = 0; i < keys.Length; i++) { Native.UnregisterHotKey(Handle,i+1);bool registered = LeoHotkeys.Register(Handle, i + 1, keys[i]); hotkeyChecks[i]=keys[i]==Keys.None?"未启用":registered?"正常":"被占用";if (i == 2) lyricsHotkeyRegistered = keys[i] != Keys.None && registered; }
     }
     void ApplySettings(Preferences next, bool startup)
     {
@@ -186,7 +186,7 @@ sealed partial class PetForm
         if(!previewMode)ConfigureClientActivity();
         Modules.SetFootball(prefs.FootballModule);foot.ConfigureModules(prefs);launcher.RefreshModules();
         prefs.PetSize = next.PetSize; prefs.RememberHistory = next.RememberHistory; prefs.ContextAware = next.ContextAware; prefs.HideInFullscreen = next.HideInFullscreen; prefs.ClipboardHistory = next.ClipboardHistory;
-        prefs.SearchHotkey = next.SearchHotkey; prefs.VoiceHotkey = next.VoiceHotkey; prefs.LyricsHotkey = next.LyricsHotkey; lyricsHotkeyRegistered = next.MusicModule&&next.LyricsHotkey != Keys.None;
+        prefs.QuickNoteHotkey=next.QuickNoteHotkey;prefs.SearchHotkey = next.SearchHotkey; prefs.VoiceHotkey = next.VoiceHotkey; prefs.LyricsHotkey = next.LyricsHotkey; lyricsHotkeyRegistered = next.MusicModule&&next.LyricsHotkey != Keys.None;
         if(!previewMode)RegisterConfiguredHotkeys();
         launcher.PreviewSize(prefs.PetSize); ResizePet(); PollFullscreen();
     }

@@ -24,7 +24,7 @@ sealed class ConfigMigration
         if(new FileInfo(file).Length>16_000_000)throw new ArgumentException("配置文件过大，最多支持16MB。");
         string text=File.ReadAllText(file);using var doc=JsonDocument.Parse(text);var obj=doc.RootElement;
         foreach(string name in new[]{"Format","Version","Preferences","Combos","WatchLinks","Quiet","Budget"})if(!obj.TryGetProperty(name,out _))throw new ArgumentException("不是完整的 Leo 配置文件。");
-        var bundle=JsonSerializer.Deserialize<ConfigBundle>(text)??throw new ArgumentException("无法读取配置文件。");
+        var bundle=JsonSerializer.Deserialize<ConfigBundle>(text)??throw new ArgumentException("无法读取配置文件。");QuickNoteCompatibility.Migrate(obj.GetProperty("Preferences"),bundle.Preferences);
         if(bundle.Format!="LeoConfig"||bundle.Version!=1)throw new ArgumentException("不支持这个配置文件版本。");
         var p=bundle.Preferences??throw new ArgumentException("配置缺少个人设置。");p.EntryDisplayModes??=new();EntryDisplay.Validate(p.EntryDisplayModes);
         if(p==null||p.PetSize is <80 or >230||p.Favorites==null||p.Favorites.Any(string.IsNullOrWhiteSpace)||p.Aliases==null||p.ModuleExecutables==null||p.Aliases.Any(x=>x.Value==null||x.Value.Any(a=>string.IsNullOrWhiteSpace(a)||a.Length>30)))throw new ArgumentException("外观、收藏或简称配置无效。");

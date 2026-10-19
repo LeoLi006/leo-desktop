@@ -30,7 +30,7 @@ sealed class DockMotion
 sealed class DockSprites:IDisposable
 {
     readonly Bitmap[] frames;readonly Rectangle[] sources;readonly string? kit;
-    readonly float[] headScales=new float[24];internal readonly Size ReferenceHead;internal Size HeadAt(int index)=>HeadGeometry.Measure(frames[index],new Rectangle(Point.Empty,frames[index].Size));
+    readonly float[] headScales=new float[24];readonly Rectangle[] heads=new Rectangle[24];internal readonly Size ReferenceHead;internal Size HeadAt(int index)=>heads[index].Size;
     public const int FramesPerDirection=6;
     public DockSprites(string? path=null,string? kit=null)
     {
@@ -74,31 +74,37 @@ sealed class DockSprites:IDisposable
             frames[FramesPerDirection+i].Dispose();frames[FramesPerDirection+i]=mirrored;
             sources[FramesPerDirection+i]=new Rectangle(sources[FramesPerDirection+i].Location,mirrored.Size);
         }
-        using var main=new Bitmap(Path.Combine(Store.Root,"assets","leo.png"));var cell=new Rectangle(0,0,main.Width/8,main.Height/11);ReferenceHead=HeadGeometry.Measure(main,cell);for(int i=0;i<24;i++)headScales[i]=HeadGeometry.Fit(ReferenceHead,HeadAt(i))*192f/cell.Width;
+        using var main=new Bitmap(Path.Combine(Store.Root,"assets","leo.png"));var cell=new Rectangle(0,0,main.Width/8,main.Height/11);ReferenceHead=HeadGeometry.Measure(main,cell);for(int i=0;i<24;i++){heads[i]=HeadGeometry.Bounds(frames[i],new Rectangle(Point.Empty,frames[i].Size));headScales[i]=HeadGeometry.Fit(ReferenceHead,heads[i].Size)*192f/cell.Width;}
     }
     internal bool RightGazeMatchesLeftMirror()
     {
         for(int i=0;i<FramesPerDirection;i++){using var expected=(Bitmap)frames[i].Clone();expected.RotateFlip(RotateFlipType.RotateNoneFlipX);if(SkinAnimationTests.Hash(expected)!=SkinAnimationTests.Hash(frames[FramesPerDirection+i]))return false;}return true;
     }
-    public static int FrameIndex(float progress)=>Math.Clamp((int)(Math.Clamp(progress,0,1)*FramesPerDirection),0,FramesPerDirection-1);
+    public static int FrameIndex(float progress)=>Math.Clamp((int)(Math.Clamp(progress,0,1)*(FramesPerDirection-1)),0,FramesPerDirection-1);
     int Index(float progress,DockSide side)=>Math.Clamp((int)side-1,0,3)*FramesPerDirection+FrameIndex(progress);
     public Rectangle Source(float progress,long now,DockSide side=DockSide.Bottom)=>sources[Index(progress,side)];
+    float Scale(Size size,float progress,int index){float inset=Math.Max(2,size.Width*.025f);float scale=Math.Min((size.Width-inset*2)/sources.Max(r=>r.Width),(size.Height-inset*2)/sources.Max(r=>r.Height));scale=Math.Min(scale,size.Width*(138f/192)/sources.Max(r=>r.Width));if(index>=0)scale=Math.Min(scale,Math.Min(size.Width/192f,size.Height/208f)*headScales[index]);float t=progress*progress*(3-2*progress);return scale*(1-.14f*t);}
     public RectangleF Destination(Size size,float progress,DockSide side,Rectangle source)
     {
-        float inset=Math.Max(2,size.Width*.025f),scale=Math.Min((size.Width-inset*2)/sources.Max(r=>r.Width),(size.Height-inset*2)/sources.Max(r=>r.Height));
-        scale=Math.Min(scale,size.Width*(138f/192)/sources.Max(r=>r.Width));
-        int index=Array.IndexOf(sources,source);if(index>=0)scale=Math.Min(scale,Math.Min(size.Width/192f,size.Height/208f)*headScales[index]);
-        // A slightly smaller tucked silhouette avoids a head-only pose feeling magnified.
-        float tuck=progress*progress*(3-2*progress);scale*=1-.14f*tuck;
-        float w=source.Width*scale,h=source.Height*scale,x=(size.Width-w)/2,y=size.Height-h-inset;
-        float edgeX=side==DockSide.Left?0:side==DockSide.Right?size.Width-w:x;
-        float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:(size.Height-h)/2;
-        float t=progress*progress*(3-2*progress);return new(x+(edgeX-x)*t,y+(edgeY-y)*t,w,h);
+        int index=Array.IndexOf(sources,source);float scale=Scale(size,progress,index),inset=Math.Max(2,size.Width*.025f);float w=source.Width*scale,h=source.Height*scale,x=(size.Width-w)/2,y=size.Height-h-inset;
+        float t=progress*progress*(3-2*progress);
+        if(side is DockSide.Left or DockSide.Right&&index>=0){int first=((int)side-1)*FramesPerDirection,last=first+FramesPerDirection-1;float startScale=Scale(size,0,first),endScale=Scale(size,1,last);var firstHead=heads[first];var lastHead=heads[last];var face=heads[index];
+            float startX=(size.Width-sources[first].Width*startScale)/2+(firstHead.Left+firstHead.Width/2f)*startScale;
+            float endX=(side==DockSide.Left?0:size.Width-sources[last].Width*endScale)+(lastHead.Left+lastHead.Width/2f)*endScale;
+            float startY=size.Height-sources[first].Height*startScale-inset+(firstHead.Top+firstHead.Height/2f)*startScale;
+            float endY=(size.Height-sources[last].Height*endScale)/2+(lastHead.Top+lastHead.Height/2f)*endScale;
+            x=startX+(endX-startX)*t-(face.Left+face.Width/2f)*scale;y=startY+(endY-startY)*t-(face.Top+face.Height/2f)*scale;
+        }else{float edgeY=side==DockSide.Top?inset:side==DockSide.Bottom?size.Height-h-inset:(size.Height-h)/2;y+=(edgeY-y)*t;}
+        return new(Math.Clamp(x,0,Math.Max(0,size.Width-w)),Math.Clamp(y,0,Math.Max(0,size.Height-h)),w,h);
     }
+    internal (int First,int Next,float Blend) Sample(float progress,DockSide side){float phase=Math.Clamp(progress,0,1)*(FramesPerDirection-1);int row=Math.Clamp((int)side-1,0,3)*FramesPerDirection;int first=(int)phase,next=Math.Min(first+1,FramesPerDirection-1);float blend=phase-first;return(row+first,row+next,blend*blend*(3-2*blend));}
+    public RectangleF RenderBounds(Size size,float progress,DockSide side,float position){var sample=Sample(progress,side);var first=Destination(size,position,side,sources[sample.First]);return sample.Blend<=.001f?first:RectangleF.Union(first,Destination(size,position,side,sources[sample.Next]));}
     public RectangleF Draw(Graphics graphics,Size size,float progress,DockSide side,long now,float opacity=1,float? positionProgress=null)
     {
-        int index=Index(progress,side);var target=Destination(size,positionProgress??progress,side,sources[index]);if(kit!=null){KitPalette.Draw(graphics,frames[index],target,new RectangleF(Point.Empty,frames[index].Size),kit,opacity);return target;}
-        using var alpha=new ImageAttributes();alpha.SetColorMatrix(new ColorMatrix{Matrix33=opacity});graphics.DrawImage(frames[index],Rectangle.Round(target),0,0,frames[index].Width,frames[index].Height,GraphicsUnit.Pixel,alpha);return target;
+        var sample=Sample(progress,side);float position=positionProgress??progress;
+        void Paint(Graphics canvas,int index,float alpha){if(alpha<=.001f)return;var target=Destination(size,position,side,sources[index]);if(kit!=null){KitPalette.Draw(canvas,frames[index],target,new RectangleF(Point.Empty,frames[index].Size),kit,alpha);return;}using var attributes=new ImageAttributes();attributes.SetColorMatrix(new ColorMatrix{Matrix33=alpha});canvas.DrawImage(frames[index],Rectangle.Round(target),0,0,frames[index].Width,frames[index].Height,GraphicsUnit.Pixel,attributes);}
+        if(sample.Blend<=.001f){Paint(graphics,sample.First,opacity);}
+        else{using var first=new Bitmap(size.Width,size.Height,PixelFormat.Format32bppPArgb);using var second=new Bitmap(size.Width,size.Height,PixelFormat.Format32bppPArgb);using(var g=Graphics.FromImage(first)){g.InterpolationMode=graphics.InterpolationMode;g.PixelOffsetMode=graphics.PixelOffsetMode;Paint(g,sample.First,1);}using(var g=Graphics.FromImage(second)){g.InterpolationMode=graphics.InterpolationMode;g.PixelOffsetMode=graphics.PixelOffsetMode;Paint(g,sample.Next,1);}SpriteBlend.Mix(first,second,sample.Blend);using var alpha=new ImageAttributes();alpha.SetColorMatrix(new ColorMatrix{Matrix33=opacity});graphics.DrawImage(first,new Rectangle(Point.Empty,size),0,0,size.Width,size.Height,GraphicsUnit.Pixel,alpha);}return RenderBounds(size,progress,side,position);
     }
     public void Dispose(){foreach(var frame in frames)frame.Dispose();}
 }
@@ -112,9 +118,10 @@ sealed partial class PetForm
     Point dockShift;
     bool movingDock;
     long dockFootShownAt;
-    bool dockAwaitExit,dockClickReveal;
-    void BeginDockTuck(){var side=DesktopDock.Detect(Bounds,foot.ReservedSpace,dockSide);if(!prefs.EdgeDocking||side==DockSide.None)return;movingDock=true;try{Location=DesktopDock.Snap(Bounds,DesktopDock.Area(Bounds,DesktopDock.Displays()),foot.ReservedSpace,side);}finally{movingDock=false;}dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
-    void StartDockAnimation(){if(previewMode)return;dockMotion.Reset(clock.ElapsedMilliseconds);dockTimer.Tick+=(_,_)=>UpdateDockAnimation();dockTimer.Start();}
+    bool dockAwaitExit,dockClickReveal,dockDisabled;
+    void DisableDockingForSession(){dockDisabled=true;dockTimer.Stop();RevealDock(true);}
+    void BeginDockTuck(){var side=DesktopDock.Detect(Bounds,foot.ReservedSpace,dockSide);if(dockDisabled||!prefs.EdgeDocking||side==DockSide.None)return;movingDock=true;try{Location=DesktopDock.Snap(Bounds,DesktopDock.Area(Bounds,DesktopDock.Displays()),foot.ReservedSpace,side);}finally{movingDock=false;}dockSide=side;dockAwaitExit=true;dockMotion.BeginTuck(clock.ElapsedMilliseconds);}
+    void StartDockAnimation(){if(previewMode)return;dockMotion.Reset(clock.ElapsedMilliseconds);FeatureFaults.Timer(dockTimer,"吸附动画",UpdateDockAnimation,DisableDockingForSession,()=>dockDisabled=false);dockTimer.Start();}
     void RevealDock(bool immediate=false)
     {
         if(resourcesDisposed)return;
@@ -133,12 +140,12 @@ sealed partial class PetForm
     {
         if(hit==null||hit.IsDisposed)return;
         Rectangle relative=ClientRectangle;
-        if(dockMotion.Progress>=DockBridge.End){var sprites=CurrentDock();var source=sprites.Source(DockProgress(dockMotion.Progress,dockSide),clock.ElapsedMilliseconds,dockSide);relative=Rectangle.Ceiling(sprites.Destination(ClientSize,dockMotion.Progress,dockSide,source));relative=Rectangle.Intersect(ClientRectangle,relative);}
+        if(dockMotion.Progress>=DockBridge.End){var sprites=CurrentDock();relative=Rectangle.Ceiling(sprites.RenderBounds(ClientSize,DockProgress(dockMotion.Progress,dockSide),dockSide,dockMotion.Progress));relative=Rectangle.Intersect(ClientRectangle,relative);}
         hit.Bounds=new Rectangle(new Point(Left+relative.Left,Top+relative.Top),relative.Size);
     }
     void UpdateDockAnimation()
     {
-        if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated||previewMode||hiddenForFullscreen)return;
+        if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated||previewMode||hiddenForFullscreen||dockDisabled)return;
         AdvanceDock(clock.ElapsedMilliseconds,Cursor.Position);
     }
     void AdvanceDock(long now,Point pointer)
@@ -165,10 +172,10 @@ sealed partial class PetForm
     {
         if(dockMotion.Progress<=.001f)return false;
         target=new RectangleF(Point.Empty,ClientSize);var sprites=CurrentDock();var state=graphics.Save();graphics.TranslateTransform(target.Left,target.Top);
-        graphics.SetClip(new Rectangle(Point.Empty,new Size((int)target.Width,(int)target.Height)));
+        try{graphics.SetClip(new Rectangle(Point.Empty,new Size((int)target.Width,(int)target.Height)));
         var size=new Size((int)target.Width,(int)target.Height);
         if(dockMotion.Progress<DockBridge.End)CurrentBridge().Draw(graphics,size,dockMotion.Progress,dockSide,sprites);
-        else sprites.Draw(graphics,size,DockProgress(dockMotion.Progress,dockSide),dockSide,clock.ElapsedMilliseconds,positionProgress:dockMotion.Progress);
-        graphics.Restore(state);return true;
+        else sprites.Draw(graphics,size,DockProgress(dockMotion.Progress,dockSide),dockSide,clock.ElapsedMilliseconds,positionProgress:dockMotion.Progress);return true;}
+        finally{graphics.Restore(state);}
     }
 }

@@ -58,5 +58,6 @@ static class WindowPositions
         form.FormClosing += (_, _) => Save();
         form.VisibleChanged += (_, _) => { if (!form.Visible) Save(); };
         form.FormClosed += (_, _) => { lock(tracked)tracked.Remove(form); };
+        form.Disposed+=(_,_)=>{lock(tracked)tracked.Remove(form);};
     }
 }

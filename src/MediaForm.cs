@@ -18,5 +18,5 @@ sealed class MediaForm:BarcaWindow
 sealed partial class PetForm
 {
     MediaForm? mediaWindow;
-    void ShowMedia(){Modules.Require(prefs,"media");if(mediaWindow==null||mediaWindow.IsDisposed)mediaWindow=new MediaForm((a,v,t)=>commands.ExecuteAsync(new(a,v,"media-ui"),t),previewMode);if(!mediaWindow.Visible)WindowPositions.Prepare(mediaWindow,"media",Bounds,previewMode);mediaWindow.Show();mediaWindow.Activate();}
+    void ShowMedia(){Modules.Require(prefs,"media");if(mediaWindow==null||mediaWindow.IsDisposed)mediaWindow=new MediaForm((a,v,t)=>commands.ExecuteAsync(new(a,v,"media-ui"),t),previewMode);if(!mediaWindow.Visible)WindowPositions.Prepare(mediaWindow,"media",Bounds,previewMode);WindowInteraction.Show(mediaWindow);}
 }

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
@@ -95,7 +95,7 @@ static class FootballFeed
     }
 }
 
-sealed class FootballForm : BarcaWindow
+sealed class FootballForm : BarcaWindow,IWindowBack
 {
     readonly bool preview;
     readonly TodoStore tasks;
@@ -142,6 +142,7 @@ sealed class FootballForm : BarcaWindow
         homeScroll=new Point(0,-list.AutoScrollPosition.Y);home.Hide();
         detail=new TeamView(name,preview,BackToSchedule,tasks);pages.Controls.Add(detail);detail.BringToFront();
     }
+    public bool TryGoBack(){if(detail==null)return false;BackToSchedule();return true;}
     void BackToSchedule()
     {
         detail?.Dispose();detail=null;home.Show();home.BringToFront();list.AutoScrollPosition=homeScroll;

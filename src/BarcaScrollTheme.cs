@@ -6,7 +6,7 @@ namespace LeoLauncher;
 static class BarcaScrollTheme
 {
     static readonly ConditionalWeakTable<Control, ScrollSkin> skins=new();
-    public static void Start() => Application.Idle+=(_,_)=>{foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())Attach(form);};
+    public static void Start() => Application.Idle+=(_,_)=>{foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())FeatureFaults.Run("滚动条主题",()=>Attach(form));};
     internal static void Attach(Control control)
     {
         if(control.IsDisposed)return;

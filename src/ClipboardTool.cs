@@ -152,7 +152,7 @@ static class ClipboardTool
     {
         if (service == null) return null;
         service.Capture();
-        var window = new Form { FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = UiTheme.Color(24, 29, 44), ForeColor = Color.White };
+        var window = new Form { Name="clipboard",FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = UiTheme.Color(24, 29, 44), ForeColor = Color.White };
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 112, Padding = new Padding(8), WrapContents = true };
         var search = new TextBox { Width = 190, PlaceholderText = "搜索剪切板历史", BackColor = Appearance.Field, ForeColor = Appearance.Ink, BorderStyle = BorderStyle.FixedSingle };
         var enabled = new CheckBox { Text = "记录历史", Checked = service.Enabled, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
@@ -202,8 +202,7 @@ static class ClipboardTool
             try { service.Copy(item); RefreshItems(); state.Text = "已复制到剪切板"; }
             catch (Exception e) { state.Text = "复制失败：" + e.Message; }
         }
-        copy.Click += (_, _) => CopySelected(); list.DoubleClick += (_, _) => CopySelected();
-        list.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { CopySelected(); e.SuppressKeyPress = true; } };
+        copy.Click += (_, _) => CopySelected();SelectionKeys.Wire(list,CopySelected);
         delete.Click += (_, _) => { if (list.SelectedItem is ClipItem item) service.History.Delete(item); RefreshItems(); };
         undoButton.Click+=(_,_)=>{service.History.Undo();RefreshItems();};
         clear.Click += (_, _) => { service.History.Clear(); RefreshItems(); };
@@ -217,9 +216,9 @@ static class ClipboardTool
         search.TextChanged += (_, _) => RefreshItems();
         var refresh = new System.Windows.Forms.Timer { Interval = 900 };
         string signature = "";
-        refresh.Tick += (_, _) => { string current = string.Join("|", service.History.Items.Select(x => x.Key + x.Pinned)); if (current != signature) { signature = current; RefreshItems(); } };
+        FeatureFaults.Timer(refresh,"剪贴板窗口刷新",()=>{ string current = string.Join("|", service.History.Items.Select(x => x.Key + x.Pinned)); if (current != signature) { signature = current; RefreshItems(); } });
         window.FormClosed += (_, _) => { refresh.Dispose(); picture.Image?.Dispose(); };
-        window.Shown += (_, _) => { split.SplitterDistance = 280; RefreshItems(); refresh.Start(); };
+        window.Shown += (_, _) => {if(!FeatureFaults.IsTestMode){FeatureFaults.Run("剪贴板窗口",()=>{WindowInteraction.Prepare(window);WindowInteraction.FocusInput(window);});} split.SplitterDistance = 280; RefreshItems(); refresh.Start(); };
         window.Show();
         return window;
     }

@@ -123,7 +123,7 @@ sealed partial class LauncherForm : Form
             football.StartPosition = FormStartPosition.Manual;
             if(!football.Visible)WindowPositions.Prepare(football,"football",PetBounds?.Invoke() ?? Bounds,preview);
             Hide();
-            football.Show(); football.Activate();
+            WindowInteraction.Show(football);
         };
         footballButton.Click+=(_,_)=>{if(!ignoreShortcutClick&&!shortcutDragging)openFootball();};
         var shortcutViewport=new Panel{Bounds=new Rectangle(69,3,308,31)};shortcutRow=new FlowLayoutPanel{Bounds=new Rectangle(0,0,308,52),WrapContents=false,AutoScroll=true,FlowDirection=FlowDirection.LeftToRight};shortcutViewport.Controls.Add(shortcutRow);Controls.Add(shortcutViewport);footballShortcut=footballButton;
@@ -155,7 +155,7 @@ sealed partial class LauncherForm : Form
         // Error messages only; no instructional footer.
         status.SetBounds(22, 248, 556, 24); status.ForeColor = Color.LightSalmon; status.Visible = false; Controls.Add(status);
         if (!preview) clipboard = new ClipboardHistoryService(prefs);
-        debounce.Tick += (_, _) => { debounce.Stop(); Filter(); };
+        FeatureFaults.Timer(debounce,"应用搜索",()=>{debounce.Stop();Filter();});
         query.TextChanged += (_, _) => { keyboardNavigation=false;pathLookup?.Cancel();pathChoices.Items.Clear();debounce.Stop(); debounce.Start(); };
         InitializePathCompletion();
         query.KeyDown += (_, e) => {
@@ -175,7 +175,7 @@ sealed partial class LauncherForm : Form
         };
         Deactivate += (_, _) => { if (!preview) ProcessDeactivation(PointerOverPet?.Invoke() == true); };
         Disposed+=(_,_)=>{shortcutTips.Dispose();shortcutOverflowMenu.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
-        observer.Tick += (_, _) => Observe();
+        FeatureFaults.Timer(observer,"应用上下文",Observe,enabled:()=>prefs.ApplicationIndexing&&prefs.ContextAware);
         ConfigureActivity();
     }
     protected override void OnPaint(PaintEventArgs e)
@@ -191,6 +191,7 @@ sealed partial class LauncherForm : Form
         var button = new Button { Text = text, Left = x, Top = y, Width = width, Height = 24, FlatStyle = FlatStyle.Flat, BackColor = Appearance.Background, ForeColor = Appearance.Muted, TabStop = false };
         button.FlatAppearance.BorderSize = 0; button.Click += (_, _) => action(); Controls.Add(button);
     }
+    void PostCatalog(Action action){if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((Action)(()=>{if(!IsDisposed)FeatureFaults.Run("应用索引结果",action);}));}catch(InvalidOperationException){}}
     void LoadCatalog()
     {
         catalogStarted=true;CancelCatalog();var pending=new CancellationTokenSource();catalogRequest=pending;int generation=++catalogGeneration;
@@ -202,7 +203,7 @@ sealed partial class LauncherForm : Form
             {
                 var scanned = Catalog.Scan(pending.Token);
                 scanned.Add(ClipboardTool.Entry);
-                if (!IsDisposed) BeginInvoke((Action)(() => {
+                PostCatalog(() => {
                     if(generation!=catalogGeneration||!prefs.ApplicationIndexing||pending.IsCancellationRequested)return;apps = scanned; loading = false;
                     if (demo)
                     {
@@ -212,12 +213,12 @@ sealed partial class LauncherForm : Form
                     }
                     Observe(); Filter();
                     if (!preview&&prefs.ContextAware&&prefs.ApplicationIndexing) observer.Start();
-                }));
+                });
             }
             catch(OperationCanceledException){}
-            catch (Exception e)
+            catch (Exception e) when(FeatureFaults.Recoverable(e))
             {
-                if (!IsDisposed && IsHandleCreated) BeginInvoke((Action)(() => { if(generation==catalogGeneration){loading = false; status.Text = "应用索引失败：" + e.Message;} }));
+                FeatureFaults.Report("应用索引",e);PostCatalog(() => { if(generation==catalogGeneration){loading = false; status.Text = "应用索引失败，请稍后重新开启索引。";} });
             }
             finally{pending.Dispose();}
         }) { IsBackground = true };

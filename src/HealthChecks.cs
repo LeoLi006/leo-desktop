@@ -32,6 +32,7 @@ sealed class HealthChecksView:Panel
         try{string file=Path.Combine(Store.Root,".health-"+Guid.NewGuid().ToString("N")+".tmp");File.WriteAllText(file,"Leo");File.Delete(file);lines.Add("✓ 个人配置目录：可写");}catch{lines.Add("○ 个人配置目录：无法写入，设置可能无法保存");}
         var config=ChatSettings.Load();lines.Add("API 配置："+(config.ReadKey().Length>0&&config.Model.Length>0?"已填写（连接请手动检测）":"尚未完整填写"));
         try{var used=ApiUsageLedger.Shared.Today();var limit=ApiUsageConfig.Load().DailyLimit;lines.Add("今日模型请求："+used.Requests+" / "+(limit==0?"不限":limit));}catch{lines.Add("○ API 用量配置或记录无法读取，模型调用暂停");}
+        foreach(var failure in FeatureFaults.Snapshot())lines.Add("本次运行已隔离："+failure.Feature+" · "+failure.ErrorType+" · "+failure.Count+"次（其他功能保留）");
         result.Text=string.Join("\n\n",lines);
     }
     protected override void Dispose(bool disposing){if(disposing){lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}

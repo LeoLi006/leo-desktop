@@ -154,3 +154,16 @@ Leo以当前用户权限启动包内程序，附加固定参数`--leo-module`，
 `ClientOperationHub.Configure`按资源取消排队与等待中的动作，并在停用时拒绝新请求。它不退出本机软件，也不回滚已完成的代理或播放操作。独立扩展使用`module:<id>`资源名。
 
 `FileDropActions.ConfiguredStart`按模块ID解析当前已启用应用，沿用`LocalApplications.Start`的参数、工作目录和提权设置，通过Windows引号规则追加有效文件路径。拖放请求不接受外部传入的管理员标记或任意启动参数。
+
+
+## v1.02.0：窗口交互与故障边界
+
+`WindowInteraction`集中普通窗口的可见区域、父窗口附近放置、焦点和最小化恢复；伴随浮层与提醒保留各自层级。`SelectionKeys`只给明确的列表动作绑定Enter/双击，不截获正文方向键。
+
+`Preferences.QuickNoteHotkey`添加第四组快捷键，使用统一的注册、冲突回滚及配置迁移校验。`QuickNoteCompatibility`在旧配置省略此字段且原快捷键已占用默认组合时停用新增绑定；不修改旧绑定。方案增加可选的`NoteKey`字段，旧方案默认未启用。
+
+`StickyNote.Pinned`默认false，兼容旧便签文件。`NoteStore.Query`只按分类与关键字筛选，不删除已关联待办的原文；写入采用原子替换，通知订阅者失败不会反过来撤销已保存的数据。
+
+`FeatureFaults`提供可恢复异常边界、定时器熔断、UI兜底和本次运行诊断；不存储异常消息或用户输入。UI连续异常按活动普通窗口隔离，核心附属窗口不销毁；进程级致命异常不伪装成功恢复。独立进程扩展仍是隔离原生崩溃的边界。
+
+吸附绘图通过`HeadGeometry.Bounds`对齐脸部中心，`SpriteBlend`按预乘像素插值相邻姿态，避免透明度凹陷和旧轮廓残留。绘图与命中区域共用同一采样。

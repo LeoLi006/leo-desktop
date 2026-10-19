@@ -26,7 +26,7 @@ sealed class EntryDisplayForm:BarcaWindow
             var hint=new Label{Text="搜索口令："+entry.Hint,Bounds=new(8,y+33,660,23),AutoEllipsis=true,ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};scroll.Controls.AddRange([title,enabled,field,hint]);y+=70;
         }
         scroll.AutoScrollMinSize=new(0,y+4);var note=new Label{Text="快捷栏显示：保留原位置的快捷按钮，也能从右键菜单进入。\n仅菜单显示：隐藏快捷按钮，保留右键入口。仅搜索调用：两种入口都隐藏。\n聊天、语音、组合、已有快捷键和内容操作仍可调用已启用能力。\n停用模块的显示选择会保留，重新启用后恢复。确认后还需保存设置。",Bounds=new(28,468,710,75),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};
-        var save=new BarcaButton{Text="确定",Bounds=new(628,542,112,32)};save.Click+=(_,_)=>{try{Result=new(original);foreach(var field in fields)Result[field.Key]=((ComboChoice)field.Value.SelectedItem!).Value;EntryDisplay.Validate(Result);DialogResult=DialogResult.OK;}catch(Exception e){note.Text=e.Message;note.ForeColor=Color.LightSalmon;}};var cancel=new BarcaButton{Text="取消",Bounds=new(504,542,112,32),DialogResult=DialogResult.Cancel};CancelButton=cancel;Controls.AddRange([scroll,note,cancel,save]);MinimumSize=MaximumSize=Size;
+        var save=new BarcaButton{Text="确定",Bounds=new(628,542,112,32)};save.Click+=(_,_)=>{try{Result=new(original);foreach(var field in fields)Result[field.Key]=((ComboChoice)field.Value.SelectedItem!).Value;EntryDisplay.Validate(Result);DialogResult=DialogResult.OK;}catch(Exception e){note.Text=e.Message;note.ForeColor=Color.LightSalmon;}};var cancel=new BarcaButton{Text="取消",Bounds=new(504,542,112,32),DialogResult=DialogResult.Cancel};AcceptButton=save;CancelButton=cancel;Controls.AddRange([scroll,note,cancel,save]);MinimumSize=MaximumSize=Size;
     }
 }
 sealed partial class PetForm

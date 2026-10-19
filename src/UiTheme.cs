@@ -61,7 +61,7 @@ static class UiTheme
         foreach(var raw in originals.Values)if(Map(raw).ToArgb()==value.ToArgb())return raw;
         return value;
     }
-    public static void Start(){if(started)return;started=true;Application.Idle+=(_,_)=>{foreach(Form f in Application.OpenForms.Cast<Form>().ToArray())if(!seen.TryGetValue(f,out _)){seen.Add(f,new object());Attach(f);}};}
+    public static void Start(){if(started)return;started=true;Application.Idle+=(_,_)=>{foreach(Form f in Application.OpenForms.Cast<Form>().ToArray())if(!seen.TryGetValue(f,out _)){seen.Add(f,new object());FeatureFaults.Run("窗口主题",()=>Attach(f));}};}
     public static void Configure(string id,string? name,ThemeOptions? appearance=null)
     {
         var next=PaletteFor(id);var options=appearance??SkinLibrary.Find(id)?.DefaultOptions??new ThemeOptions();try{options.Validate();}catch(ArgumentException){options=new();}string valid;try{valid=ValidateName(name);}catch{valid="Leo";}

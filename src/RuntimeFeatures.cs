@@ -30,7 +30,7 @@ sealed class EscapeWindows:IMessageFilter
     {
         if(window is FootTools tools){tools.CollapseSearch();return true;}
         if(window is LauncherForm){window.Hide();return true;}
-        window.Close();return true;
+        var owner=window.Owner;if(window.Modal&&window.DialogResult==DialogResult.None)window.DialogResult=DialogResult.Cancel;window.Close();if(owner!=null&&!owner.IsDisposed&&owner.Visible)owner.Activate();return true;
     }
 }
 

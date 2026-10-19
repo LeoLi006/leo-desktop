@@ -25,6 +25,7 @@ sealed class Preferences
     public Keys SearchHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.Space;
     public Keys VoiceHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.V;
     public Keys LyricsHotkey { get; set; } = Keys.Control | Keys.Alt | Keys.L;
+    public Keys QuickNoteHotkey {get;set;}=Keys.Control|Keys.Alt|Keys.N;
     public bool RememberHistory { get; set; } = true;
     public bool ContextAware { get; set; } = true;
     public List<string> Favorites { get; set; } = new();
@@ -61,7 +62,7 @@ static class Store
     public static Preferences Load()
     {
         Migrate();
-        try { return JsonSerializer.Deserialize<Preferences>(File.ReadAllText(FilePath)) ?? new(); }
+        try {using var document=JsonDocument.Parse(File.ReadAllText(FilePath));var result=document.RootElement.Deserialize<Preferences>()??new();QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
         catch { return new(); }
     }
     static void Migrate()
@@ -201,9 +202,12 @@ static class Program
         Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
         Application.EnableVisualStyles();
         if(args.Length>0&&args[0]=="--dock-animation-test")Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+        FeatureFaults.IsTestMode=args.Any(a=>a.EndsWith("-test",StringComparison.Ordinal))||args.Contains("--package-verify");
+        if(!FeatureFaults.IsTestMode){Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);FeatureFaults.Start();}
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}
@@ -515,6 +519,7 @@ sealed partial class PetForm : Form
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
         WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
         PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
+        var quickNoteItem=new ToolStripMenuItem("一句话速记…");quickNoteItem.Click+=(_,_)=>ShowQuickNote();menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="清单与记录").DropDownItems.Insert(0,quickNoteItem);
         WireOptionalEntryMenus(menu);
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
@@ -544,11 +549,11 @@ sealed partial class PetForm : Form
         LocationChanged += (_, _) => OnDockLocationChanged();
         ClientSizeChanged += (_, _) => { SyncDockHit(); PositionFoot(); };
         animation.Interval = 140;
-        animation.Tick += (_, _) => Animate();
+        FeatureFaults.Timer(animation,"桌宠动画",Animate);
         animation.Start();
-        fullscreenTimer.Tick += (_, _) => PollFullscreen();
+        FeatureFaults.Timer(fullscreenTimer,"全屏检测",PollFullscreen);
         if (!preview) fullscreenTimer.Start();
-        reminderTimer.Tick+=(_,_)=>CheckReminders();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();if(prefs.FootballModule)matchSyncTimer.Start();}
+        FeatureFaults.Timer(reminderTimer,"清单提醒",CheckReminders);tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();if(prefs.FootballModule)matchSyncTimer.Start();}
     }
     protected override bool ShowWithoutActivation => true;
     void ShowChat()
@@ -557,10 +562,10 @@ sealed partial class PetForm : Form
         launcher.Hide(); foot.CollapseSearch();
         if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction){RecognizesExtension=commands.RecognizesExtension,OriginDispatcher=(a,v,s,t)=>commands.ExecuteAsync(new(a,v,s),t)}, clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore);
         if (!chat.Visible) WindowPositions.Prepare(chat,"chat",Bounds,previewMode);
-        chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; chat.Show(); chat.Activate();
+        chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; WindowInteraction.Show(chat);
     }
     void ShowVoice(){ShowChat();chat!.ToggleVoiceInput();}
-    void ShowTodos(QuickIntent? intent=null){RevealDock(true);launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);todoWindow.Show();todoWindow.Activate();if(intent!=null)todoWindow.Apply(intent);}
+    void ShowTodos(QuickIntent? intent=null){RevealDock(true);launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);WindowInteraction.Show(todoWindow);if(intent!=null)todoWindow.Apply(intent);}
     void PollFullscreen()
     {
         if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;
@@ -617,6 +622,7 @@ sealed partial class PetForm : Form
     }
     protected override void OnHandleDestroyed(EventArgs e)
     {
+        Native.UnregisterHotKey(Handle, 4);
         Native.UnregisterHotKey(Handle, 3);
         Native.UnregisterHotKey(Handle, 2);
         Native.UnregisterHotKey(Handle, 1);
@@ -624,6 +630,7 @@ sealed partial class PetForm : Form
     }
     protected override void WndProc(ref Message m)
     {
+        if(m.Msg==0x312&&m.WParam.ToInt32()==4){ShowQuickNote();return;}
         if(m.Msg==0x312&&m.WParam.ToInt32()==3){_=ToggleLyricsWithFeedback();return;}
         if(m.Msg==0x312&&m.WParam.ToInt32()==2){ShowVoice();return;}
         if (m.Msg == 0x312 && m.WParam.ToInt32() == 1)
@@ -660,7 +667,7 @@ sealed partial class PetForm : Form
     }
     void DrawPet(Graphics graphics, RectangleF destination)
     {
-        if(DrawDragPickup(graphics,destination)||DrawDockPet(graphics,destination))return;
+        if(DrawDragPickup(graphics,destination))return;try{if(!dockDisabled&&DrawDockPet(graphics,destination))return;}catch(Exception e)when(FeatureFaults.Recoverable(e)){DisableDockingForSession();FeatureFaults.Report("吸附动画",e,()=>{dockDisabled=false;dockTimer.Start();return Task.CompletedTask;});}
         DrawAnimationFrame(graphics,destination);
         DrawCompanionBadges(graphics,destination);
     }
@@ -704,7 +711,7 @@ sealed partial class PetForm : Form
         if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new SettingsForm(prefs,ApplySettings,()=>chat?.ReloadConfiguration(),previewMode,SetHotkeyCapture,()=>launcher.FileApplications,ShortcutStatus,()=>{todoStore.ReloadImported();launcher.ReloadImportedConfiguration();todoWindow?.View.Render();});
         if(settingsWindow.WindowState==FormWindowState.Minimized)settingsWindow.WindowState=FormWindowState.Normal;
         if(!settingsWindow.Visible)WindowPositions.Prepare(settingsWindow,"settings",Bounds,previewMode);
-        settingsWindow.Show();settingsWindow.Activate();
+        WindowInteraction.Show(settingsWindow);
     }
     public void SavePreview(string path)
     {
@@ -860,7 +867,7 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
-        updateNotifications?.Dispose();companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
+        updateNotifications?.Dispose();quickNoteWindow?.Dispose();companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         commands.Dispose();if(!previewMode)OwnedHelpers.Shutdown();

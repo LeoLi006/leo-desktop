@@ -105,7 +105,7 @@ sealed class FootTools : Form
             finally { if (!IsDisposed) { proxyBusy = false; proxyButton.Enabled = true; RefreshProxy(); } }
         }
         proxyButton.Click+=async(_,_)=>await ChangeProxy();
-        proxyTimer.Tick += (_, _) => RefreshProxy();
+        FeatureFaults.Timer(proxyTimer,"代理状态检查",RefreshProxy,enabled:()=>modules.ClashModule);
         search.SetBounds(67, 6, 154, 21); search.PlaceholderText = "输入关键词，回车搜索";
         search.BorderStyle = BorderStyle.None; search.BackColor = Appearance.Background; search.ForeColor = Appearance.Ink;
         search.Visible = false;

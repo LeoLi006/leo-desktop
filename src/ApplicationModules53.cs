@@ -52,7 +52,7 @@ sealed class RepairPathForm:BarcaWindow
         Text="确认修复应用路径";ClientSize=new(710,410);StartPosition=FormStartPosition.CenterParent;Controls.Add(BarcaUi.Chrome(this,"程序位置发生变化","只匹配同名程序；确认后更新路径，不会自动启动候选。"));
         var list=new ListBox{Bounds=new(24,151,662,172),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,HorizontalScrollbar=true};list.Items.AddRange(candidates);if(list.Items.Count>0)list.SelectedIndex=0;Controls.Add(new Label{Text=candidates.Length>0?"发现以下候选，请确认正确位置：":"未找到候选，可手动选择程序。",Bounds=new(24,111,662,32),ForeColor=BarcaUi.Muted});
         var browse=new BarcaButton{Text="手动选择…",Bounds=new(24,350,140,34)};browse.Click+=(_,_)=>{using var picker=new OpenFileDialog{Filter="应用程序与快捷方式|*.exe;*.lnk",CheckFileExists=true,FileName=Path.GetFileName(old)};if(picker.ShowDialog(this)==DialogResult.OK){list.Items.Add(picker.FileName);list.SelectedItem=picker.FileName;}};
-        var accept=new BarcaButton{Text="确认使用",Bounds=new(546,350,140,34)};accept.Click+=(_,_)=>{if(list.SelectedItem is string p){SelectedPath=p;DialogResult=DialogResult.OK;}};var cancel=new BarcaButton{Text="取消",Bounds=new(394,350,140,34),DialogResult=DialogResult.Cancel};CancelButton=cancel;Controls.AddRange([list,browse,cancel,accept]);MinimumSize=MaximumSize=Size;
+        var accept=new BarcaButton{Text="确认使用",Bounds=new(546,350,140,34)};accept.Click+=(_,_)=>{if(list.SelectedItem is string p){SelectedPath=p;DialogResult=DialogResult.OK;}};var cancel=new BarcaButton{Text="取消",Bounds=new(394,350,140,34),DialogResult=DialogResult.Cancel};AcceptButton=accept;CancelButton=cancel;SelectionKeys.Wire(list,()=>accept.PerformClick());Controls.AddRange([list,browse,cancel,accept]);MinimumSize=MaximumSize=Size;
     }
 }
 sealed partial class PetForm

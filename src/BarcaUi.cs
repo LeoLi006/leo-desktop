@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 namespace LeoLauncher;
 
@@ -133,6 +133,8 @@ sealed class ConversationView:Panel
 class BarcaWindow:Form
 {
     protected bool CanResize=false;
+    protected override void OnShown(EventArgs e){if(!FeatureFaults.IsTestMode)FeatureFaults.Run("窗口显示",()=>WindowInteraction.Prepare(this));base.OnShown(e);if(!FeatureFaults.IsTestMode)FeatureFaults.Run("输入焦点",()=>WindowInteraction.FocusInput(this));}
+    protected override bool ProcessCmdKey(ref Message message,Keys key){if(key is Keys.BrowserBack||key==(Keys.Alt|Keys.Left)){if(ActiveControl is not TextBoxBase&&WindowInteraction.Back(this))return true;}return base.ProcessCmdKey(ref message,key);}
     protected override void WndProc(ref Message m)
     {
         if(!CanResize&&m.Msg==0x112&&(m.WParam.ToInt64()&0xFFF0) is 0xF000 or 0xF030){m.Result=IntPtr.Zero;return;}

@@ -48,7 +48,7 @@ sealed partial class PetForm
     void StartHoverSummary()
     {
         if (previewMode) return;
-        hoverTimer.Tick += (_, _) =>
+        FeatureFaults.Timer(hoverTimer,"悬停摘要",()=>
         {
             bool over = hit.Visible && hit.Bounds.Contains(Cursor.Position) && Control.MouseButtons == MouseButtons.None && !dragging && !launcher.Visible && ContextMenuStrip?.Visible != true && !hiddenForFullscreen && dockMotion.Progress<.001f && feedback?.Visible != true;
             if (!over) { hoverSince = 0; hoverCard?.Hide(); return; }
@@ -58,7 +58,7 @@ sealed partial class PetForm
             if(hoverCard?.Visible==true&&clock.ElapsedMilliseconds-summaryRenderedAt<30000)return;summaryRenderedAt=clock.ElapsedMilliseconds;
             if (clock.ElapsedMilliseconds - summaryLoadedAt > 60000||summaryFollowingVersion!=FootballFollowing.Current.Version) { summaryFollowingVersion=FootballFollowing.Current.Version;summaryMatches = prefs.FootballModule?LeoSummary.CachedMatches():[]; summaryLoadedAt = clock.ElapsedMilliseconds; }
             hoverCard ??= new HoverCard(); string focusText=(notices.Unread>0?notices.Unread+" 条未读通知 · 点击右上金点查看\n":"")+(focus.Active(DateTimeOffset.Now)?"专注中 · 还剩 "+focus.Remaining(DateTimeOffset.Now)+"\n\n":"");hoverCard.Present(focusText+(prefs.FootballModule?LeoSummary.Build(todoStore.Items,summaryMatches,DateTimeOffset.Now):LeoSummary.Build(todoStore.Items,[],DateTimeOffset.Now).Split("\n\n下一场关注比赛")[0]),Bounds);
-        };
+        },()=>hoverCard?.Hide());
         hoverTimer.Start();
     }
 }
