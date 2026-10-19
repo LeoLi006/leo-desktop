@@ -1,0 +1,316 @@
+{
+  "scope": "isolated preview only; not real application launch speed or real desktop background load",
+  "runs": 3,
+  "comparisons": [
+    {
+      "metric": "construction_to_show_ms",
+      "baseline_median": 334.7878,
+      "current_median": 711.3265,
+      "baseline_range": [
+        334.5096,
+        439.7465
+      ],
+      "investigation_threshold": 105.23690000000005,
+      "investigate": true
+    },
+    {
+      "metric": "quick_note_show_ms",
+      "baseline_median": 102.86795000000001,
+      "current_median": 115.38505,
+      "baseline_range": [
+        54.6031,
+        243.0138
+      ],
+      "investigation_threshold": 188.41070000000002,
+      "investigate": false
+    },
+    {
+      "metric": "module_disable_cancel_ms",
+      "baseline_median": 14.1921,
+      "current_median": 0.2803,
+      "baseline_range": [
+        12.1908,
+        45.555
+      ],
+      "investigation_threshold": 33.3642,
+      "investigate": false
+    },
+    {
+      "metric": "idle/cpu_one_core_percent",
+      "baseline_median": 5.460491143657497,
+      "current_median": 6.430618376244822,
+      "baseline_range": [
+        4.880821612864113,
+        7.6072209945043126
+      ],
+      "investigation_threshold": 2.7263993816401992,
+      "investigate": false
+    },
+    {
+      "metric": "idle/allocated_bytes",
+      "baseline_median": 70376,
+      "current_median": 71096,
+      "baseline_range": [
+        70376,
+        100552
+      ],
+      "investigation_threshold": 30176,
+      "investigate": false
+    },
+    {
+      "metric": "idle/private_bytes_after",
+      "baseline_median": 39079936,
+      "current_median": 39157760,
+      "baseline_range": [
+        39075840,
+        39247872
+      ],
+      "investigation_threshold": 7815987.2,
+      "investigate": false
+    },
+    {
+      "metric": "idle/pump_gap_p95_ms",
+      "baseline_median": 30.895700000000033,
+      "current_median": 27.076900000000023,
+      "baseline_range": [
+        30.784900000000107,
+        31.690700000000106
+      ],
+      "investigation_threshold": 6.179140000000007,
+      "investigate": false
+    },
+    {
+      "metric": "docked/cpu_one_core_percent",
+      "baseline_median": 0.19530159972946506,
+      "current_median": 0.39021285230773195,
+      "baseline_range": [
+        0,
+        0.3902266566289132
+      ],
+      "investigation_threshold": 0.3902266566289132,
+      "investigate": false
+    },
+    {
+      "metric": "docked/allocated_bytes",
+      "baseline_median": 41000,
+      "current_median": 41000,
+      "baseline_range": [
+        41000,
+        41000
+      ],
+      "investigation_threshold": 8200.0,
+      "investigate": false
+    },
+    {
+      "metric": "docked/private_bytes_after",
+      "baseline_median": 70574080,
+      "current_median": 71249920,
+      "baseline_range": [
+        69816320,
+        71245824
+      ],
+      "investigation_threshold": 14114816.0,
+      "investigate": false
+    },
+    {
+      "metric": "docked/pump_gap_p95_ms",
+      "baseline_median": 21.522399999999834,
+      "current_median": 25.630199999999945,
+      "baseline_range": [
+        17.03099999999995,
+        25.080599999999777
+      ],
+      "investigation_threshold": 8.049599999999828,
+      "investigate": false
+    },
+    {
+      "metric": "hidden/cpu_one_core_percent",
+      "baseline_median": 0.39002746330019417,
+      "current_median": 0,
+      "baseline_range": [
+        0,
+        0.39040766005564703
+      ],
+      "investigation_threshold": 0.39040766005564703,
+      "investigate": false
+    },
+    {
+      "metric": "hidden/allocated_bytes",
+      "baseline_median": 41000,
+      "current_median": 41000,
+      "baseline_range": [
+        32800,
+        41000
+      ],
+      "investigation_threshold": 8200.0,
+      "investigate": false
+    },
+    {
+      "metric": "hidden/private_bytes_after",
+      "baseline_median": 70574080,
+      "current_median": 71176192,
+      "baseline_range": [
+        69767168,
+        71237632
+      ],
+      "investigation_threshold": 14114816.0,
+      "investigate": false
+    },
+    {
+      "metric": "hidden/pump_gap_p95_ms",
+      "baseline_median": 28.88079999999991,
+      "current_median": 27.242099999999482,
+      "baseline_range": [
+        28.195800000000418,
+        29.38209999999981
+      ],
+      "investigation_threshold": 5.776159999999982,
+      "investigate": false
+    },
+    {
+      "metric": "windows/cpu_one_core_percent",
+      "baseline_median": 5.662287514421416,
+      "current_median": 6.831172415681442,
+      "baseline_range": [
+        4.872003473094592,
+        7.024116219765753
+      ],
+      "investigation_threshold": 2.152112746671161,
+      "investigate": false
+    },
+    {
+      "metric": "windows/allocated_bytes",
+      "baseline_median": 82120,
+      "current_median": 81880,
+      "baseline_range": [
+        82120,
+        97584
+      ],
+      "investigation_threshold": 16424.0,
+      "investigate": false
+    },
+    {
+      "metric": "windows/private_bytes_after",
+      "baseline_median": 71946240,
+      "current_median": 73265152,
+      "baseline_range": [
+        71929856,
+        73379840
+      ],
+      "investigation_threshold": 14389248.0,
+      "investigate": false
+    },
+    {
+      "metric": "windows/pump_gap_p95_ms",
+      "baseline_median": 31.631800000000112,
+      "current_median": 26.928499999999985,
+      "baseline_range": [
+        31.511099999999715,
+        31.923499999999876
+      ],
+      "investigation_threshold": 6.326360000000022,
+      "investigate": false
+    }
+  ],
+  "resources": [
+    {
+      "scene": "idle",
+      "handles_after": {
+        "baseline": 330,
+        "current": 330
+      },
+      "gdi_after": {
+        "baseline": 42,
+        "current": 42
+      },
+      "user_after": {
+        "baseline": 24,
+        "current": 24
+      },
+      "frames": {
+        "baseline": 57,
+        "current": 57
+      }
+    },
+    {
+      "scene": "docked",
+      "handles_after": {
+        "baseline": 333,
+        "current": 333
+      },
+      "gdi_after": {
+        "baseline": 42,
+        "current": 42
+      },
+      "user_after": {
+        "baseline": 24,
+        "current": 24
+      },
+      "frames": {
+        "baseline": 0,
+        "current": 0
+      }
+    },
+    {
+      "scene": "hidden",
+      "handles_after": {
+        "baseline": 333,
+        "current": 333
+      },
+      "gdi_after": {
+        "baseline": 42,
+        "current": 42
+      },
+      "user_after": {
+        "baseline": 22,
+        "current": 22
+      },
+      "frames": {
+        "baseline": 0,
+        "current": 0
+      }
+    },
+    {
+      "scene": "windows",
+      "handles_after": {
+        "baseline": 339,
+        "current": 336
+      },
+      "gdi_after": {
+        "baseline": 71,
+        "current": 71
+      },
+      "user_after": {
+        "baseline": 76,
+        "current": 76
+      },
+      "frames": {
+        "baseline": 57,
+        "current": 56
+      }
+    }
+  ],
+  "needs_investigation": true,
+  "matched_startup_control": {
+    "old": {
+      "values_ms": [
+        666.0246,
+        711.1334,
+        818.0397
+      ],
+      "median_ms": 711.1334
+    },
+    "new": {
+      "values_ms": [
+        575.7306,
+        693.4035,
+        630.1194
+      ],
+      "median_ms": 630.1194
+    },
+    "threshold_ms": 152.01510000000007,
+    "new_startup_regression": false,
+    "method": "Existing unchanged --performance-test, paired old/new order; explicit same framework runtime/deps; preview fixtures only."
+  },
+  "unresolved_regression": false
+}

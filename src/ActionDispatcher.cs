@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 namespace LeoLauncher;
 
-sealed record ActionRequest(string Action,string Value="",string Source="ui");
+sealed record ActionRequest(string Action,string Value="",string Source="ui",string? RequestId=null,string? TraceId=null,DateTimeOffset? Deadline=null);
 sealed record ActionReceipt(DateTimeOffset Time,string Action,string Source,bool Success,string Message);
 interface ILeoModule
 {
@@ -20,27 +20,8 @@ static class ModuleCatalog
     public static readonly (string Id,string Name)[] Builtins=[("core","核心功能"),("terminal","管理员终端"),("clash","Clash Verge"),("music","QQ 音乐"),("football","足球"),("edge","Edge"),("media","统一媒体控制")];
     public static string Owner(string action)=>action.StartsWith("football_")||action=="match_add"?"football":action.StartsWith("music_")?"music":action.StartsWith("media_")?"media":action.StartsWith("proxy_")?"clash":action=="terminal_open"?"terminal":action is "web_search" or "web_open" or "watch_open"?"edge":"core";
 }
-sealed class ActionDispatcher:IDisposable
+sealed partial class ActionDispatcher:IDisposable
 {
-    readonly CancellationTokenSource lifetime=new();readonly CancellationToken lifetimeToken;bool disposed;
-    readonly Preferences prefs;readonly Func<string,string,CancellationToken,Task<string>> execute;
-    readonly Dictionary<string,Task<string>> pending=new();readonly Queue<ActionReceipt> receipts=new();readonly AsyncLocal<string[]?> ancestry=new();
-    readonly Dictionary<string,(string Module,CancellationTokenSource Source)> running=new();
-    public ExtensionStore Extensions{get;}
-    public IReadOnlyList<ActionReceipt> Receipts{get{lock(pending)return receipts.ToArray();}}
-    public ActionDispatcher(Preferences preferences,Func<string,string,CancellationToken,Task<string>> core,ExtensionStore? extensions=null){lifetimeToken=lifetime.Token;prefs=preferences;execute=core;Extensions=extensions??new ExtensionStore(Path.Combine(Store.Root,"modules"));}
-    public ILeoModule[] Modules=>ModuleCatalog.Builtins.Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>LeoLauncher.Modules.Enabled(prefs,m.Id),LeoActions.Names.Where(a=>ModuleCatalog.Owner(a)==m.Id).ToArray(),execute)).Concat((prefs.ApplicationModules??[]).Select(a=>(ILeoModule)new LocalApplicationModule(a,execute))).Concat(Extensions.Load().Select(m=>(ILeoModule)new ExtensionLeoModule(m,prefs,this))).ToArray();
-    public Task<string> ExecuteAsync(ActionRequest request,CancellationToken token=default)
-    {
-        token.ThrowIfCancellationRequested();if(request.Value.Length>16000)throw new ArgumentException("操作参数过长");string key=request.Action+"\n"+request.Value;if(ancestry.Value?.Contains(key)==true||ancestry.Value?.Length>12)throw new InvalidOperationException("检测到循环调用或过深的组合，请检查自定义步骤。");
-        TaskCompletionSource<string> completion;
-        lock(pending){if(disposed)throw new ObjectDisposedException(nameof(ActionDispatcher));if(pending.TryGetValue(key,out var running))return running.WaitAsync(token);completion=new(TaskCreationOptions.RunContinuationsAsynchronously);pending[key]=completion.Task;}
-        _=Run();return completion.Task;
-        async Task Run(){string statusId=ModuleCatalog.Owner(request.Action);long statusTicket=0;using var linked=CancellationTokenSource.CreateLinkedTokenSource(token,lifetimeToken);var previous=ancestry.Value;ancestry.Value=(previous??[]).Append(key).ToArray();try{var module=Modules.SingleOrDefault(m=>m.Actions.Contains(request.Action))??throw new ArgumentException("操作不存在，或对应扩展未安装");statusId=module.Id;lock(pending)running[key]=(module.Id,linked);statusTicket=ModuleActivity.Begin(statusId);string result=await module.ExecuteAsync(request,linked.Token);linked.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(statusId,statusTicket,ModuleState.Ready,result);Record(true,result);completion.TrySetResult(result);}catch(OperationCanceledException){ModuleActivity.Complete(statusId,statusTicket,ModuleState.Ready,"已取消，可重新操作。");Record(false,"已取消");completion.TrySetCanceled(token);}catch(Exception e){ModuleActivity.Complete(statusId,statusTicket,ModuleState.Failed,e.Message);Record(false,e.Message);completion.TrySetException(e);}finally{ancestry.Value=previous;lock(pending){pending.Remove(key);running.Remove(key);if(disposed&&pending.Count==0)lifetime.Dispose();}}}
-        void Record(bool success,string message){lock(pending){receipts.Enqueue(new(DateTimeOffset.Now,request.Action,request.Source,success,message));while(receipts.Count>60)receipts.Dequeue();}}
-    }
-    public void CancelDisabled(){var enabled=Modules.Where(m=>m.Enabled).Select(m=>m.Id).ToHashSet();CancellationTokenSource[] cancel;lock(pending)cancel=running.Values.Where(v=>!enabled.Contains(v.Module)).Select(v=>v.Source).ToArray();foreach(var source in cancel)try{source.Cancel();}catch(ObjectDisposedException){} }
-    public void Dispose(){lock(pending){if(disposed)return;disposed=true;lifetime.Cancel();if(pending.Count==0)lifetime.Dispose();}}
     public bool RecognizesExtension(string text)=>Extensions.Load().Any(m=>m.Commands.Any(c=>c.Title.Equals(text.Trim(),StringComparison.OrdinalIgnoreCase)||c.Phrases.Any(p=>p.Equals(text.Trim(),StringComparison.OrdinalIgnoreCase))));
     public async Task<string> ExecuteTextAsync(string text,string source,CancellationToken token=default)
     {

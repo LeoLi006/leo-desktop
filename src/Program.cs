@@ -210,6 +210,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--q2-capability-test"){Q2CapabilityTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--baseline-test"){BaselineProbe.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--baseline-runtime-test"){BaselineProbe.Run(args[1],true);return;}
         if(args.Length==2&&args[0]=="--baseline-companion-test"){BaselineProbe.Run(args[1],true,true);return;}
@@ -495,8 +496,9 @@ sealed partial class PetForm : Form
     readonly DragTransition dragTransition = new();
     readonly System.Windows.Forms.Timer fullscreenTimer = new() { Interval = 750 };
     bool hiddenForFullscreen;
-    public PetForm(Preferences p, bool preview = false, bool demo = false)
+    public PetForm(Preferences p, bool preview = false, bool demo = false,ApplicationCapabilityHost? applicationOverride=null,Action<string>? constructionProbe=null)
     {
+        constructionProbe?.Invoke("body_enter");
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
         PlannerPhrases.Configure(p.PlannerQuotes);prefs = p;p.EntryDisplayModes??=new();p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
@@ -511,9 +513,14 @@ sealed partial class PetForm : Form
         ClientSize = new Size(size, size * 208 / 192);
         var screen = Screen.PrimaryScreen!.WorkingArea;
         Location = p.X == -1 && p.Y == -1 ? new Point(screen.Right - Width - 36, screen.Bottom - Height - 36) : Clamp(new Point(p.X, p.Y));
-        commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null);
-        launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
+        constructionProbe?.Invoke("assets_and_window_ready");
+        var applicationHost=applicationOverride??new ApplicationCapabilityHost((app,token)=>{token.ThrowIfCancellationRequested();return Task.FromResult(!preview&&!File.Exists(app.Path)?RepairLocalApplication(app):app);},ApplicationCapabilityHost.StartProcess,app=>launcher?.RememberConfiguredLaunch(app),preview);
+        commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null,applicationHost);
+        constructionProbe?.Invoke("dispatcher_ready");
+        launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
+        commands.ApplicationAliases=launcher.ResolveApplicationRequest;
         if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}
+        constructionProbe?.Invoke("launcher_ready");
         foot = new FootTools(p.PetSize, preview);
         if(!preview)ConfigureClientActivity();
         foot.ManageShortcut=ManageQuickEntry;launcher.ManageShortcut=ManageQuickEntry;foot.ConfigureModules(prefs);
@@ -531,6 +538,7 @@ sealed partial class PetForm : Form
         menu.Items.Add("每日清单",null,(_,_)=>ShowTodos());
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
+        constructionProbe?.Invoke("input_surfaces_ready");
         WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
         PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{launcher.Hide();using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
         var quickNoteItem=new ToolStripMenuItem("一句话速记…");quickNoteItem.Click+=(_,_)=>ShowQuickNote();menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="清单与记录").DropDownItems.Insert(0,quickNoteItem);
@@ -562,6 +570,7 @@ sealed partial class PetForm : Form
             }
         };
         hit.MouseCaptureChanged+=(_,_)=>{if(!hit.Capture)CancelPetPress();};
+        constructionProbe?.Invoke("menus_ready");
         Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();if(!previewMode&&Store.LoadFailed)PresentFeedback(new("设置文件无法读取，已使用默认设置；损坏原文件仍保留。",true));else if(!previewMode&&AtomicJson.Recovered.Count>0)PresentFeedback(new("已从本地备份恢复数据，损坏原文件已保留。请核对最近的设置和记录。",Attention:true));};
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; if(!hit.Visible)hit.Show(this); PositionFoot(); if(!foot.Visible)foot.Show(this); };
         LocationChanged += (_, _) => OnDockLocationChanged();

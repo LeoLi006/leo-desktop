@@ -3,8 +3,19 @@ using System.Text.Json;
 namespace LeoLauncher;
 
 sealed record LocalApplication(string Id,string Name,string Path,bool Enabled=true,string Icon="",string Arguments="",string WorkingDirectory="",bool Administrator=false);
-sealed class LocalApplicationModule(LocalApplication app,Func<string,string,CancellationToken,Task<string>> execute):ILeoModule
-{public string Id=>"local:"+app.Id;public string Name=>app.Name;public string Version=>"1.0";public bool Enabled=>app.Enabled;public IReadOnlyList<string> Actions=>[Id];public Task<string> ExecuteAsync(ActionRequest request,CancellationToken token){if(!Enabled)throw new InvalidOperationException(Name+"已停用");return execute("local_app_open",app.Id,token);}}
+sealed class LocalApplicationModule:IStructuredLeoModule
+{
+    readonly LocalApplication app;readonly Func<string,string,CancellationToken,Task<string>> execute;readonly ApplicationCapabilityHost? host;readonly Func<LocalApplication?>? current;
+    LocalApplication configuration;
+    public LocalApplicationModule(LocalApplication app,Func<string,string,CancellationToken,Task<string>> execute,ApplicationCapabilityHost? host=null,Func<LocalApplication?>? current=null){this.app=app;this.execute=execute;this.host=host;this.current=current;configuration=app;}
+    public LocalApplication Configuration=>configuration;
+    public bool ConfigurationIsCurrent=>current==null||current()==configuration;
+    public CapabilityDefinition Describe(string action)=>new(action,Id,"application-adapter","application-id/v1","external","coalesce-inflight",15000);
+    public string FailureCode(Exception error)=>error is ArgumentException?"invalid_configuration":"launch_failed";
+    public string Id=>"local:"+app.Id;public string Name=>app.Name;public string Version=>"1.0";public bool Enabled=>current==null?app.Enabled:current()?.Enabled==true;public IReadOnlyList<string> Actions=>[Id];
+    public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest request,CancellationToken token){if(!Enabled)throw new InvalidOperationException(Name+"已停用");if(host!=null)return await host.Execute(app,current??(()=>app),token,a=>configuration=a);return new(await execute("local_app_open",app.Id,token));}
+    public async Task<string> ExecuteAsync(ActionRequest request,CancellationToken token)=>(await ExecuteStructuredAsync(request,token)).Message;
+}
 static class LocalPath
 {
     public static string Expand(string text)=>Environment.ExpandEnvironmentVariables(text.Trim().Trim('"'));

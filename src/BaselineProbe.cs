@@ -23,7 +23,7 @@ static class BaselineProbe
             if(runtime&&Directory.Exists(Path.Combine(Store.Root,"models")))throw new InvalidOperationException("Use clean build fixtures, never installed app data");
             if(runtime&&new[]{"leo-settings.json","leo-ai.json","leo-history.json","leo-todos.json","leo-notes.json"}.Any(name=>File.Exists(Path.Combine(Store.Root,name))))throw new InvalidOperationException("Runtime baseline requires clean fixture data");
             var prefs=new Preferences{SkinId="83",ApplicationIndexing=false,ContextAware=false,ClipboardHistory=false,AutoUpdateNotifications=false,HideInFullscreen=false,TerminalModule=!companion,ClashModule=!companion,MusicModule=!companion,FootballModule=!companion,EdgeModule=!companion,MediaModule=!companion,SearchHotkey=Keys.None,VoiceHotkey=Keys.None,LyricsHotkey=Keys.None,QuickNoteHotkey=Keys.None};
-            using var pet=new PetForm(prefs,!runtime);pet.Show();Application.DoEvents();double firstShow=startup.Elapsed.TotalMilliseconds;
+            var stages=new Dictionary<string,double>();using var pet=new PetForm(prefs,!runtime,constructionProbe:stage=>stages[stage]=startup.Elapsed.TotalMilliseconds);stages["constructed"]=startup.Elapsed.TotalMilliseconds;pet.Show();Application.DoEvents();double firstShow=startup.Elapsed.TotalMilliseconds;File.WriteAllText(report+".startup.json",JsonSerializer.Serialize(stages,Json));
             var samples=new List<object>();
             foreach(var scene in new[]{"idle","docked","hidden","windows"}){
                 pet.PrepareBaselineScene(scene,runtime);Pump(1200);process.Refresh();

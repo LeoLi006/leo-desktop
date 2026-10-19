@@ -11,6 +11,7 @@ sealed partial class LauncherForm : Form
     Action openFootball=null!;
     FlowLayoutPanel shortcutRow=null!;GlyphButton footballShortcut=null!;
     internal Func<string,string,CancellationToken,Task<string>>? ActionRequested;
+    internal Func<string,string,string,CancellationToken,Task<string>>? OriginActionRequested;
     readonly TextBox query = new();
     int selection;bool keyboardNavigation;
     Action? undoFavorite;
@@ -354,10 +355,41 @@ sealed partial class LauncherForm : Form
         var entries = VisibleEntries();
         if (selection >= 0 && selection < entries.Count) Launch(entries[selection]);
     }
+    LocalApplication? ConfiguredApplication(AppEntry app)=>(prefs.ApplicationModules??[]).LastOrDefault(a=>a.Enabled&&a.Path.Equals(app.Target,StringComparison.OrdinalIgnoreCase))??(prefs.ApplicationModules??[]).LastOrDefault(a=>a.Path.Equals(app.Target,StringComparison.OrdinalIgnoreCase));
+    internal ActionRequest ResolveApplicationRequest(ActionRequest request)
+    {
+        AppEntry? entry=null;
+        if(request.Action=="app_open")entry=FileApplications.Where(AppTools.Launchable).SingleOrDefault(a=>AppTools.Id(a)==request.Value);
+        if(request.Action=="app_open_name"){
+            var found=new AppTools(()=>FileApplications,LaunchFromAssistant,()=>prefs.Aliases).FindLocal(request.Value);
+            var exact=found.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(request.Value)).ToArray();
+            entry=exact.Length==1?exact[0]:found.Length==1?found[0]:null;
+        }
+        return entry!=null&&ConfiguredApplication(entry) is {} app?request with{Action="local:"+app.Id,Value=""}:request;
+    }
+    public async Task<string> LaunchFromAssistantAsync(AppEntry app,string source,CancellationToken token)
+    {
+        if(ConfiguredApplication(app) is {} module){
+            if(OriginActionRequested!=null)return await OriginActionRequested("local:"+module.Id,"",source,token);
+            if(ActionRequested!=null)return await ActionRequested("local:"+module.Id,"",token);
+            if(preview)return "示例模式，不启动应用。";
+            throw new InvalidOperationException("应用启动入口未连接，请从 Leo 打开。");
+        }
+        token.ThrowIfCancellationRequested();launchApplication(app);RememberApplication(app);return "已打开 "+app.Name;
+    }
     public void LaunchFromAssistant(AppEntry app)
     {
-        var module=(prefs.ApplicationModules??[]).FirstOrDefault(a=>a.Enabled&&a.Path.Equals(app.Target,StringComparison.OrdinalIgnoreCase));if(module!=null&&!preview){if(!File.Exists(module.Path)&&RepairApplication!=null)module=RepairApplication(module);Process.Start(LocalApplications.Start(module));}else launchApplication(app);
-        if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
+        if(ConfiguredApplication(app)!=null){_=LaunchConfigured();return;}
+        launchApplication(app);RememberApplication(app);
+        async Task LaunchConfigured(){try{await LaunchFromAssistantAsync(app,"ui",CancellationToken.None);}catch(OperationCanceledException){}catch(Exception e){OperationFeedback.Error(e.Message);}}
+    }
+    void RememberApplication(AppEntry app){if(prefs.RememberHistory)memory.Record(app,activationContext,DateTimeOffset.UtcNow);}
+    internal void RememberConfiguredLaunch(LocalApplication app)
+    {
+        if(IsDisposed||Disposing)return;
+        if(InvokeRequired){BeginInvoke((Action)(()=>RememberConfiguredLaunch(app)));return;}
+        if(!(prefs.ApplicationModules??[]).Contains(app)||!app.Enabled)return;
+        RememberApplication(new AppEntry(app.Name,app.Path,"自定义应用",app.Path));
     }
     public bool VerifyMusicEntry(){if(!Visible)Show();var icon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public void ReloadImportedConfiguration(){FootballFollowing.Current.Reload();football?.Close();football=null;RefreshModules();Filter();}
@@ -375,6 +407,7 @@ sealed partial class LauncherForm : Form
             if (app.Target == ClipboardTool.Target) ClipboardTool.Open(clipboard); else launchApplication(app);
             if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
         }
+        catch(OperationCanceledException){}
         catch (Exception e) { MessageBox.Show("无法打开 " + app.Name + "：" + e.Message, "Leo"); }
     }
     void RememberFavoriteUndo(){pendingFavorites=prefs.Favorites.ToList();pendingAliases=prefs.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());}
