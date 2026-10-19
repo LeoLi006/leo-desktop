@@ -9,6 +9,7 @@ sealed class KitTexture
     readonly Bitmap image;
     readonly byte[] pixels;readonly int width,height,stride;
     KitTexture(string name):this(ReadTexture(name)){}
+    internal static string? SourcePath(string skin){var name=AnimationSkin.Name(skin);return name==null?null:name.StartsWith("custom:")?SkinLibrary.TexturePath(name):Path.Combine(Store.Root,"assets","MatchDay","Kits",name+"-2024.png");}
     static Bitmap ReadTexture(string name){using var source=new Bitmap(name.StartsWith("custom:")?SkinLibrary.TexturePath(name):Path.Combine(Store.Root,"assets","MatchDay","Kits",name+"-2024.png"));var image=new Bitmap(source.Width,source.Height,PixelFormat.Format32bppArgb);using var g=Graphics.FromImage(image);g.DrawImageUnscaled(source,0,0);return image;}
     KitTexture(Bitmap prepared)
     {

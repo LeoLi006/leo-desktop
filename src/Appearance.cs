@@ -80,6 +80,7 @@ sealed class GlyphButton : Button
             using var shape = Appearance.Path(ClientRectangle, Math.Min(9, Height / 2));
             using var brush = new LinearGradientBrush(ClientRectangle, Appearance.Blue, Appearance.Red, 20f); e.Graphics.FillPath(brush, shape);
         }
+        if(Image!=null){e.Graphics.InterpolationMode=InterpolationMode.HighQualityBicubic;int side=Math.Min(Width-6,Height-4);e.Graphics.DrawImage(Image,new Rectangle((Width-side)/2,(Height-side)/2,side,side));return;}
         e.Graphics.ScaleTransform(Width / 28f, Height / 24f);
         using var pen = new Pen(IconColor, 1.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         if (glyph == "chat")
@@ -88,6 +89,7 @@ sealed class GlyphButton : Button
             e.Graphics.DrawLines(pen, new[] { new PointF(9, 17), new PointF(8, 21), new PointF(14, 17) });
             e.Graphics.DrawLine(pen, 9, 9, 19, 9); e.Graphics.DrawLine(pen, 9, 13, 16, 13);
         }
+        else if(glyph=="play"){e.Graphics.DrawRectangle(pen,4,3,20,17);e.Graphics.DrawPolygon(pen,new[]{new PointF(12,7),new PointF(18,11),new PointF(12,15)});}
         else if(glyph=="more"){e.Graphics.DrawLines(pen,ActiveState==true?new[]{new PointF(8,14),new PointF(14,8),new PointF(20,14)}:new[]{new PointF(8,9),new PointF(14,15),new PointF(20,9)});}
         else if(glyph=="todo"){e.Graphics.DrawRectangle(pen,6,3,16,18);for(int y=7;y<=17;y+=5){e.Graphics.DrawLines(pen,new[]{new PointF(9,y),new PointF(10,y+1),new PointF(12,y-1)});e.Graphics.DrawLine(pen,15,y,19,y);}}
         else if(glyph=="music"){e.Graphics.DrawLines(pen,new[]{new PointF(11,17),new PointF(11,5),new PointF(21,3),new PointF(21,15)});e.Graphics.DrawLine(pen,11,9,21,7);e.Graphics.DrawEllipse(pen,6,15,5,4);e.Graphics.DrawEllipse(pen,16,13,5,4);}

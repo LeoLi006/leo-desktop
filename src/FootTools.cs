@@ -11,7 +11,7 @@ sealed class FootTools : Form
     int CompactUnits=>94;
     int UtilityUnits=>4+30*((modules.TerminalModule?1:0)+(modules.ClashModule?1:0)+(modules.EdgeModule?1:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
-    public void ConfigureModules(Preferences p){modules=p;if(UtilityUnits==4)utilitiesOpen=false;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
+    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(p.ModuleIcons?.GetValueOrDefault(pair.Item1));old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
     Font? scaledFont;
     int S(int value) => Math.Max(1, (int)Math.Round(value * uiScale));
@@ -123,7 +123,7 @@ sealed class FootTools : Form
         ApplyScale(petSize);
         Shown += (_, _) => { SetExpanded(false); RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
-        Disposed += (_, _) => { proxyTimer.Dispose(); tip.Dispose(); scaledFont?.Dispose(); };
+        Disposed += (_, _) => { proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
     }
     void SetExpanded(bool value)
     {

@@ -28,7 +28,7 @@ sealed class ActionDispatcher:IDisposable
     public ExtensionStore Extensions{get;}
     public IReadOnlyList<ActionReceipt> Receipts{get{lock(pending)return receipts.ToArray();}}
     public ActionDispatcher(Preferences preferences,Func<string,string,CancellationToken,Task<string>> core,ExtensionStore? extensions=null){lifetimeToken=lifetime.Token;prefs=preferences;execute=core;Extensions=extensions??new ExtensionStore(Path.Combine(Store.Root,"modules"));}
-    public ILeoModule[] Modules=>ModuleCatalog.Builtins.Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>LeoLauncher.Modules.Enabled(prefs,m.Id),LeoActions.Names.Where(a=>ModuleCatalog.Owner(a)==m.Id).ToArray(),execute)).Concat(Extensions.Load().Select(m=>(ILeoModule)new ExtensionLeoModule(m,prefs,this))).ToArray();
+    public ILeoModule[] Modules=>ModuleCatalog.Builtins.Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>LeoLauncher.Modules.Enabled(prefs,m.Id),LeoActions.Names.Where(a=>ModuleCatalog.Owner(a)==m.Id).ToArray(),execute)).Concat((prefs.ApplicationModules??[]).Select(a=>(ILeoModule)new LocalApplicationModule(a,execute))).Concat(Extensions.Load().Select(m=>(ILeoModule)new ExtensionLeoModule(m,prefs,this))).ToArray();
     public Task<string> ExecuteAsync(ActionRequest request,CancellationToken token=default)
     {
         token.ThrowIfCancellationRequested();if(request.Value.Length>16000)throw new ArgumentException("操作参数过长");string key=request.Action+"\n"+request.Value;if(ancestry.Value?.Contains(key)==true||ancestry.Value?.Length>12)throw new InvalidOperationException("检测到循环调用或过深的组合，请检查自定义步骤。");
@@ -42,7 +42,7 @@ sealed class ActionDispatcher:IDisposable
     public bool RecognizesExtension(string text)=>Extensions.Load().Any(m=>m.Commands.Any(c=>c.Title.Equals(text.Trim(),StringComparison.OrdinalIgnoreCase)||c.Phrases.Any(p=>p.Equals(text.Trim(),StringComparison.OrdinalIgnoreCase))));
     public async Task<string> ExecuteTextAsync(string text,string source,CancellationToken token=default)
     {
-        text=text.Trim();if(text.StartsWith("ext:"))return await ExecuteAsync(new(text,"",source),token);
+        text=text.Trim();if(LocalPath.LooksLike(text))return await ExecuteAsync(new("path_open",text,source),token);if(text.StartsWith("ext:"))return await ExecuteAsync(new(text,"",source),token);
         var intent=QuickRouter.Route(text);var action=CommandTranslation.From(intent,source);if(action!=null)return await ExecuteAsync(action,token);
         var matches=Extensions.Load().SelectMany(m=>m.Commands.Select(c=>(Module:m,Command:c))).Where(x=>x.Command.Title.Equals(text.Trim(),StringComparison.OrdinalIgnoreCase)||x.Command.Phrases.Any(p=>p.Equals(text.Trim(),StringComparison.OrdinalIgnoreCase))).ToArray();if(matches.Length>1)throw new ArgumentException("有多个扩展使用同一口令，请修改扩展口令后重试。");var extension=matches.FirstOrDefault();
         if(extension.Module!=null)return await ExecuteAsync(new("ext:"+extension.Module.Id+":"+extension.Command.Id,"",source),token);

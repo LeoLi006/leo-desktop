@@ -17,7 +17,7 @@ static class ModulePaths
     public static string? Selected(string id)
     {
         if(!current.TryGetValue(id,out var path)||string.IsNullOrWhiteSpace(path))return null;
-        try{return Validate(id,path);}catch{throw new InvalidOperationException("手动指定的软件路径已失效，请在设置 → 功能 → 软件路径中重新选择。");}
+        try{return Validate(id,path);}catch{throw new InvalidOperationException("手动指定的软件路径已失效，请在设置 → 功能 → 应用模块与图标中重新选择。");}
     }
 }
 

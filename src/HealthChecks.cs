@@ -43,9 +43,10 @@ sealed class ModulesView:Panel
     readonly Dictionary<string,CheckBox> fields=new();
     public readonly CheckBox Docking;
     Dictionary<string,string> selectedPaths;
+    List<LocalApplication> applicationModules;Dictionary<string,string> moduleIcons;
     public ModulesView(Preferences p,bool preview=false)
     {
-        selectedPaths=new(p.ModuleExecutables);
+        selectedPaths=new(p.ModuleExecutables);applicationModules=(p.ApplicationModules??[]).ToList();moduleIcons=new(p.ModuleIcons??new());
         Dock=DockStyle.Fill;AutoScroll=true;AutoScrollMinSize=new Size(0,535);
         Controls.Add(new Label{Text="按需开启 · 图标、菜单与后台检查同步变化",Bounds=new Rectangle(8,10,550,30),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});
         int y=50;
@@ -54,10 +55,10 @@ sealed class ModulesView:Panel
         }
         Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,410,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
         var extensions=new BarcaButton{Text="管理扩展模块…",Bounds=new Rectangle(10,455,230,32)};extensions.Click+=(_,_)=>{using var manager=new ExtensionManager(p,preview);manager.ShowDialog(FindForm());};Controls.Add(extensions);
-        var paths=new BarcaButton{Text="软件路径…",Bounds=new Rectangle(365,410,180,32)};paths.Click+=(_,_)=>EditPaths(FindForm());Controls.Add(paths);
+        var paths=new BarcaButton{Text="应用模块与图标…",Bounds=new Rectangle(365,410,180,32)};paths.Click+=(_,_)=>EditPaths(FindForm());Controls.Add(paths);
         Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,503,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
     }
-    public bool EditPaths(IWin32Window? owner){using var dialog=new ModulePathsForm(selectedPaths);if(dialog.ShowDialog(owner)!=DialogResult.OK)return false;selectedPaths=dialog.Paths;return true;}
+    public bool EditPaths(IWin32Window? owner){var draft=new Preferences();Apply(draft,false);using var dialog=new LocalApplicationsForm(draft);if(dialog.ShowDialog(owner)!=DialogResult.OK)return false;selectedPaths=new(draft.ModuleExecutables);applicationModules=draft.ApplicationModules.ToList();moduleIcons=new(draft.ModuleIcons);foreach(var pair in fields)pair.Value.Checked=Modules.Enabled(draft,pair.Key);return true;}
     public Dictionary<string,string> Paths=>selectedPaths.ToDictionary();
-    public void Apply(Preferences next){next.MediaModule=fields["media"].Checked;next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.FootballModule=fields["football"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
+    public void Apply(Preferences next,bool validatePaths=true){next.ApplicationModules=applicationModules.ToList();next.ModuleIcons=new(moduleIcons);next.MediaModule=fields["media"].Checked;next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.FootballModule=fields["football"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(validatePaths&&Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}
 }

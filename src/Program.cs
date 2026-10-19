@@ -11,6 +11,8 @@ record AppEntry(string Name, string Target, string Hint = "应用", string ExePa
 sealed class Preferences
 {
     public Dictionary<string,string> ModuleExecutables {get;set;}=new();
+    public List<LocalApplication> ApplicationModules {get;set;}=[];
+    public Dictionary<string,string> ModuleIcons {get;set;}=new();
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
     public int PetSize { get; set; } = 130;
@@ -193,6 +195,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--platform52-test"){Platform52Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--package-smoke-test"){try{var checks=PackageSmokeTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--package-verify"){try{var release=LeoInstaller.Verify(AppContext.BaseDirectory);bool selfContained=new[]{typeof(object).Assembly.Location,typeof(Form).Assembly.Location}.All(p=>p.StartsWith(AppContext.BaseDirectory,StringComparison.OrdinalIgnoreCase));File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=selfContained,version=release.Version,files=release.Files.Count,self_contained=selfContained}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.Message}));Environment.ExitCode=1;}return;}
         if(args.Length>=1&&args[0]=="--install-wizard"){string? target=args.Length==3&&args[1]=="--target"?args[2]:null;Application.Run(new InstallForm(target));return;}

@@ -6,7 +6,7 @@ sealed record ThemeOptions(string? Accent=null,int Brightness=100,int CornerRadi
 {
     public void Validate(){if(Accent!=null&&!Regex.IsMatch(Accent,@"^#[0-9a-fA-F]{6}$")||Brightness is <70 or >130||CornerRadius is <0 or >24||Opacity is <70 or >100)throw new ArgumentException("主题参数无效：明暗70～130、圆角0～24、透明度70～100。");}
 }
-sealed record CustomSkin(string Id,string Name,string BaseTheme,string Format="LeoJersey/1");
+sealed record CustomSkin(string Id,string Name,string BaseTheme,string Format="LeoJersey/1",bool OriginalKit=false);
 static class SkinLibrary
 {
     internal static string Root{get;set;}=Path.Combine(Store.Root,"skins");
@@ -20,6 +20,11 @@ static class SkinLibrary
         name=UiTheme.ValidateName(name);if(!SkinSelection.Options.Any(o=>o.Id==baseTheme))throw new ArgumentException("请选择内置球队作为界面基础主题");if(new FileInfo(source).Length>10_000_000)throw new ArgumentException("球衣PNG最多10MB");
         using var stream=File.OpenRead(source);using var image=Image.FromStream(stream);if(image.RawFormat.Guid!=ImageFormat.Png.Guid||image.Width!=1024||image.Height!=1024)throw new ArgumentException("请使用1024×1024像素的PNG球衣纹样，其他尺寸请先按模板制作。");
         using var clean=new Bitmap(1024,1024,PixelFormat.Format32bppArgb);using(var g=Graphics.FromImage(clean)){g.Clear(Color.White);g.DrawImageUnscaled(image,0,0);}var skin=new CustomSkin("custom:"+Guid.NewGuid().ToString("N"),name,baseTheme);string folder=Folder(skin.Id);Directory.CreateDirectory(folder);cacheKey="";try{clean.Save(Path.Combine(folder,"jersey.png"),ImageFormat.Png);ConfigMigration.Write(Path.Combine(folder,"skin.json"),JsonSerializer.Serialize(skin));return skin;}catch{Directory.Delete(folder,true);throw;}
+    }
+    public static CustomSkin Duplicate(string id,string name)
+    {
+        var custom=Find(id);string basis=custom?.BaseTheme??id;string? source=custom!=null?TexturePath(id):KitTexture.SourcePath(basis);
+        using var image=source!=null&&File.Exists(source)?Image.FromFile(source):null;using var scaled=new Bitmap(1024,1024);using(var g=Graphics.FromImage(scaled)){if(image!=null)g.DrawImage(image,0,0,1024,1024);else{g.Clear(Color.FromArgb(24,48,113));using var red=new SolidBrush(Color.FromArgb(160,28,54));for(int x=0;x<1024;x+=256)g.FillRectangle(red,x,0,128,1024);}}string temp=Path.Combine(Path.GetTempPath(),Guid.NewGuid()+".png");try{scaled.Save(temp,ImageFormat.Png);var added=Import(temp,name,basis);if(id=="83"||custom?.OriginalKit==true){added=added with{OriginalKit=true};ConfigMigration.Write(Path.Combine(Folder(added.Id),"skin.json"),JsonSerializer.Serialize(added));cacheKey="";}return added;}finally{File.Delete(temp);}
     }
     public static void Remove(string id){string folder=Folder(id);if(Directory.Exists(folder)){if(File.GetAttributes(folder).HasFlag(FileAttributes.ReparsePoint))throw new IOException("不支持链接目录");Directory.Delete(folder,true);cacheKey="";}}
     public static void ExportTemplate(string path)

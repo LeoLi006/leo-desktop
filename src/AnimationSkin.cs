@@ -8,7 +8,7 @@ sealed class AnimationSkin:IDisposable
     public readonly string NameOfKit;
     public readonly DockSprites Dock;
     public readonly DockBridge Bridge;
-    public static string? Name(string? id)=>id switch{"382"=>"city","20232"=>"miami","202"=>"argentina","164"=>"spain",_=>SkinLibrary.Find(id)?.Id};
+    public static string? Name(string? id)=>id switch{"382"=>"city","20232"=>"miami","202"=>"argentina","164"=>"spain",_=>SkinLibrary.Find(id) is {} custom&&!custom.OriginalKit?custom.Id:null};
     public AnimationSkin(string name)
     {
         NameOfKit=name;KitTexture.Load(name);string root=Path.Combine(Store.Root,"assets");

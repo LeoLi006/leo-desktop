@@ -6,6 +6,7 @@ sealed partial class LauncherForm : Form
     internal Func<string,CancellationToken,Task<string>>? CommandRequested;
     internal Func<string,bool>? RecognizesCommand;
     internal Action? MediaRequested;
+    FlowLayoutPanel shortcutRow=null!;GlyphButton footballShortcut=null!;
     internal Func<string,string,CancellationToken,Task<string>>? ActionRequested;
     readonly TextBox query = new();
     int selection;bool keyboardNavigation;
@@ -32,7 +33,7 @@ sealed partial class LauncherForm : Form
     public bool VerifyFootballEntry()
     {
         if (!Visible) Show();
-        var button = Controls.OfType<GlyphButton>().Single(x => x.AccessibleName == "足球赛程");
+        var button = shortcutRow.Controls.OfType<GlyphButton>().Single(x => x.AccessibleName == "足球赛程");
         button.PerformClick(); Application.DoEvents();
         bool ok = football != null && football.Visible && football.Owner == null && !football.TopMost
             && (PetBounds == null || !football.Bounds.IntersectsWith(PetBounds!()));
@@ -40,7 +41,8 @@ sealed partial class LauncherForm : Form
     }
     string lastExternal = "", lastObservedIdentity = "", activationContext = "";
     public bool IsIndexing => loading;
-    public IEnumerable<AppEntry> FileApplications => apps;
+    IEnumerable<AppEntry> AllApplications=>apps.Concat((prefs.ApplicationModules??[]).Where(a=>a.Enabled).Select(a=>new AppEntry(a.Name,a.Path,"自定义应用",a.Path))).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
+    public IEnumerable<AppEntry> FileApplications => AllApplications;
     public bool HasTextInput => Visible && query.Focused && !string.IsNullOrWhiteSpace(query.Text);
     public void PreviewTyping(string text) { query.Text = text; query.Focus(); }
     public bool VerifyTwoRows()
@@ -119,9 +121,10 @@ sealed partial class LauncherForm : Form
             Hide();
             football.Show(); football.Activate();
         };
-        Controls.Add(footballButton);
-        var musicButton=new GlyphButton("music"){Bounds=new Rectangle(102,7,28,24),AccessibleName="QQ音乐点歌",FlatStyle=FlatStyle.Flat,Visible=prefs.MusicModule};musicButton.FlatAppearance.BorderSize=0;musicButton.Click+=(_,_)=>OpenMusicFromAssistant();Controls.Add(musicButton);
-        void BrandLayout(){brand.Width=Math.Clamp(TextRenderer.MeasureText(brand.Text,brand.Font).Width+6,43,270);footballButton.Left=brand.Right+4;musicButton.Left=footballButton.Right+5;}brand.TextChanged+=(_,_)=>BrandLayout();BrandLayout();
+        var shortcutViewport=new Panel{Bounds=new Rectangle(69,3,308,31)};shortcutRow=new FlowLayoutPanel{Bounds=new Rectangle(0,0,308,52),WrapContents=false,AutoScroll=true,FlowDirection=FlowDirection.LeftToRight};shortcutViewport.Controls.Add(shortcutRow);Controls.Add(shortcutViewport);footballShortcut=footballButton;
+        shortcutRow.MouseWheel+=(_,e)=>{shortcutRow.AutoScrollPosition=new Point(Math.Max(0,-shortcutRow.AutoScrollPosition.X-e.Delta/3),0);};
+        void BrandLayout(){brand.Width=Math.Clamp(TextRenderer.MeasureText(brand.Text,brand.Font).Width+6,43,190);shortcutViewport.Left=brand.Right+4;shortcutViewport.Width=Math.Max(120,377-shortcutViewport.Left);shortcutRow.Width=shortcutViewport.Width;}brand.TextChanged+=(_,_)=>BrandLayout();BrandLayout();
+        RefreshShortcuts();
         var size = new MsnSlider { Value = Math.Clamp(p.PetSize, 80, 230) };
         size.AutoSize = false; size.SetBounds(390, 6, 145, 28);
         size.AccessibleName = "Leo 大小";
@@ -132,7 +135,7 @@ sealed partial class LauncherForm : Form
         Controls.Add(size);
         AddButton("×", 548, 6, 30, Hide);
         var field = new SoftPanel { Bounds = new Rectangle(16, 38, 568, 32) }; Appearance.Round(field, 11); Controls.Add(field);
-        query.SetBounds(38, 5, 520, 24); query.PlaceholderText = "搜索应用，或输入指令（例如：开启系统代理）";
+        query.SetBounds(38, 5, 520, 24); query.PlaceholderText = "搜索应用、文件路径或指令";
         query.BorderStyle = BorderStyle.None; query.Font = Appearance.Body(10.5f);
         query.BackColor = Appearance.Field; query.ForeColor = Appearance.Ink; field.Controls.Add(query);
         recent.SetBounds(18, 76, 564, 166); recent.WrapContents = true; Controls.Add(recent);
@@ -164,6 +167,7 @@ sealed partial class LauncherForm : Form
             if (e.KeyCode == Keys.Escape) { Hide(); e.SuppressKeyPress = true; }
         };
         Deactivate += (_, _) => { if (!preview) ProcessDeactivation(PointerOverPet?.Invoke() == true); };
+        Disposed+=(_,_)=>{shortcutTips.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
         observer.Tick += (_, _) => Observe();
         LoadCatalog();
     }
@@ -222,8 +226,8 @@ sealed partial class LauncherForm : Form
         lastExternal = match?.Name ?? active.Process;
         if (match != null && prefs.RememberHistory) memory.Record(match, previous, DateTimeOffset.UtcNow);
     }
-    public void RefreshModules(){foreach(var icon in Controls.OfType<GlyphButton>())if(icon.AccessibleName=="足球赛程")icon.Visible=prefs.FootballModule;
-        if(!prefs.FootballModule){football?.Close();football=null;}foreach(var icon in Controls.OfType<GlyphButton>())if(icon.AccessibleName=="QQ音乐点歌")icon.Visible=prefs.MusicModule;
+    public void RefreshModules(){RefreshShortcuts();
+        if(!prefs.FootballModule){football?.Close();football=null;}
         if(!prefs.MusicModule){music?.Close();music=null;}
         music?.ConfigureMedia(prefs.MediaModule);if(football!=null)SetWatchVisibility(football);
     }
@@ -316,7 +320,7 @@ sealed partial class LauncherForm : Form
     {
         filteredQuery = query.Text;
         var source = prefs.RememberHistory ? memory : new Memory(null);
-        filtered = source.Search(apps, query.Text, activationContext, DateTimeOffset.UtcNow, prefs.ContextAware, prefs.Aliases);
+        filtered = source.Search(AllApplications.ToList(), query.Text, activationContext, DateTimeOffset.UtcNow, prefs.ContextAware, prefs.Aliases);
         if (!string.IsNullOrWhiteSpace(query.Text) && ClipboardTool.Matches(query.Text) && !filtered.Any(x => x.Target == ClipboardTool.Target)) filtered.Insert(0, ClipboardTool.Entry);
         filtered = filtered.Take(14).ToList();
         selection = 0;
@@ -326,11 +330,11 @@ sealed partial class LauncherForm : Form
         ClientSize = new Size(600, status.Visible ? 276 : 248);
     }
     List<AppEntry> VisibleEntries() => string.IsNullOrWhiteSpace(query.Text)
-        ? FavoriteOrder.Merge(apps, prefs.Favorites, prefs.RememberHistory ? memory.Recent(apps) : new List<AppEntry>())
+        ? FavoriteOrder.Merge(AllApplications.ToList(), prefs.Favorites, prefs.RememberHistory ? memory.Recent(AllApplications.ToList()) : new List<AppEntry>())
         : filtered;
 
     bool CanRunCommand(string text)=>IsCommand(text)||RecognizesCommand?.Invoke(text.Trim())==true;
-    internal static bool IsCommand(string text)=>text.StartsWith(":")||text.StartsWith("：")||QuickRouter.Route(text).Kind is not(QuickKind.Ai or QuickKind.SearchApp)||NaturalTodo.Parse(text,DateTime.Now,DateOnly.FromDateTime(DateTime.Today))!=null;
+    internal static bool IsCommand(string text)=>LocalPath.LooksLike(text)||text.StartsWith(":")||text.StartsWith("：")||QuickRouter.Route(text).Kind is not(QuickKind.Ai or QuickKind.SearchApp)||NaturalTodo.Parse(text,DateTime.Now,DateOnly.FromDateTime(DateTime.Today))!=null;
     async Task RunCommand(){var text=query.Text.Trim().TrimStart(':','：').Trim();try{query.Enabled=false;var result=await CommandRequested!(text,CancellationToken.None);if(!IsDisposed){query.Clear();Hide();OperationFeedback.Show(result);}}catch(Exception e){if(!IsDisposed){status.Visible=true;status.Text=e.Message;ClientSize=new Size(600,280);}}finally{if(!IsDisposed){query.Enabled=true;query.Focus();}}}
     void LaunchSelected()
     {
@@ -342,11 +346,11 @@ sealed partial class LauncherForm : Form
         launchApplication(app);
         if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
     }
-    public bool VerifyMusicEntry(){if(!Visible)Show();var icon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
+    public bool VerifyMusicEntry(){if(!Visible)Show();var icon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public void ReloadImportedConfiguration(){FootballFollowing.Current.Reload();football?.Close();football=null;RefreshModules();Filter();}
     public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview){MediaRequested=()=>MediaRequested?.Invoke()};music.ConfigureMedia(prefs.MediaModule);return music;}
     public MusicForm OpenMusicFromAssistant(string query=""){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview){MediaRequested=()=>MediaRequested?.Invoke()};if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);music.ConfigureMedia(prefs.MediaModule);return music;}
-    public void OpenFootballFromAssistant(){Modules.Require(prefs,"football");var button=Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
+    public void OpenFootballFromAssistant(){Modules.Require(prefs,"football");var button=shortcutRow.Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
     public string PinClipboardText(string text){if(clipboard==null)throw new InvalidOperationException("剪贴板尚未就绪");if(string.IsNullOrWhiteSpace(text)||text.Length>100000)throw new ArgumentException("文字为空或过长");var item=new ClipItem("text",text,text.Replace('\n',' ')[..Math.Min(100,text.Length)],DateTimeOffset.Now);clipboard.History.Add(item);if(!clipboard.History.Pin(item,true))throw new InvalidOperationException("剪贴板收藏已达上限");if(clipboard.History.Error!=null)throw new IOException(clipboard.History.Error);return "已收藏这段文字到剪贴板。";}
     public void OpenClipboardFromAssistant(){Hide();ClipboardTool.Open(clipboard);if(prefs.RememberHistory)memory.Record(ClipboardTool.Entry,activationContext,DateTimeOffset.UtcNow);}
     async void Launch(AppEntry app)
