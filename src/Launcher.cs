@@ -22,7 +22,9 @@ sealed partial class LauncherForm : Form
     readonly TodoStore tasks;
     readonly Action resizePet;
     readonly Action<AppEntry> launchApplication;
-    readonly ClipboardHistoryService? clipboard;
+    readonly ClipboardHistoryService clipboard;
+    internal ClipboardHistoryService ClipboardService=>clipboard;
+    internal MusicClient? SharedMusicClient;internal ClipboardClient? SharedClipboardClient;Form? clipboardWindow;
     bool menuOpen, sorting;
     const string SortFormat = "LeoFavoriteTarget";
     readonly AppIcons icons = new();
@@ -155,7 +157,7 @@ sealed partial class LauncherForm : Form
         };
         // Error messages only; no instructional footer.
         status.SetBounds(22, 248, 556, 24); status.ForeColor = Color.LightSalmon; status.Visible = false; Controls.Add(status);
-        if (!preview) clipboard = new ClipboardHistoryService(prefs);
+        clipboard = new ClipboardHistoryService(prefs,preview);
         FeatureFaults.Timer(debounce,"应用搜索",()=>{debounce.Stop();Filter();});
         query.TextChanged += (_, _) => { keyboardNavigation=false;pathLookup?.Cancel();pathChoices.Items.Clear();debounce.Stop(); debounce.Start(); };
         InitializePathCompletion();
@@ -393,11 +395,15 @@ sealed partial class LauncherForm : Form
     }
     public bool VerifyMusicEntry(){if(!Visible)Show();var icon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public void ReloadImportedConfiguration(){FootballFollowing.Current.Reload();football?.Close();football=null;RefreshModules();Filter();}
-    public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview){MediaRequested=()=>MediaRequested?.Invoke()};music.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));return music;}
-    public MusicForm OpenMusicFromAssistant(string query=""){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview){MediaRequested=()=>MediaRequested?.Invoke()};if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);music.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));return music;}
+    public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview,shared:SharedMusicClient){MediaRequested=()=>MediaRequested?.Invoke()};music.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));return music;}
+    public MusicForm OpenMusicFromAssistant(string query=""){var form=MusicWithoutOpening();if(SharedMusicClient!=null){_ = OpenRegisteredMusic(query);}else OpenMusicCore(query);return form;}
+    async Task OpenRegisteredMusic(string query){try{await SharedMusicClient!.Run("music_open",query);}catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed)OperationFeedback.Error(e.Message);}}
+    internal void OpenMusicCore(string query=""){var form=MusicWithoutOpening();if(!form.Visible)WindowPositions.Prepare(form,"music",PetBounds?.Invoke()??Bounds,preview);form.OpenQuery(query);}
     public void OpenFootballFromAssistant(){Modules.Require(prefs,"football");openFootball();}
-    public string PinClipboardText(string text){if(clipboard==null)throw new InvalidOperationException("剪贴板尚未就绪");if(string.IsNullOrWhiteSpace(text)||text.Length>100000)throw new ArgumentException("文字为空或过长");var item=new ClipItem("text",text,text.Replace('\n',' ')[..Math.Min(100,text.Length)],DateTimeOffset.Now);clipboard.History.Add(item);if(!clipboard.History.Pin(item,true))throw new InvalidOperationException("剪贴板收藏已达上限");if(clipboard.History.Error!=null)throw new IOException(clipboard.History.Error);return "已收藏这段文字到剪贴板。";}
-    public void OpenClipboardFromAssistant(){Hide();ClipboardTool.Open(clipboard);if(prefs.RememberHistory)memory.Record(ClipboardTool.Entry,activationContext,DateTimeOffset.UtcNow);}
+    public string PinClipboardText(string text){if(SharedClipboardClient==null)throw new InvalidOperationException("剪贴板能力尚未就绪");SharedClipboardClient.Execute("clipboard_pin_text",text);return "已收藏这段文字到剪贴板。";}
+
+    public void OpenClipboardFromAssistant(){if(SharedClipboardClient!=null){SharedClipboardClient.Execute("clipboard_open");return;}OpenClipboardCore();}
+    internal void OpenClipboardCore(){Hide();if(clipboardWindow is {IsDisposed:false}){WindowInteraction.Show(clipboardWindow);return;}clipboardWindow=ClipboardTool.Open(clipboard,SharedClipboardClient);if(prefs.RememberHistory)memory.Record(ClipboardTool.Entry,activationContext,DateTimeOffset.UtcNow);}
     async void Launch(AppEntry app)
     {
         Hide();
@@ -428,7 +434,7 @@ sealed partial class LauncherForm : Form
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { CancelCatalog();music?.Dispose();football?.Dispose(); observer.Dispose(); debounce.Dispose(); icons.Dispose(); clipboard?.Dispose(); }
+        if (disposing) { CancelCatalog();clipboardWindow?.Dispose();music?.Dispose();football?.Dispose(); observer.Dispose(); debounce.Dispose(); icons.Dispose(); clipboard?.Dispose(); }
         base.Dispose(disposing);
     }
 }

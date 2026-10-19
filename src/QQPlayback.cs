@@ -32,19 +32,19 @@ try {
 } catch {@{ok=$false;message=$_.Exception.Message}|ConvertTo-Json -Compress;exit 1}
 """;
     public static Task<string> ToggleAsync()=>SetPausedAsync(null);
-    public static Task<string> SetPausedAsync(bool? paused)=>ClientOperations.Hub.Run("music",paused?.ToString()??"pause-toggle",async op=>{if(paused==true&&!QQNative.Ready)return "QQ音乐未运行，无需暂停";await QQNative.EnsureReadyAsync(op.Token,op.Report);op.Report("正在读取 QQ音乐播放状态…");return await SetPausedCoreAsync(paused,op.Token);});
-    static async Task<string> SetPausedCoreAsync(bool? paused,CancellationToken token)
+    public static Task<string> SetPausedAsync(bool? paused)=>ClientOperations.Hub.Run("music",paused?.ToString()??"pause-toggle",async op=>{if(paused==true&&!QQNative.Ready)return "QQ音乐未运行，无需暂停";await QQNative.EnsureReadyAsync(op.Token,op.Report);op.Report("正在读取 QQ音乐播放状态…");return (await SetPausedCoreAsync(paused,op.Token)).Message;});
+    internal static async Task<MusicControlReceipt> SetPausedCoreAsync(bool? paused,CancellationToken token)
     {
         string action=paused==null?"toggle":paused.Value?"pause":"play";
         var start=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"WindowsPowerShell","v1.0","powershell.exe")){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
         foreach(string arg in new[]{"-NoLogo","-NoProfile","-NonInteractive","-EncodedCommand",Convert.ToBase64String(Encoding.Unicode.GetBytes(Script.Replace("__ACTION__",action)))})start.ArgumentList.Add(arg);
-        using var process=Process.Start(start)??throw new IOException("无法启动QQ音乐媒体控制");
+        using var process=OwnedHelpers.Start(start);using var owned=OwnedHelpers.Lease(process);
         var output=process.StandardOutput.ReadToEndAsync();var errors=process.StandardError.ReadToEndAsync();using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromSeconds(12));
         try{await process.WaitForExitAsync(timeout.Token);}catch(OperationCanceledException){try{process.Kill(true);}catch{}token.ThrowIfCancellationRequested();throw new TimeoutException("QQ音乐播放控制超时，请稍后重试");}
         string json=(await output).Trim();_=await errors;
         if(json.Length==0)throw new IOException("无法读取QQ音乐媒体状态");
         using var result=JsonDocument.Parse(json);string message=result.RootElement.GetProperty("message").GetString()??"QQ音乐未响应";
         if(!result.RootElement.GetProperty("ok").GetBoolean())throw new IOException(message);
-        return message;
+        return new(message,result.RootElement.TryGetProperty("confirmed",out var confirmed)&&confirmed.GetBoolean());
     }
 }

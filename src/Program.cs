@@ -211,6 +211,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--m05-music-clipboard-test"){MusicClipboardTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m05-client-test"){M05ClientTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q6-package-test"){Q6PackageTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q5-brain-test"){Q5BrainTests.Run(args[1]);return;}
@@ -525,7 +526,7 @@ sealed partial class PetForm : Form
         RegisterNotesCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();
         constructionProbe?.Invoke("dispatcher_ready");
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
-        commands.ApplicationAliases=launcher.ResolveApplicationRequest;
+        commands.ApplicationAliases=launcher.ResolveApplicationRequest;RegisterMusicCapability();launcher.SharedMusicClient=new MusicClient(musicSession!,commands);RegisterClipboardCapability();
         if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}
         constructionProbe?.Invoke("launcher_ready");
         foot = new FootTools(p.PetSize, preview);foot.ProxyAction=(a,t)=>commands.ExecuteAsync(new(a,"","foot-ui"),t);

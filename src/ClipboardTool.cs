@@ -12,52 +12,21 @@ sealed record ClipItem(string Kind, string Content, string Label, DateTimeOffset
 
 sealed class ClipHistory
 {
-    readonly string? file;
-    readonly Stack<List<ClipItem>> undo=new();
+    readonly string? file;readonly Stack<List<ClipItem>> undo=new();bool blocked;
     public bool CanUndo=>undo.Count>0;
-    void Remember(IEnumerable<ClipItem> touched){var data=touched.ToList();if(data.Count>0){undo.Push(data);if(undo.Count>20){var keep=undo.Take(20).Reverse().ToArray();undo.Clear();foreach(var frame in keep)undo.Push(frame);}}}
-    public void Undo(){if(undo.Count==0)return;var restore=undo.Peek();var keys=restore.Select(x=>x.Key).ToHashSet();Items=restore.Concat(Items.Where(x=>!keys.Contains(x.Key))).ToList();Trim();Save();if(Error==null)undo.Pop();}
-
-    public List<ClipItem> Items { get; private set; } = new();
-    public string? Error { get; private set; }
-    public ClipHistory(string? path)
-    {
-        file = path;
-        try { if (path != null) Items = JsonSerializer.Deserialize<List<ClipItem>>(File.ReadAllText(path)) ?? new(); }
-        catch { Items = new(); }
-        Trim();
-    }
-    void Trim()
-    {
-        var valid = Items.Where(x => x != null && x.Content != null && x.Content.Length <= 4_000_000 && x.Kind is "text" or "image" or "files").DistinctBy(x => x.Key).ToList();
-        var pins = valid.Where(x => x.Pinned).ToList();
-        var history = valid.Where(x => !x.Pinned).Take(50).ToList();
-        while (history.Sum(x => (long)x.Content.Length) > 12_000_000) history.RemoveAt(history.Count - 1);
-        Items = pins.Concat(history).ToList();
-    }
-    public void Add(ClipItem item)
-    {
-        var previous = Items.FirstOrDefault(x => x.Key == item.Key);
-        if (previous?.Pinned == true) item = item with { Pinned = true };
-        Items.RemoveAll(x => x.Key == item.Key); Items.Insert(0, item); Trim(); Save();
-    }
-    public bool Pin(ClipItem item, bool value)
-    {
-        int index = Items.FindIndex(x => x.Key == item.Key);
-        if (index < 0) return false;
-        if (value && !Items[index].Pinned && (Items.Count(x => x.Pinned) >= 50 || Items.Where(x => x.Pinned).Sum(x => (long)x.Content.Length) + item.Content.Length > 12_000_000)) return false;
-        Remember([Items[index]]);Items[index] = Items[index] with { Pinned = value }; Trim(); Save(); return true;
-    }
-    public void Delete(ClipItem item) { Remember(Items.Where(x=>x.Key==item.Key));Items.RemoveAll(x => x.Key == item.Key); Save(); }
-    public void Clear() { Remember(Items.Where(x=>!x.Pinned));Items.RemoveAll(x => !x.Pinned); Save(); }
-    public void Expire(int days,DateTimeOffset now){if(days<=0)return;int removed=Items.RemoveAll(i=>!i.Pinned&&i.Time<now.AddDays(-days));if(removed>0){undo.Clear();Save();}}
-    public List<ClipItem> Search(string query) => Items.Where(x => x.Label.Contains(query, StringComparison.OrdinalIgnoreCase) || (x.Kind != "image" && x.Content.Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
-    void Save()
-    {
-        if (file == null) return;
-        try { File.WriteAllText(file + ".tmp", JsonSerializer.Serialize(Items)); File.Move(file + ".tmp", file, true); Error = null; }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Error = "历史保存失败，本次记录仅保存在内存"; }
-    }
+    public List<ClipItem> Items{get;private set;}=[];
+    public string? Error{get;private set;}
+    public ClipHistory(string? path){file=path;try{if(path!=null&&(File.Exists(path)||File.Exists(path+".bak")))Items=AtomicJson.Read(path,text=>Trim(JsonSerializer.Deserialize<List<ClipItem>>(text)??throw new IOException("剪贴板数据为空")));}catch{blocked=true;Error="剪贴板文件无法读取，原文件已保留；请恢复备份。";}}
+    static List<ClipItem> Trim(IEnumerable<ClipItem> data){var valid=data.Where(x=>x!=null&&x.Content!=null&&x.Label!=null&&x.Content.Length<=4_000_000&&x.Kind is "text" or "image" or "files").DistinctBy(x=>x.Key).ToList();var history=valid.Where(x=>!x.Pinned).Take(50).ToList();while(history.Sum(x=>(long)x.Content.Length)>12_000_000)history.RemoveAt(history.Count-1);return valid.Where(x=>x.Pinned).Concat(history).ToList();}
+    bool Commit(IEnumerable<ClipItem> data,IEnumerable<ClipItem>? touched=null){if(blocked)return false;var next=Trim(data);try{if(file!=null)AtomicJson.Write(file,JsonSerializer.Serialize(next));if(touched!=null){var frame=touched.ToList();if(frame.Count>0){undo.Push(frame);if(undo.Count>20){var keep=undo.Take(20).Reverse().ToArray();undo.Clear();foreach(var item in keep)undo.Push(item);}}}Items=next;Error=null;return true;}catch(Exception e)when(e is IOException or UnauthorizedAccessException){Error="剪贴板保存失败，原文件和当前记录均保留。";return false;}}
+    public void Add(ClipItem item){var old=Items.FirstOrDefault(x=>x.Key==item.Key);if(old?.Pinned==true)item=item with{Pinned=true};Commit(Items.Where(x=>x.Key!=item.Key).Prepend(item));}
+    public bool Pin(ClipItem item,bool value){var old=Items.FirstOrDefault(x=>x.Key==item.Key);if(old==null)return false;if(value&&!old.Pinned&&(Items.Count(x=>x.Pinned)>=50||Items.Where(x=>x.Pinned).Sum(x=>(long)x.Content.Length)+old.Content.Length>12_000_000))return false;return Commit(Items.Select(x=>x.Key==item.Key?x with{Pinned=value}:x),[old]);}
+    public bool AddPinned(ClipItem item){var old=Items.FirstOrDefault(x=>x.Key==item.Key);if(old?.Pinned!=true&&(Items.Count(x=>x.Pinned)>=50||Items.Where(x=>x.Pinned).Sum(x=>(long)x.Content.Length)+item.Content.Length>12_000_000))return false;return Commit(Items.Where(x=>x.Key!=item.Key).Prepend(item with{Pinned=true}),[old??item]);}
+    public void Delete(ClipItem item)=>Commit(Items.Where(x=>x.Key!=item.Key),Items.Where(x=>x.Key==item.Key));
+    public void Clear()=>Commit(Items.Where(x=>x.Pinned),Items.Where(x=>!x.Pinned));
+    public void Undo(){if(undo.Count==0)return;var frame=undo.Peek();var keys=frame.Select(x=>x.Key).ToHashSet();if(Commit(frame.Concat(Items.Where(x=>!keys.Contains(x.Key)))))undo.Pop();}
+    public void Expire(int days,DateTimeOffset now){if(days<=0)return;var next=Items.Where(x=>x.Pinned||x.Time>=now.AddDays(-days)).ToList();if(next.Count!=Items.Count&&Commit(next))undo.Clear();}
+    public List<ClipItem> Search(string query)=>Items.Where(x=>x.Label.Contains(query,StringComparison.OrdinalIgnoreCase)||x.Kind!="image"&&x.Content.Contains(query,StringComparison.OrdinalIgnoreCase)).ToList();
 }
 
 sealed class ClipboardHistoryService : IDisposable
@@ -70,17 +39,18 @@ sealed class ClipboardHistoryService : IDisposable
     public void RefreshPrivacy(){History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastSequence=GetClipboardSequenceNumber();}
     public void OpenPrivacy(IWin32Window? owner=null){using var form=new ClipboardPrivacyForm(prefs,RefreshPrivacy,preview);form.ShowDialog(owner);}
     public ClipHistory History { get; }
-    public ClipboardHistoryService(Preferences p, bool previewMode = false)
+    public ClipboardHistoryService(Preferences p, bool previewMode = false,string? historyPath=null)
     {
         prefs = p; preview = previewMode;
-        History = new(preview ? null : Path.Combine(Store.Root, "leo-clipboard.json"));
+        History = new(historyPath??(preview ? null : Path.Combine(Store.Root, "leo-clipboard.json")));
         History.Expire(p.ClipboardExpireDays,DateTimeOffset.Now);
         timer.Tick += (_, _) => Capture();
         ClipboardPrivacy.Changed+=RefreshPrivacy;
         ConfigureActivity();
     }
     public void ConfigureActivity(){lastSequence=GetClipboardSequenceNumber();if(!preview&&prefs.ClipboardHistory)timer.Start();else timer.Stop();}
-    public bool Enabled { get => prefs.ClipboardHistory; set { prefs.ClipboardHistory = value; ConfigureActivity(); Store.Save(prefs); } }
+    public bool Enabled { get => prefs.ClipboardHistory; set { var next=LocalApplications.Clone(prefs);next.ClipboardHistory=value;if(!preview)ConfigMigration.Write(Store.FilePath,JsonSerializer.Serialize(next));prefs.ClipboardHistory=value;ConfigureActivity(); } }
+    internal Preferences Preferences=>prefs;
     public void Capture()
     {
         if (preview) return;
@@ -123,6 +93,7 @@ sealed class ClipboardHistoryService : IDisposable
     }
     public void Copy(ClipItem item)
     {
+        if(preview)return;
         if (item.Kind == "text") Clipboard.SetText(item.Content);
         else if (item.Kind == "files")
         {
@@ -148,10 +119,11 @@ static class ClipboardTool
         var text = Catalog.Normalize(query);
         return new[] { "剪切板", "剪贴板", "clipboard" }.Any(x => Catalog.Normalize(x).Contains(text));
     }
-    public static Form? Open(ClipboardHistoryService? service)
+    public static Form? Open(ClipboardHistoryService? service,ClipboardClient? shared=null)
     {
         if (service == null) return null;
         service.Capture();
+        var client=shared??ClipboardClient.Standalone(service,service.Preferences,()=>{});
         var window = new Form { Name="clipboard",FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = UiTheme.Color(24, 29, 44), ForeColor = Color.White };
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 112, Padding = new Padding(8), WrapContents = true };
         var search = new TextBox { Width = 190, PlaceholderText = "搜索剪切板历史", BackColor = Appearance.Field, ForeColor = Appearance.Ink, BorderStyle = BorderStyle.FixedSingle };
@@ -176,7 +148,7 @@ static class ClipboardTool
         {
             string? selected = (list.SelectedItem as ClipItem)?.Key;
             list.BeginUpdate(); list.Items.Clear();
-            foreach (var item in service.History.Search(search.Text).Where(x => !onlyPins.Checked || x.Pinned)) list.Items.Add(item);
+            foreach (var item in client.Search(search.Text).Where(x => !onlyPins.Checked || x.Pinned)) list.Items.Add(item);
             list.SelectedIndex = list.Items.Cast<ClipItem>().ToList().FindIndex(x => x.Key == selected);
             if (list.SelectedIndex < 0 && list.Items.Count > 0) list.SelectedIndex = 0;
             list.EndUpdate();
@@ -194,30 +166,32 @@ static class ClipboardTool
                 try { using var stream = new MemoryStream(Convert.FromBase64String(item.Content)); using var image = Image.FromStream(stream); picture.Image = new Bitmap(image); }
                 catch { picture.Visible = false; text.Visible = true; text.Text = "图片无法读取"; }
             }
-            else text.Text = item.Kind == "files" ? string.Join(Environment.NewLine, JsonSerializer.Deserialize<string[]>(item.Content) ?? Array.Empty<string>()) : item.Content;
+            else try{text.Text = item.Kind == "files" ? string.Join(Environment.NewLine, JsonSerializer.Deserialize<string[]>(item.Content) ?? Array.Empty<string>()) : item.Content;}catch(JsonException){text.Text="文件列表无法读取，原记录已保留。";}
         };
+        bool Apply(string action,string value=""){try{client.Execute(action,value);RefreshItems();return true;}catch(Exception e){state.Text=e.Message;return false;}}
         void CopySelected()
         {
             if (list.SelectedItem is not ClipItem item) return;
-            try { service.Copy(item); RefreshItems(); state.Text = "已复制到剪切板"; }
+            try { if(Apply("clipboard_copy",item.Key))state.Text = service.History.Error??"已复制到剪切板"; }
             catch (Exception e) { state.Text = "复制失败：" + e.Message; }
         }
         copy.Click += (_, _) => CopySelected();SelectionKeys.Wire(list,CopySelected);
-        delete.Click += (_, _) => { if (list.SelectedItem is ClipItem item) service.History.Delete(item); RefreshItems(); };
-        undoButton.Click+=(_,_)=>{service.History.Undo();RefreshItems();};
-        clear.Click += (_, _) => { service.History.Clear(); RefreshItems(); };
+        delete.Click += (_, _) => { if (list.SelectedItem is ClipItem item) Apply("clipboard_delete",item.Key); };
+        undoButton.Click+=(_,_)=>{Apply("clipboard_undo");};
+        clear.Click += (_, _) => { Apply("clipboard_clear"); };
         pin.Click += (_, _) => {
             if (list.SelectedItem is not ClipItem item) return;
-            if (!service.History.Pin(item, !item.Pinned)) { state.Text = "收藏已达上限（50 条或约 1200 万字符），请先移除部分收藏"; return; }
+            try{client.Execute("clipboard_pin",item.Key);}catch(Exception e){state.Text=e.Message;return;}
             RefreshItems();
         };
         onlyPins.CheckedChanged += (_, _) => RefreshItems();
-        enabled.CheckedChanged += (_, _) => service.Enabled = enabled.Checked;
+        bool recordingUi=false;enabled.CheckedChanged += (_, _) => {if(recordingUi)return;try{client.Execute("clipboard_recording",enabled.Checked?"true":"false");}catch(Exception e){recordingUi=true;enabled.Checked=service.Enabled;recordingUi=false;state.Text=e.Message;}};
         search.TextChanged += (_, _) => RefreshItems();
         var refresh = new System.Windows.Forms.Timer { Interval = 900 };
         string signature = "";
-        FeatureFaults.Timer(refresh,"剪贴板窗口刷新",()=>{ string current = string.Join("|", service.History.Items.Select(x => x.Key + x.Pinned)); if (current != signature) { signature = current; RefreshItems(); } });
-        window.FormClosed += (_, _) => { refresh.Dispose(); picture.Image?.Dispose(); };
+        FeatureFaults.Timer(refresh,"剪贴板窗口刷新",()=>{ if(window.IsDisposed||window.Disposing)return;string current = string.Join("|", service.History.Items.Select(x => x.Key + x.Pinned)); if (current != signature) { signature = current; RefreshItems(); } });
+        bool released=false;void Release(){if(released)return;released=true;refresh.Stop();refresh.Dispose();picture.Image?.Dispose();if(shared==null)client.Dispose();}
+        window.FormClosed += (_, _) => Release();window.Disposed+=(_,_)=>Release();
         window.Shown += (_, _) => {if(!FeatureFaults.IsTestMode){FeatureFaults.Run("剪贴板窗口",()=>{WindowInteraction.Prepare(window);WindowInteraction.FocusInput(window);});} split.SplitterDistance = 280; RefreshItems(); refresh.Start(); };
         window.Show();
         return window;

@@ -31,11 +31,11 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
     readonly Dictionary<string,(string Home,string Away,DateTimeOffset Kickoff)> matchTargets=new();string userPrompt="";
     readonly HashSet<string> matches=new(StringComparer.Ordinal);readonly Dictionary<string,string> knownCombos=new();
     readonly ReliableWorkflow workflow=new(new WorkflowJournal(null),execute,verify);
-    readonly Dictionary<string,string> mediaTargets=new();
+    readonly Dictionary<string,string> mediaTargets=new();readonly Dictionary<string,(string Name,string Artist)> musicTargets=new();
     bool disposed,notesRequested;int calls;DateTimeOffset turnStarted;public BrainPlan? Pending{get;private set;}
     DateTimeOffset Now=>(clock??(()=>DateTimeOffset.UtcNow))();
-    public void BeginTurn(string prompt=""){userPrompt=prompt;notesRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"便签|笔记|随手记|记事|记录的|我的想法")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不需要|不用|别|不许|禁止|无需).{0,12}(便签|笔记|随手记|记录)|(便签|笔记).{0,8}(不要|不需要|不用|别|无需)");if(disposed)throw new ObjectDisposedException(nameof(BrainSession));Pending=null;mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();calls=0;turnStarted=Now;}
-    public void Clear(){userPrompt="";notesRequested=false;turnStarted=DateTimeOffset.MinValue;Pending=null;mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();}
+    public void BeginTurn(string prompt=""){userPrompt=prompt;notesRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"便签|笔记|随手记|记事|记录的|我的想法")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不需要|不用|别|不许|禁止|无需).{0,12}(便签|笔记|随手记|记录)|(便签|笔记).{0,8}(不要|不需要|不用|别|无需)");if(disposed)throw new ObjectDisposedException(nameof(BrainSession));Pending=null;musicTargets.Clear();mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();calls=0;turnStarted=Now;}
+    public void Clear(){userPrompt="";notesRequested=false;turnStarted=DateTimeOffset.MinValue;Pending=null;musicTargets.Clear();mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();}
     public void Dispose(){disposed=true;Clear();}
     public object[] Definitions(bool responses)
     {
@@ -58,6 +58,13 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
             var team=ClubCatalog.Find(QuickRouter.Team(userPrompt));var candidates=team==null?[]:matchTargets.Where(x=>x.Value.Home==team.Id||x.Value.Away==team.Id).OrderBy(x=>x.Value.Kickoff).Select(x=>x.Key).ToArray();
             bool next=System.Text.RegularExpressions.Regex.IsMatch(userPrompt,"下一场|最近一场");
             if(next?(candidates.Length==0||candidates[0]!=value):(candidates.Length!=1||candidates[0]!=value))throw new ArgumentException("找到多场比赛，请先询问用户具体球队及场次，不能任意选择");
+        }
+        if(action.InputKind=="music-song"){
+            if(!musicTargets.ContainsKey(value))throw new ArgumentException("请先搜索歌曲，再使用实际返回的编号");
+            if(musicTargets.Count>1&&!userPrompt.Contains(value,StringComparison.Ordinal)){
+                var names=musicTargets.Where(x=>userPrompt.Contains(x.Value.Name,StringComparison.OrdinalIgnoreCase)).ToArray();var artists=names.Where(x=>x.Value.Artist.Split(" / ").Any(a=>a.Length>0&&userPrompt.Contains(a,StringComparison.OrdinalIgnoreCase))).ToArray();var matches=artists.Length>0?artists:names;
+                if(matches.Length!=1||matches[0].Key!=value)throw new ArgumentException("找到多首候选，请先询问用户明确歌名或歌手");
+            }
         }
         if(action.InputKind=="media-session"){if(!mediaTargets.ContainsKey(value))throw new ArgumentException("请先查询播放器，再使用实际返回的身份");if(mediaTargets.Count>1&&!userPrompt.Contains(value,StringComparison.Ordinal)){var candidates=mediaTargets.Where(x=>userPrompt.Contains(x.Value,StringComparison.OrdinalIgnoreCase)).Select(x=>x.Key).ToArray();if(candidates.Length!=1||candidates[0]!=value)throw new ArgumentException("有多个播放器，请先询问用户选择哪个");}}
         if(action.InputKind=="combo-name"&&!knownCombos.ContainsKey(value))throw new ArgumentException("请先查询组合清单，再选用实际返回的名称");
@@ -90,7 +97,7 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
             if(call.Name!="leo_action")throw new ArgumentException("模型请求了未提供的工具");Fields(p,"action","value");var requested=catalog.Require(Text(p,"action")).Action;string argument=Text(p,"value");if(!requested.ReadOnly)throw new ArgumentException("写操作必须生成计划，并由用户确认后执行");Check(requested,argument);
             var result=await execute(new(requested.Id,argument,"brain-query:"+Origin),token);result.ToLegacy(token);
             string raw=result.Data?.GetRawText()??result.Message;var node=JsonNode.Parse(raw);Shape(node,0);string answer=node?.ToJsonString(ToolJson)??"null";
-            if(answer.Length>10000)throw new InvalidOperationException("查询结果过多，请缩小范围");if(requested.Id=="football_facts")CollectMatches(node);if(requested.Id=="media_status"){mediaTargets.Clear();if(node is JsonArray rows)foreach(var row in rows)if(row is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Provider"]?.ToString() is string provider)mediaTargets[id]=provider;}return answer;
+            if(answer.Length>10000)throw new InvalidOperationException("查询结果过多，请缩小范围");if(requested.Id=="football_facts")CollectMatches(node);if(requested.Id=="media_status"){mediaTargets.Clear();if(node is JsonArray rows)foreach(var row in rows)if(row is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Provider"]?.ToString() is string provider)mediaTargets[id]=provider;}if(requested.Id=="music_search"){musicTargets.Clear();if(node is JsonArray songRows)foreach(var song in songRows)if(song is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Name"]?.ToString() is string name)musicTargets[id]=(name,obj["Artist"]?.ToString()??"");}return answer;
         }catch(Exception e)when(e is ArgumentException or JsonException or InvalidOperationException or KeyNotFoundException){return JsonSerializer.Serialize(new{error=e.Message,note="没有执行本地写操作；请补充参数或重新选择目标"});}
     }
     void CollectMatches(JsonNode? node)
