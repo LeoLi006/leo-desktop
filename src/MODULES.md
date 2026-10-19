@@ -127,3 +127,10 @@ Leo以当前用户权限启动包内程序，附加固定参数`--leo-module`，
 新增动作：`notes_open`（可带便签草稿）、`note_add`（明确要求记下的文字）、`path_reveal`（本地路径）、`media_file`（PotPlayer媒体路径）、`files_with_app`（JSON字符串`{application,paths}`，应用必须为存在的EXE）。`files_open`的文件选择结果进入统一拖放动作面板。
 
 便签、拖放内容及其它个人记录不包含在皮肤包或源码发布包中。普通应用模块仍只提供启动能力；复杂控制沿用独立进程扩展协议。
+
+
+## S01：入口显示（v1.00.1）
+
+`Preferences.EntryDisplayModes`独立保存六个内置可选模块及自定义应用的入口选择。键为原模块ID或自定义应用GUID，值为`shortcut`、`menu`、`search`；缺省为`shortcut`，不改变旧配置。未知但格式有效的键保留，便于模块重新加入后恢复。
+
+显示策略只控制通用按钮与菜单，不参与`Modules.Enabled`和动作执行权限判定。隐藏不等于停用：指令仍走原分发器；真正停用仍由原模块开关和自定义应用`Enabled`判断。扩展指令入口沿用现有协议，本轮不增加扩展桌面按钮。

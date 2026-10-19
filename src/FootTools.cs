@@ -8,10 +8,11 @@ sealed class FootTools : Form
     public const int Space = 64;
     float uiScale = 1f;
     Preferences modules=new();
-    int CompactUnits=>94;
-    int UtilityUnits=>4+30*((modules.TerminalModule?1:0)+(modules.ClashModule?1:0)+(modules.EdgeModule?1:0));
+    bool Quick(string id)=>Modules.Enabled(modules,id)&&EntryDisplay.ShowShortcut(modules,id);
+    int CompactUnits=>UtilityUnits==4?64:94;
+    int UtilityUnits=>4+30*((Quick("terminal")?1:0)+(Quick("clash")?1:0)+(Quick("edge")?1:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
-    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(p.ModuleIcons?.GetValueOrDefault(pair.Item1));old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!p.EdgeModule)expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
+    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(p.ModuleIcons?.GetValueOrDefault(pair.Item1));old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!Quick("edge"))expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
     Font? scaledFont;
     int S(int value) => Math.Max(1, (int)Math.Round(value * uiScale));
@@ -127,7 +128,7 @@ sealed class FootTools : Form
     }
     void SetExpanded(bool value)
     {
-        value=value&&modules.EdgeModule;expanded = value;if(value)utilitiesOpen=true; search.Visible = value;
+        value=value&&Quick("edge");expanded = value;if(value)utilitiesOpen=true; search.Visible = value;
         LayoutTools();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);
         Invalidate(true);
@@ -142,14 +143,14 @@ sealed class FootTools : Form
     }
     void LayoutTools()
     {
-        if(!utilitiesOpen||!modules.EdgeModule)expanded=false;
+        if(!utilitiesOpen||!Quick("edge"))expanded=false;
         SuspendLayout();
         chatButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));moreButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
-        chatButton.Visible=todoButton.Visible=moreButton.Visible=true;
-        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,modules.TerminalModule),((Button)proxyButton,modules.ClashModule),(searchButton,modules.EdgeModule)}){
+        chatButton.Visible=todoButton.Visible=true;moreButton.Visible=UtilityUnits>4;
+        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,Quick("terminal")),((Button)proxyButton,Quick("clash")),(searchButton,Quick("edge"))}){
             button.Visible=utilitiesOpen&&enabled;if(enabled){button.Bounds=new Rectangle(S(toolX),S(32),S(28),S(24));toolX+=30;}
         }
-        search.Visible=expanded&&modules.EdgeModule;search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+3),S(36),S(154),S(21));
+        search.Visible=expanded&&Quick("edge");search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+3),S(36),S(154),S(21));
         ClientSize=new Size(S(expanded?VisibleCompactUnits+168:VisibleCompactUnits),S(utilitiesOpen?58:28));
         ResumeLayout();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);

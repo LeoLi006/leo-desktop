@@ -48,7 +48,7 @@ sealed partial class PetForm
             case "todo_complete_title":{var matches=todoStore.ForDay(DateOnly.FromDateTime(DateTime.Today)).Where(t=>t.Completed==null&&t.Title==value).ToArray();if(matches.Length!=1)throw new ArgumentException("没有唯一匹配的事项，请在清单中选择");todoStore.Toggle(matches[0].Id);return "已完成："+value;}
             case "todo_natural":{var draft=JsonSerializer.Deserialize<NaturalTodoDraft>(value)??throw new ArgumentException("安排无效");using var dialog=new NaturalTodoForm(draft);if(dialog.ShowDialog()!=DialogResult.OK)return "已取消添加";draft=dialog.Draft;DateTimeOffset? reminder=draft.Time is {} at?new DateTimeOffset(draft.Day.ToDateTime(at)):null;if(draft.Frequency.Length>0)todoStore.AddRepeating(draft.Title,draft.Day,draft.Frequency,reminder);else todoStore.Add(draft.Title,draft.Day,reminder);return "已添加："+draft.Title;}
             case "web_open":{FootTools.ValidateUrl(value);string url=value;if(!previewMode)Process.Start(FootTools.EdgeUrlStart(url));return "已打开网址";}
-            case "launcher_open":ShowLauncher();return "已打开应用搜索，可以查看收藏、设置简称与排序。";
+            case "launcher_open":ShowLauncher();if(value=="web")launcher.PreviewTyping("网页搜索 ");return "已打开应用搜索，可以查看收藏、设置简称与排序。";
             case "clipboard_open":launcher.OpenClipboardFromAssistant();return "已打开剪贴板历史与收藏。";
             case "clipboard_pin_text":return launcher.PinClipboardText(value);
             case "football_open":launcher.OpenFootballFromAssistant();return "已打开足球日程、球队详情与观赛网址。";

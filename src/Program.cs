@@ -13,6 +13,7 @@ sealed class Preferences
     public Dictionary<string,string> ModuleExecutables {get;set;}=new();
     public List<LocalApplication> ApplicationModules {get;set;}=[];
     public List<string> ShortcutOrder {get;set;}=[];
+    public Dictionary<string,string> EntryDisplayModes {get;set;}=new();
     public Dictionary<string,string> ModuleIcons {get;set;}=new();
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
@@ -196,6 +197,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--release100-test"){Release100Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform53-test"){Platform53Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform52-test"){Platform52Tests.Run(args[1]);return;}
@@ -470,7 +472,7 @@ sealed partial class PetForm : Form
     {
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
-        prefs = p;p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        prefs = p;p.EntryDisplayModes??=new();p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -503,6 +505,7 @@ sealed partial class PetForm : Form
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
         WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
         PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
+        WireOptionalEntryMenus(menu);
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
