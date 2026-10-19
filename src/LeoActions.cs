@@ -29,8 +29,7 @@ sealed partial class PetForm
     async Task<string> ExecuteLeoActionCore(string action,string value,CancellationToken token){token.ThrowIfCancellationRequested();if(!LeoActions.Names.Contains(action))throw new ArgumentException("不支持的功能");Modules.Require(prefs,Modules.ForAction(action));
         switch(action){
             case "files_with_app":{using var doc=JsonDocument.Parse(value);var root=doc.RootElement;string app=root.TryGetProperty("application",out var application)?application.GetString()??"":"";var paths=root.GetProperty("paths").EnumerateArray().Select(e=>e.GetString()??"").ToArray();var start=root.TryGetProperty("module",out var module)&&module.GetString() is {Length:>0} moduleId?FileDropActions.ConfiguredStart(prefs,moduleId,paths):FileDropActions.AppStart(app,paths);if(!previewMode)Process.Start(start);return "已交给所选应用。";}
-            case "notes_open":ShowNotes(value);return "已打开临时便签。";
-            case "note_add":{var note=Notes.Save(null,value);return "已记下便签。";}
+            case "notes_open":case "note_add":throw new InvalidOperationException("便签动作必须通过已注册模块执行");
             case "path_reveal":{string path=LocalPath.Resolve(value);if(!previewMode)Process.Start(FileDropActions.FolderStart(path));return "已打开所在文件夹。";}
             case "media_file":if(!previewMode)MediaControl.OpenPotPlayer(LocalPath.Resolve(value));return "已交给PotPlayer。";
             case "path_open":{string path=LocalPath.Resolve(value);if(!previewMode)Process.Start(new ProcessStartInfo(path){UseShellExecute=true});return "已打开 "+Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));}

@@ -4,22 +4,25 @@ sealed record StickyNote(string Id,string Text,DateTimeOffset Created,DateTimeOf
 sealed class NoteStore
 {
     public event Action? Changed;
-    readonly string? file;public List<StickyNote> Items{get;private set;}=[];
-    public NoteStore(string? path){file=path;if(file!=null&&(File.Exists(file)||File.Exists(file+".bak")))Items=AtomicJson.Read(file,Validate);}
+    readonly ModuleJsonData<List<StickyNote>> data;
+    public List<StickyNote> Items=>data.Read(items=>items.ToList());
+    public NoteStore(string? path){data=new(path,[],Validate,items=>items.ToList());}
+    internal NoteStore(string? path,Action<string,string> writer){data=new(path,[],Validate,items=>items.ToList(),writer);}
     internal static List<StickyNote> Validate(string text){var items=JsonSerializer.Deserialize<List<StickyNote>>(text)??throw new IOException("便签内容为空");if(items.Count>1000||items.Any(n=>n==null||n.Text==null||n.Text.Length>20000||string.IsNullOrWhiteSpace(n.Id))||items.Select(n=>n.Id).Distinct().Count()!=items.Count)throw new IOException("便签文件格式无效，请保留原文件后恢复备份。");return items;}
-    public StickyNote Save(string? id,string text){text=text.Trim();if(text.Length is <1 or >20000)throw new ArgumentException("便签须为1～20000个字符");var previous=Items.ToList();var old=Items.FirstOrDefault(n=>n.Id==id);if(old==null&&Items.Count>=1000)throw new InvalidOperationException("便签已达1000条，请先清理");var now=DateTimeOffset.Now;var item=old==null?new StickyNote(Guid.NewGuid().ToString("N"),text,now,now):old with{Text=text,Updated=now};if(old!=null)Items.Remove(old);Items.Insert(0,item);Commit(previous);return item;}
-    public void Remove(string id){var previous=Items.ToList();Items.RemoveAll(n=>n.Id==id);Commit(previous);}
-    public void Link(string id,string task){var previous=Items.ToList();int at=Items.FindIndex(n=>n.Id==id);if(at<0)throw new InvalidOperationException("便签已删除");Items[at]=Items[at] with{TaskId=task};Commit(previous);}
-    public List<StickyNote> Query(string text="",string scope="active")=>Items.Where(n=>(scope=="all"||scope=="linked"?scope=="all"||n.TaskId!=null:n.TaskId==null)&&n.Text.Contains(text.Trim(),StringComparison.OrdinalIgnoreCase)).OrderByDescending(n=>n.Pinned).ThenByDescending(n=>n.Updated).ToList();
-    public void Pin(string id,bool value){var previous=Items.ToList();int at=Items.FindIndex(n=>n.Id==id);if(at<0)throw new ArgumentException("便签已不存在");Items[at]=Items[at] with{Pinned=value};Commit(previous);}
-    void Commit(List<StickyNote> previous){try{if(file!=null)ConfigMigration.Write(file,JsonSerializer.Serialize(Items));}catch{Items=previous;throw;}if(Changed is {} changed)foreach(Action subscriber in changed.GetInvocationList())FeatureFaults.Run("便签列表刷新",subscriber);}
+    public StickyNote Save(string? id,string text,CancellationToken token=default){text=text.Trim();if(text.Length is <1 or >20000)throw new ArgumentException("便签须为1～20000个字符");return Change(items=>{var old=items.FirstOrDefault(n=>n.Id==id);if(id!=null&&old==null)throw new ArgumentException("便签已删除，请另存为新便签");if(old==null&&items.Count>=1000)throw new InvalidOperationException("便签已达1000条，请先清理");var now=DateTimeOffset.Now;var item=old==null?new StickyNote(Guid.NewGuid().ToString("N"),text,now,now):old with{Text=text,Updated=now};if(old!=null)items.Remove(old);items.Insert(0,item);return item;},token);}
+    public void Remove(string id,CancellationToken token=default)=>Change(items=>items.RemoveAll(n=>n.Id==id),token);
+    public void Link(string id,string task,CancellationToken token=default)=>Change(items=>{int at=items.FindIndex(n=>n.Id==id);if(at<0)throw new ArgumentException("便签已删除");items[at]=items[at] with{TaskId=task};return true;},token);
+    public List<StickyNote> Query(string text="",string scope="active")=>data.Read(items=>items.Where(n=>(scope=="all"||scope=="linked"?scope=="all"||n.TaskId!=null:n.TaskId==null)&&n.Text.Contains(text.Trim(),StringComparison.OrdinalIgnoreCase)).OrderByDescending(n=>n.Pinned).ThenByDescending(n=>n.Updated).ToList());
+    public void Pin(string id,bool value,CancellationToken token=default)=>Change(items=>{int at=items.FindIndex(n=>n.Id==id);if(at<0)throw new ArgumentException("便签已不存在");items[at]=items[at] with{Pinned=value};return true;},token);
+    T Change<T>(Func<List<StickyNote>,T> edit,CancellationToken token){var result=data.Change(edit,token);if(Changed is {} changed)foreach(Action subscriber in changed.GetInvocationList())FeatureFaults.Run("便签列表刷新",subscriber);return result;}
 }
 sealed class NotesForm:BarcaWindow
 {
-    readonly NoteStore store;readonly Func<StickyNote,DateOnly,string> convert;readonly ListBox list=new();readonly TextBox input=new(),search=new();readonly ComboBox filter=new();readonly Label status=new();readonly BarcaButton turn=new(){Text="转为待办"},pin=new(){Text="置顶"};readonly NoteDateButton date=new();string? selected;bool changing,discardOnClose,disposed;
-    public NotesForm(NoteStore notes,Func<StickyNote,DateOnly,string> addTodo)
+    readonly NotesClient store;readonly Dictionary<string,string> pendingLinks;readonly Func<StickyNote,DateOnly,string> convert;readonly ListBox list=new();readonly TextBox input=new(),search=new();readonly ComboBox filter=new();readonly Label status=new();readonly BarcaButton turn=new(){Text="转为待办"},pin=new(){Text="置顶"};readonly NoteDateButton date=new();string? selected;bool changing,discardOnClose,disposed;
+    public NotesForm(NoteStore notes,Func<StickyNote,DateOnly,string> addTodo):this(NotesClient.Standalone(notes),addTodo){}
+    public NotesForm(NotesClient notes,Func<StickyNote,DateOnly,string> addTodo,Dictionary<string,string>? links=null)
     {
-        store=notes;convert=addTodo;Text="Leo · 临时便签";ClientSize=new(800,620);StartPosition=FormStartPosition.CenterParent;Controls.Add(BarcaUi.Chrome(this,"临时便签","Ctrl+Enter保存 · Ctrl+F搜索 · 已转待办的原文单独收好。"));
+        store=notes;convert=addTodo;pendingLinks=links??new();Text="Leo · 临时便签";ClientSize=new(800,620);StartPosition=FormStartPosition.CenterParent;Controls.Add(BarcaUi.Chrome(this,"临时便签","Ctrl+Enter保存 · Ctrl+F搜索 · 已转待办的原文单独收好。"));
         search.AccessibleName="便签搜索";input.AccessibleName="便签正文";filter.AccessibleName="便签分类";list.AccessibleName="便签列表";search.Bounds=new(24,108,240,30);search.PlaceholderText="搜索便签…";search.BackColor=BarcaUi.Raised;search.ForeColor=BarcaUi.Text;search.BorderStyle=BorderStyle.FixedSingle;
         filter.Bounds=new(24,150,240,30);filter.DropDownStyle=ComboBoxStyle.DropDownList;CompanionUi.ThemeCombo(filter);filter.Items.AddRange([new ComboChoice("便签","active"),new ComboChoice("已转待办","linked"),new ComboChoice("全部内容","all")]);filter.SelectedIndex=0;
         list.Bounds=new(24,192,240,310);list.BackColor=BarcaUi.Raised;list.ForeColor=BarcaUi.Text;list.BorderStyle=BorderStyle.None;list.DrawMode=DrawMode.OwnerDrawFixed;list.ItemHeight=56;list.DrawItem+=(_,e)=>{if(e.Index<0)return;var n=(StickyNote)list.Items[e.Index];using var body=BarcaUi.Font(9.5f);using var small=BarcaUi.Font(8);using var bg=new SolidBrush((e.State&DrawItemState.Selected)!=0?Appearance.Blue:BarcaUi.Raised);e.Graphics.FillRectangle(bg,e.Bounds);TextRenderer.DrawText(e.Graphics,(n.Pinned?"★ ":"")+(n.TaskId!=null?"✓ ":"")+n.Text.Replace('\n',' '),body,new Rectangle(e.Bounds.X+8,e.Bounds.Y+6,e.Bounds.Width-16,24),BarcaUi.Text,TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);TextRenderer.DrawText(e.Graphics,n.Updated.ToString("MM-dd HH:mm"),small,new Rectangle(e.Bounds.X+8,e.Bounds.Y+31,e.Bounds.Width-16,18),BarcaUi.Muted);};
@@ -28,25 +31,27 @@ sealed class NotesForm:BarcaWindow
         input.Bounds=new(286,108,490,394);input.Multiline=true;input.ScrollBars=ScrollBars.Vertical;input.MaxLength=20000;input.BackColor=BarcaUi.Raised;input.ForeColor=BarcaUi.Text;input.BorderStyle=BorderStyle.None;input.Font=BarcaUi.Font(11);input.AcceptsReturn=true;input.PlaceholderText="一句话，先记在这里…";
         var fresh=new BarcaButton{Text="新便签",Bounds=new(24,520,112,34)};fresh.Click+=(_,_)=>New();var remove=new BarcaButton{Text="删除",Bounds=new(152,520,112,34)};remove.Click+=(_,_)=>{try{if(selected==null)return;store.Remove(selected);input.Clear();selected=null;Reload();New();}catch(Exception e){status.Text=e.Message;}};
         pin.Bounds=new(24,562,240,32);pin.Click+=(_,_)=>{try{var n=store.Items.FirstOrDefault(n=>n.Id==selected);if(n==null){status.Text="先选择一条便签。";return;}store.Pin(n.Id,!n.Pinned);pin.Text=n.Pinned?"置顶":"取消置顶";}catch(Exception e){status.Text=e.Message;}};
-        var save=new BarcaButton{Text="记下 / 保存",Bounds=new(286,520,140,34)};save.Click+=(_,_)=>SaveNote();FormClosing+=(_,e)=>{if(!ConfirmPending())e.Cancel=true;else discardOnClose=true;};date.Bounds=new(438,522,166,30);turn.Bounds=new(616,520,160,34);turn.Click+=(_,_)=>{try{var n=SaveNote();if(n==null)return;if(n.TaskId!=null){status.Text="这条便签已经转为待办。";return;}string id=convert(n,DateOnly.FromDateTime(date.Value));store.Link(n.Id,id);Reload(n.Id);turn.Enabled=false;status.Text="已加入 "+date.Value.ToString("yyyy-MM-dd")+" 的清单；原文可在“已转待办”查看。";}catch(OperationCanceledException){status.Text="已取消转为待办，原文保留。";}catch(Exception e){status.Text=e.Message;}};
+        var save=new BarcaButton{Text="记下 / 保存",Bounds=new(286,520,140,34)};save.Click+=(_,_)=>SaveNote();FormClosing+=(_,e)=>{if(!ConfirmPending())e.Cancel=true;else discardOnClose=true;};date.Bounds=new(438,522,166,30);turn.Bounds=new(616,520,160,34);turn.Click+=(_,_)=>{try{var n=SaveNote();if(n==null)return;if(n.TaskId!=null){status.Text="这条便签已经转为待办。";return;}if(!pendingLinks.TryGetValue(n.Id,out string? id)){id=convert(n,DateOnly.FromDateTime(date.Value));pendingLinks[n.Id]=id;}store.Link(n.Id,id);pendingLinks.Remove(n.Id);Reload(n.Id);turn.Enabled=false;status.Text="已加入 "+date.Value.ToString("yyyy-MM-dd")+" 的清单；原文可在“已转待办”查看。";}catch(OperationCanceledException){status.Text="已取消转为待办，原文保留。";}catch(Exception e){status.Text=e.Message;}};
         status.Bounds=new(286,566,490,42);status.ForeColor=BarcaUi.Muted;status.Font=BarcaUi.Font(9);Controls.AddRange([search,filter,list,input,fresh,remove,pin,save,date,turn,status]);MinimumSize=MaximumSize=Size;store.Changed+=StoreChanged;Reload();New();
     }
-    void StoreChanged(){if(!IsDisposed&&!disposed)FeatureFaults.Run("便签列表",()=>Reload(selected));}
+    void StoreChanged(){if(IsDisposed||disposed)return;if(InvokeRequired){try{BeginInvoke((Action)StoreChanged);}catch(InvalidOperationException){}return;}FeatureFaults.Run("便签列表",()=>Reload(selected));}
     public void New(string text=""){if(!ConfirmPending())return;selected=null;changing=true;list.ClearSelected();changing=false;input.Text=text;turn.Enabled=true;pin.Text="置顶";status.Text="Ctrl+Enter快速记下 · 无需填写日期";input.Focus();}
     bool Dirty=>input.Text.Trim()!=(store.Items.FirstOrDefault(n=>n.Id==selected)?.Text??"");
     bool ConfirmPending(){if(!Dirty)return true;using var confirm=new PendingNoteForm();var answer=confirm.ShowDialog(this);return answer==DialogResult.No||answer==DialogResult.Yes&&SaveNote()!=null;}
-    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;store.Changed-=StoreChanged;if(!discardOnClose&&Dirty)try{store.Save(selected,input.Text);}catch{}}base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;store.Changed-=StoreChanged;try{if(!discardOnClose&&Dirty)store.Save(selected,input.Text);}catch{}store.Dispose();}base.Dispose(disposing);}
     StickyNote? SaveNote(){try{var n=store.Save(selected,input.Text);selected=n.Id;Reload(n.Id);status.Text="已保存到本机";return n;}catch(Exception e){status.Text=e.Message;return null;}}
     void Reload(string? id=null){changing=true;list.Items.Clear();list.Items.AddRange(store.Query(search.Text,(filter.SelectedItem as ComboChoice)?.Value??"active").ToArray());list.SelectedItem=list.Items.Cast<StickyNote>().FirstOrDefault(n=>n.Id==id);changing=false;}
     protected override bool ProcessCmdKey(ref Message message,Keys key){if(key==(Keys.Control|Keys.Enter)||key==(Keys.Control|Keys.S)){SaveNote();return true;}if(key==(Keys.Control|Keys.F)){search.Focus();search.SelectAll();return true;}if(key==(Keys.Control|Keys.N)){New();return true;}return base.ProcessCmdKey(ref message,key);}
 }
 sealed partial class PetForm
 {
+    readonly object noteGate=new();readonly Dictionary<string,string> pendingNoteLinks=new();
     NoteStore? noteStore;NotesForm? notesWindow;
-    NoteStore Notes=>noteStore??=new(previewMode?null:Path.Combine(Store.Root,"leo-notes.json"));
-    void ShowNotes(string initial="")
+    NoteStore Notes{get{lock(noteGate)return noteStore??=new(previewMode?null:Path.Combine(Store.Root,"leo-notes.json"));}}
+    void ShowNotes(string initial="")=>RunNotesEntry("notes_open",initial,"notes-entry");
+    void ShowNotesCore(string initial="")
     {
-        RevealDock(true);launcher.Hide();if(notesWindow==null||notesWindow.IsDisposed)notesWindow=new NotesForm(Notes,(note,day)=>{using var confirm=new QuickTextForm("便签转待办",note.Text,"确认标题后加入 "+day.ToString("yyyy-MM-dd")+" 的清单，原便签保留。");WindowPositions.Prepare(confirm,"note-todo",Bounds,previewMode);if(confirm.ShowDialog()!=DialogResult.OK)throw new OperationCanceledException("已取消转为待办");var task=todoStore.Add(confirm.Value,day,null);todoWindow?.View.Render();return task.Id;});if(!notesWindow.Visible)WindowPositions.Prepare(notesWindow,"notes",Bounds,previewMode);if(initial.Length>0)notesWindow.New(initial);WindowInteraction.Show(notesWindow);
+        RevealDock(true);launcher.Hide();if(notesWindow==null||notesWindow.IsDisposed)notesWindow=new NotesForm(new NotesClient(Notes,commands),(note,day)=>{using var confirm=new QuickTextForm("便签转待办",note.Text,"确认标题后加入 "+day.ToString("yyyy-MM-dd")+" 的清单，原便签保留。");WindowPositions.Prepare(confirm,"note-todo",Bounds,previewMode);if(confirm.ShowDialog()!=DialogResult.OK)throw new OperationCanceledException("已取消转为待办");var task=todoStore.Add(confirm.Value,day,null);todoWindow?.View.Render();return task.Id;},pendingNoteLinks);if(!notesWindow.Visible)WindowPositions.Prepare(notesWindow,"notes",Bounds,previewMode);if(initial.Length>0)notesWindow.New(initial);WindowInteraction.Show(notesWindow);
     }
 }
 

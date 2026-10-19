@@ -12,6 +12,7 @@ sealed partial class ActionDispatcher
         public readonly CancellationToken Token=cancellation.Token;
         public readonly DateTimeOffset? Expires=expires;
         public readonly TaskCompletionSource<ActionResult> Completion=new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public System.Threading.Timer? Timeout;
         public int Subscribers;
         public string CancelReason="cancelled";
     }
@@ -39,15 +40,15 @@ sealed partial class ActionDispatcher
     public async Task<string> ExecuteAsync(ActionRequest request,CancellationToken token=default)=>(await ExecuteDetailedAsync(request,token)).ToLegacy(token);
     public Task<ActionResult> ExecuteStructuredAsync(StructuredActionRequest request,CancellationToken token=default)
     {
-        try{return ExecuteDetailedAsync(ApplicationRequestAdapter.Adapt(request),token);}
-        catch(ArgumentException e){var old=new ActionRequest(request.ActionId,"",request.Source,request.RequestId,request.TraceId,request.Deadline);lock(pending)requests++;return Task.FromResult(Record(Failure(Identify(old),"","","invalid_request",e)));}
+        try{return ExecuteDetailedAsync(Registry.Resolve(request.ActionId) is IActionRequestAdapter adapter?adapter.Adapt(request):ApplicationRequestAdapter.Adapt(request),token);}
+        catch(Exception e)when(e is ArgumentException or JsonException or InvalidOperationException){var old=new ActionRequest(request.ActionId,"",request.Source,request.RequestId,request.TraceId,request.Deadline);lock(pending)requests++;return Task.FromResult(Record(Failure(Identify(old),"","","invalid_request",e)));}
     }
     ActionRequest Identify(ActionRequest request)=>request with{RequestId=request.RequestId??Guid.NewGuid().ToString("N"),TraceId=request.TraceId??context.Value?.TraceId??Guid.NewGuid().ToString("N")};
     public Task<ActionResult> ExecuteDetailedAsync(ActionRequest original,CancellationToken caller=default)
     {
         var request=Identify(original);lock(pending)requests++;
         try{
-            if(request.Action==null||request.Value==null||request.Value.Length>16000||string.IsNullOrWhiteSpace(request.Source)||request.Source.Length>128||request.Source.Any(char.IsControl)||string.IsNullOrWhiteSpace(request.RequestId)||string.IsNullOrWhiteSpace(request.TraceId)||request.RequestId.Length>96||request.TraceId.Length>96||request.RequestId.Any(char.IsControl)||request.TraceId.Any(char.IsControl))throw new ArgumentException("动作参数或请求标识无效");
+            if(request.Action==null||request.Value==null||request.Value.Length>125000||string.IsNullOrWhiteSpace(request.Source)||request.Source.Length>128||request.Source.Any(char.IsControl)||string.IsNullOrWhiteSpace(request.RequestId)||string.IsNullOrWhiteSpace(request.TraceId)||request.RequestId.Length>96||request.TraceId.Length>96||request.RequestId.Any(char.IsControl)||request.TraceId.Any(char.IsControl))throw new ArgumentException("动作参数或请求标识无效");
             if(caller.IsCancellationRequested)return Task.FromResult(Record(Cancelled(request,"","","cancelled")));
             if(request.Deadline<=DateTimeOffset.UtcNow)return Task.FromResult(Record(Cancelled(request,"","","timeout")));
             request=ApplicationAliases?.Invoke(request)??request;
@@ -55,21 +56,25 @@ sealed partial class ActionDispatcher
                 if(!Guid.TryParseExact(request.Value,"N",out _))throw new ArgumentException("应用模块标识无效");
                 request=request with{Action="local:"+request.Value,Value=""};
             }else if(request.Action.StartsWith("local:",StringComparison.Ordinal))request=request with{Value=""};
-            string key=request.Action+"\n"+request.Value;
-            if(ancestry.Value?.Contains(key)==true||ancestry.Value?.Length>12)throw new InvalidOperationException("检测到循环调用或过深的组合，请检查自定义步骤。");
             var module=Registry.Resolve(request.Action);
+            if(request.Value.Length>Math.Clamp((module as IStructuredLeoModule)?.MaximumInputLength??16000,1,125000))throw new ArgumentException("动作内容超出模块支持的长度");
+            var policy=(module as IStructuredLeoModule)?.Describe(request.Action);
+            string key=request.Action+"\n"+request.Value;
+            string recursionKey=key;
+            if(policy?.Concurrency=="serialized-store")key+="\n"+Guid.NewGuid().ToString("N");
+            if(ancestry.Value?.Contains(recursionKey)==true||ancestry.Value?.Length>12)throw new InvalidOperationException("检测到循环调用或过深的组合，请检查自定义步骤。");
             if(!module.Enabled)throw new CapabilityException("module_disabled","此模块已停用，请在设置 → 功能中开启。");
             Execution work;bool start=false;
             lock(pending){
                 if(disposed)throw new ObjectDisposedException(nameof(ActionDispatcher));
                 if(pending.TryGetValue(key,out work!))coalesced++;
                 else{
-                    var definition=(module as IStructuredLeoModule)?.Describe(request.Action);
-                    if(definition!=null&&(definition.Id!=request.Action||definition.ModuleId!=module.Id||definition.Concurrency!="coalesce-inflight"||definition.TimeoutMs is not(>=1 and <=120000)||definition.Retry))throw new CapabilityException("invalid_definition","当前宿主不支持此动作的执行策略");
+                    var definition=policy;
+                    if(definition!=null&&(definition.Id!=request.Action||definition.ModuleId!=module.Id||definition.Concurrency is not("coalesce-inflight" or "serialized-store")||definition.TimeoutMs is not(>=1 and <=120000)||definition.Retry))throw new CapabilityException("invalid_definition","当前宿主不支持此动作的执行策略");
                     var cancellation=definition!=null?CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken):CancellationTokenSource.CreateLinkedTokenSource(caller,lifetimeToken);
                     TimeSpan? timeout=definition!=null?StructuredTimeoutOverride??TimeSpan.FromMilliseconds(definition.TimeoutMs!.Value):null;
-                    DateTimeOffset? expires=timeout is {} duration?DateTimeOffset.UtcNow+duration:null;if(timeout is {} limit)cancellation.CancelAfter(limit);
-                    work=new(request,module,cancellation,expires);pending[key]=work;executions++;start=true;
+                    DateTimeOffset? expires=timeout is {} duration?DateTimeOffset.UtcNow+duration:null;
+                    work=new(request,module,cancellation,expires);if(timeout is {} limit)work.Timeout=new System.Threading.Timer(_=>Cancel(work,"timeout"),null,limit,Timeout.InfiniteTimeSpan);pending[key]=work;executions++;start=true;
                 }
                 work.Subscribers++;
             }
@@ -87,7 +92,7 @@ sealed partial class ActionDispatcher
         using var waiting=CancellationTokenSource.CreateLinkedTokenSource(caller,work.Token);
         try{
             if(request.Deadline is {} deadline)waiting.CancelAfter(TimeSpan.FromMilliseconds(Math.Clamp((deadline-DateTimeOffset.UtcNow).TotalMilliseconds,0,int.MaxValue)));
-            var result=await work.Completion.Task.WaitAsync(waiting.Token);
+            var result=await work.Completion.Task.WaitAsync(waiting.Token).ConfigureAwait(false);
             return Record(result with{RequestId=request.RequestId!,TraceId=request.TraceId!,Source=request.Source});
         }catch(OperationCanceledException){string reason=caller.IsCancellationRequested?"cancelled":request.Deadline<=DateTimeOffset.UtcNow?"timeout":Reason(work);return Record(Cancelled(request,work.Module.Id,work.Id,reason));}
         finally{
@@ -97,28 +102,30 @@ sealed partial class ActionDispatcher
     }
     async Task Run(Execution work,string key)
     {
-        var previous=ancestry.Value;var previousContext=context.Value;ancestry.Value=(previous??[]).Append(key).ToArray();context.Value=work.Request;
+        var previous=ancestry.Value;var previousContext=context.Value;ancestry.Value=(previous??[]).Append(work.Request.Action+"\n"+work.Request.Value).ToArray();context.Value=work.Request;
         long ticket=0;
         try{
             ticket=ModuleActivity.Begin(work.Module.Id);
             work.Token.ThrowIfCancellationRequested();if(!work.Module.Enabled)throw new OperationCanceledException();
-            var payload=work.Module is IStructuredLeoModule structured?await structured.ExecuteStructuredAsync(work.Request,work.Token):new ActionPayload(await work.Module.ExecuteAsync(work.Request,work.Token));
+            var payload=work.Module is IStructuredLeoModule structured?await structured.ExecuteStructuredAsync(work.Request,work.Token).ConfigureAwait(false):new ActionPayload(await work.Module.ExecuteAsync(work.Request,work.Token));
             work.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,payload.Message);
-            work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",payload.Message,null,payload.Data,payload.Evidence));
+            work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",payload.Message,null,payload.Data,payload.Evidence){PrivateData=payload.PrivateData});
         }catch(OperationCanceledException e){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,"等待已结束，可确认状态后重新操作。");work.Completion.TrySetResult(Cancelled(work.Request,work.Module.Id,work.Id,e is ApplicationConfigurationChangedException?"configuration_changed":Reason(work)));}
-        catch(Exception e)when(FeatureFaults.Recoverable(e)){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Failed,e.Message);work.Completion.TrySetResult(Failure(work.Request,work.Module.Id,work.Id,work.Module is IStructuredLeoModule structured?structured.FailureCode(e):"action_failed",e));}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Failed,e.Message);work.Completion.TrySetResult(Failure(work.Request,work.Module.Id,work.Id,FailureCode(work.Module,e),e));}
         finally{
             ancestry.Value=previous;context.Value=previousContext;
             lock(pending){if(pending.GetValueOrDefault(key)==work)pending.Remove(key);if(disposed&&pending.Count==0)DisposeLifetime();}
-            work.Cancellation.Dispose();
+            work.Timeout?.Dispose();work.Cancellation.Dispose();
         }
     }
+    static string FailureCode(ILeoModule module,Exception error)
+    {try{return module is IStructuredLeoModule structured?structured.FailureCode(error):"action_failed";}catch(Exception e)when(FeatureFaults.Recoverable(e)){return "action_failed";}}
     string Reason(Execution work)=>work.CancelReason!="cancelled"?work.CancelReason:work.Expires<=DateTimeOffset.UtcNow?"timeout":"cancelled";
     static ActionResult Failure(ActionRequest r,string module,string execution,string code,Exception e)=>new(r.RequestId!,r.TraceId!,r.Source,r.Action,module,execution,"failed",e.Message,code,null,"unknown"){Failure=e};
-    static ActionResult Cancelled(ActionRequest r,string module,string execution,string code)=>new(r.RequestId!,r.TraceId!,r.Source,r.Action,module,execution,"cancelled",code=="timeout"?"等待已超时，请先确认应用状态。":code is "module_disabled" or "configuration_changed"?"模块已停用、移除或更改，已停止后续操作。":r.Action.StartsWith("local:")?"已停止等待；已提交的启动请求不会撤回。":"已取消",code,null,"unknown");
+    static ActionResult Cancelled(ActionRequest r,string module,string execution,string code)=>new(r.RequestId!,r.TraceId!,r.Source,r.Action,module,execution,"cancelled",code=="timeout"?"等待已超时，请先确认操作状态。":code is "module_disabled" or "configuration_changed"?"模块已停用、移除或更改，已停止后续操作。":r.Action.StartsWith("local:")?"已停止等待；已提交的启动请求不会撤回。":"已停止等待；已提交的操作可能已经生效，请确认结果。",code,null,"unknown");
     ActionResult Record(ActionResult result)
     {
-        lock(pending){if(result.Status=="succeeded")succeeded++;else if(result.Status=="cancelled"){cancelled++;if(result.ErrorCode=="timeout")timedOut++;}else failed++;receipts.Enqueue(new(DateTimeOffset.Now,result.ActionId,result.Source,result.Status=="succeeded",result.Message));results.Enqueue(result);while(receipts.Count>60)receipts.Dequeue();while(results.Count>60)results.Dequeue();}return result;
+        lock(pending){if(result.Status=="succeeded")succeeded++;else if(result.Status=="cancelled"){cancelled++;if(result.ErrorCode=="timeout")timedOut++;}else failed++;receipts.Enqueue(new(DateTimeOffset.Now,result.ActionId,result.Source,result.Status=="succeeded",result.Message));results.Enqueue(result.PrivateData?result with{Data=null}:result);while(receipts.Count>60)receipts.Dequeue();while(results.Count>60)results.Dequeue();}return result;
     }
     static void Cancel(Execution work,string reason){if(!work.Token.IsCancellationRequested||reason!="cancelled")work.CancelReason=reason;try{work.Cancellation.Cancel();}catch(ObjectDisposedException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("动作取消",e);}}
     public void CancelDisabled()

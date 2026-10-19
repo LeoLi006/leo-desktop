@@ -210,6 +210,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--q3-notes-test"){Q3NotesTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q2-capability-test"){Q2CapabilityTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--baseline-test"){BaselineProbe.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--baseline-runtime-test"){BaselineProbe.Run(args[1],true);return;}
@@ -516,6 +517,7 @@ sealed partial class PetForm : Form
         constructionProbe?.Invoke("assets_and_window_ready");
         var applicationHost=applicationOverride??new ApplicationCapabilityHost((app,token)=>{token.ThrowIfCancellationRequested();return Task.FromResult(!preview&&!File.Exists(app.Path)?RepairLocalApplication(app):app);},ApplicationCapabilityHost.StartProcess,app=>launcher?.RememberConfiguredLaunch(app),preview);
         commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null,applicationHost);
+        RegisterNotesCapability();
         constructionProbe?.Invoke("dispatcher_ready");
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
         commands.ApplicationAliases=launcher.ResolveApplicationRequest;
@@ -905,8 +907,8 @@ sealed partial class PetForm : Form
         updateNotifications?.Dispose();quickNoteWindow?.Dispose();companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
-        commands.Dispose();if(!previewMode){ClientOperations.Hub.Dispose();OwnedHelpers.Shutdown();}
-        hoverTimer.Dispose();hoverCard?.Dispose();notesWindow?.Dispose();dropWindow?.Dispose();if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();matchSyncLife.Dispose();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        notesWindow?.Dispose();commands.Dispose();if(!previewMode){ClientOperations.Hub.Dispose();OwnedHelpers.Shutdown();}
+        hoverTimer.Dispose();hoverCard?.Dispose();dropWindow?.Dispose();if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();matchSyncLife.Dispose();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }
     protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
     protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}

@@ -6,9 +6,11 @@ namespace LeoLauncher;
 sealed class CapabilityException(string code,string message):InvalidOperationException(message){public string Code=>code;}
 sealed class ApplicationConfigurationChangedException():OperationCanceledException("应用配置已改变");
 
-sealed record ActionPayload(string Message,JsonElement? Data=null,string Evidence="unknown");
+sealed record ActionPayload(string Message,JsonElement? Data=null,string Evidence="unknown",bool PrivateData=false);
+interface IActionRequestAdapter{ActionRequest Adapt(StructuredActionRequest request);}
 interface IStructuredLeoModule:ILeoModule
 {
+    int MaximumInputLength=>16000;
     CapabilityDefinition Describe(string action);
     bool ConfigurationIsCurrent{get;}
     Task<ActionPayload> ExecuteStructuredAsync(ActionRequest request,CancellationToken token);
@@ -16,6 +18,7 @@ interface IStructuredLeoModule:ILeoModule
 }
 sealed record ActionResult(string RequestId,string TraceId,string Source,string ActionId,string ModuleId,string ExecutionId,string Status,string Message,string? ErrorCode,JsonElement? Data,string Evidence,bool Retryable=false)
 {
+    [JsonIgnore]public bool PrivateData{get;init;}
     [JsonIgnore]public Exception? Failure{get;init;}
     public string ToLegacy(CancellationToken caller)
     {
