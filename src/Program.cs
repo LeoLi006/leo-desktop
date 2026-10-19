@@ -12,6 +12,7 @@ sealed class Preferences
 {
     public Dictionary<string,string> ModuleExecutables {get;set;}=new();
     public List<LocalApplication> ApplicationModules {get;set;}=[];
+    public List<string> ShortcutOrder {get;set;}=[];
     public Dictionary<string,string> ModuleIcons {get;set;}=new();
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
@@ -195,6 +196,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--platform53-test"){Platform53Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform52-test"){Platform52Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--package-smoke-test"){try{var checks=PackageSmokeTests.Check(Path.GetDirectoryName(args[1])!);File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}return;}
         if(args.Length==2&&args[0]=="--package-verify"){try{var release=LeoInstaller.Verify(AppContext.BaseDirectory);bool selfContained=new[]{typeof(object).Assembly.Location,typeof(Form).Assembly.Location}.All(p=>p.StartsWith(AppContext.BaseDirectory,StringComparison.OrdinalIgnoreCase));File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=selfContained,version=release.Version,files=release.Files.Count,self_contained=selfContained}));}catch(Exception e){File.WriteAllText(args[1],JsonSerializer.Serialize(new{ok=false,error=e.Message}));Environment.ExitCode=1;}return;}
@@ -467,7 +469,7 @@ sealed partial class PetForm : Form
     {
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
-        prefs = p;p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        prefs = p;p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -480,7 +482,8 @@ sealed partial class PetForm : Form
         var screen = Screen.PrimaryScreen!.WorkingArea;
         Location = p.X == -1 && p.Y == -1 ? new Point(screen.Right - Width - 36, screen.Bottom - Height - 36) : Clamp(new Point(p.X, p.Y));
         commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null);
-        launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);
+        launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
+        if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}
         foot = new FootTools(p.PetSize, preview);
         foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;
@@ -488,8 +491,8 @@ sealed partial class PetForm : Form
         foot.VoiceRequested+=ShowVoice;
         hit = new HitSurface { Bounds = Bounds };
         hit.AllowDrop = true;
-        hit.DragEnter += (_, e) => e.Effect = e.Data?.GetData(DataFormats.FileDrop) is string[] paths && FileDropActions.ValidPaths(paths).Length > 0 ? DragDropEffects.Copy : DragDropEffects.None;
-        hit.DragDrop += (_, e) => { if (e.Data?.GetData(DataFormats.FileDrop) is string[] paths) { launcher.Hide(); FileDropActions.Open(paths, launcher.FileApplications); } };
+        hit.DragEnter += (_, e) => e.Effect = DropContent.Accepts(e.Data)?DragDropEffects.Copy:DragDropEffects.None;
+        hit.DragDrop += (_, e) => { if(e.Data!=null)AcceptDrop(e.Data); };
         launcher.PetBounds = () => Bounds;
         if(!preview){WindowPositions.PetBounds=()=>Bounds;WindowPositions.MonitorsChanged=OnMonitorsChanged;OperationFeedback.Sink=PresentFeedback;}
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);
@@ -498,6 +501,7 @@ sealed partial class PetForm : Form
         menu.Items.Add("设置",null,(_,_)=>OpenSettings());
         menu.Items.Add("退出 Leo", null, (_, _) => Close());
         WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
+        PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
@@ -846,7 +850,7 @@ sealed partial class PetForm : Form
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
         commands.Dispose();if(!previewMode)OwnedHelpers.Shutdown();
-        hoverTimer.Dispose();hoverCard?.Dispose();if(!previewMode){MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        hoverTimer.Dispose();hoverCard?.Dispose();notesWindow?.Dispose();dropWindow?.Dispose();if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }
     protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
     protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}

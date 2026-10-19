@@ -14,10 +14,14 @@ static class ModulePaths
         if(!allowed.Contains(Path.GetFileName(path),StringComparer.OrdinalIgnoreCase))throw new ArgumentException("所选程序与模块不匹配，请重新选择。");
         return Path.GetFullPath(path);
     }
+    static readonly AsyncLocal<int> passive=new();
+    sealed class ReadScope:IDisposable{bool disposed;public void Dispose(){if(!disposed){disposed=true;passive.Value--;}}}
+    public static IDisposable PassiveRead(){passive.Value++;return new ReadScope();}
+    internal static Func<string,string,string?>? RepairRequested;
     public static string? Selected(string id)
     {
         if(!current.TryGetValue(id,out var path)||string.IsNullOrWhiteSpace(path))return null;
-        try{return Validate(id,path);}catch{throw new InvalidOperationException("手动指定的软件路径已失效，请在设置 → 功能 → 应用模块与图标中重新选择。");}
+        try{return Validate(id,path);}catch{var repaired=passive.Value==0?RepairRequested?.Invoke(id,path):null;if(!string.IsNullOrWhiteSpace(repaired)){current[id]=Validate(id,repaired);return current[id];}throw new InvalidOperationException("手动指定的软件路径已失效，请在设置 → 功能 → 应用模块与图标中重新选择。");}
     }
 }
 

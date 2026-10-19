@@ -20,6 +20,7 @@ sealed class HealthChecksView:Panel
     }
     void Check()
     {
+        using var passive=ModulePaths.PassiveRead();
         if(preview){startup.Enabled=paths.Enabled=shortcuts.Enabled=false;result.Text="示例模式 · 不修改启动项，不启动外部软件，不联网。";return;}
         startup.Enabled=!LeoStartup.Enabled;shortcuts.Enabled=hotkeys?.Invoke().Contains("被占用")==true;paths.Enabled=false;
         var lines=new List<string>();

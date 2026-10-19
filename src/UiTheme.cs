@@ -19,7 +19,7 @@ static class UiTheme
     static int revision;
     internal static object ExportTokens(){var palette=active;var options=Options;string Hex(System.Drawing.Color c)=>"#"+c.R.ToString("X2")+c.G.ToString("X2")+c.B.ToString("X2");return new{skin=palette.Id,name=Name,accent=options.Accent??Hex(palette.Accent),background=Hex(MapCore(R(11,18,33),palette,options)),text=Hex(MapCore(R(237,242,250),palette,options)),radius=options.CornerRadius,opacity=options.Opacity};}
     public static double WindowOpacity=>Options.Opacity/100d;
-    public static Palette PaletteFor(string id)=>Palettes.FirstOrDefault(p=>p.Id==(SkinLibrary.Find(id)?.BaseTheme??id))??Palettes[0];
+    public static Palette PaletteFor(string id){var skin=SkinLibrary.Find(id);if(skin?.Palette is {} colors)return new Palette(id,skin.Name,colors.Motto,ColorTranslator.FromHtml(colors.Primary),ColorTranslator.FromHtml(colors.Secondary),ColorTranslator.FromHtml(colors.Accent));return Palettes.FirstOrDefault(p=>p.Id==(skin?.BaseTheme??id))??Palettes[0];}
     public static System.Drawing.Color PreviewColor(string id,int r,int g,int b,ThemeOptions options)=>MapCore(R(r,g,b),PaletteFor(id),options);
     static readonly Dictionary<int,System.Drawing.Color> originals=new();
     static readonly ConditionalWeakTable<Control,Style> styles=new();
@@ -64,7 +64,7 @@ static class UiTheme
     public static void Start(){if(started)return;started=true;Application.Idle+=(_,_)=>{foreach(Form f in Application.OpenForms.Cast<Form>().ToArray())if(!seen.TryGetValue(f,out _)){seen.Add(f,new object());Attach(f);}};}
     public static void Configure(string id,string? name,ThemeOptions? appearance=null)
     {
-        var next=PaletteFor(id);var options=appearance??new ThemeOptions();try{options.Validate();}catch(ArgumentException){options=new();}string valid;try{valid=ValidateName(name);}catch{valid="Leo";}
+        var next=PaletteFor(id);var options=appearance??SkinLibrary.Find(id)?.DefaultOptions??new ThemeOptions();try{options.Validate();}catch(ArgumentException){options=new();}string valid;try{valid=ValidateName(name);}catch{valid="Leo";}
         if(next==active&&valid==Name&&options==Options)return;
         // Capture controls under the old palette before changing tokens.
         RefreshAll();active=next;Name=valid;Options=options;revision++;RefreshAll();

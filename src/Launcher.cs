@@ -6,6 +6,8 @@ sealed partial class LauncherForm : Form
     internal Func<string,CancellationToken,Task<string>>? CommandRequested;
     internal Func<string,bool>? RecognizesCommand;
     internal Action? MediaRequested;
+    internal Func<LocalApplication,LocalApplication>? RepairApplication;internal Action<string[]>? ApplicationsDropped;
+    Action openFootball=null!;
     FlowLayoutPanel shortcutRow=null!;GlyphButton footballShortcut=null!;
     internal Func<string,string,CancellationToken,Task<string>>? ActionRequested;
     readonly TextBox query = new();
@@ -111,7 +113,7 @@ sealed partial class LauncherForm : Form
         var brand=new Label { Text = "LEO", Left = 22, Top = 9, Width = 43, Height = 22, AutoEllipsis=true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Appearance.Accent };Controls.Add(brand);
         var footballButton = new GlyphButton("football") { Bounds = new Rectangle(69, 7, 28, 24), AccessibleName = "足球赛程", FlatStyle = FlatStyle.Flat };
         footballButton.FlatAppearance.BorderSize = 0;
-        footballButton.Click += (_, _) => {
+        openFootball = () => {
             if(!prefs.FootballModule)return;
             if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks);
             SetWatchVisibility(football);
@@ -121,9 +123,10 @@ sealed partial class LauncherForm : Form
             Hide();
             football.Show(); football.Activate();
         };
+        footballButton.Click+=(_,_)=>{if(!ignoreShortcutClick&&!shortcutDragging)openFootball();};
         var shortcutViewport=new Panel{Bounds=new Rectangle(69,3,308,31)};shortcutRow=new FlowLayoutPanel{Bounds=new Rectangle(0,0,308,52),WrapContents=false,AutoScroll=true,FlowDirection=FlowDirection.LeftToRight};shortcutViewport.Controls.Add(shortcutRow);Controls.Add(shortcutViewport);footballShortcut=footballButton;
-        shortcutRow.MouseWheel+=(_,e)=>{shortcutRow.AutoScrollPosition=new Point(Math.Max(0,-shortcutRow.AutoScrollPosition.X-e.Delta/3),0);};
-        void BrandLayout(){brand.Width=Math.Clamp(TextRenderer.MeasureText(brand.Text,brand.Font).Width+6,43,190);shortcutViewport.Left=brand.Right+4;shortcutViewport.Width=Math.Max(120,377-shortcutViewport.Left);shortcutRow.Width=shortcutViewport.Width;}brand.TextChanged+=(_,_)=>BrandLayout();BrandLayout();
+        InitializeShortcutBar(shortcutViewport);
+        void BrandLayout(){brand.Width=Math.Clamp(TextRenderer.MeasureText(brand.Text,brand.Font).Width+6,43,190);shortcutViewport.Left=brand.Right+4;shortcutViewport.Width=Math.Max(120,377-shortcutViewport.Left);shortcutRow.Width=Math.Max(30,shortcutViewport.Width-33);LayoutShortcutOverflow();}brand.TextChanged+=(_,_)=>BrandLayout();BrandLayout();
         RefreshShortcuts();
         var size = new MsnSlider { Value = Math.Clamp(p.PetSize, 80, 230) };
         size.AutoSize = false; size.SetBounds(390, 6, 145, 28);
@@ -151,8 +154,10 @@ sealed partial class LauncherForm : Form
         status.SetBounds(22, 248, 556, 24); status.ForeColor = Color.LightSalmon; status.Visible = false; Controls.Add(status);
         if (!preview) clipboard = new ClipboardHistoryService(prefs);
         debounce.Tick += (_, _) => { debounce.Stop(); Filter(); };
-        query.TextChanged += (_, _) => { keyboardNavigation=false;debounce.Stop(); debounce.Start(); };
+        query.TextChanged += (_, _) => { keyboardNavigation=false;pathLookup?.Cancel();pathChoices.Items.Clear();debounce.Stop(); debounce.Start(); };
+        InitializePathCompletion();
         query.KeyDown += (_, e) => {
+            if(PathKey(e))return;
             if (e.KeyCode is Keys.Down or Keys.Up or Keys.Left or Keys.Right)
             {
                 if(e.KeyCode is Keys.Left or Keys.Right&&query.TextLength>0&&!keyboardNavigation)return;
@@ -167,7 +172,7 @@ sealed partial class LauncherForm : Form
             if (e.KeyCode == Keys.Escape) { Hide(); e.SuppressKeyPress = true; }
         };
         Deactivate += (_, _) => { if (!preview) ProcessDeactivation(PointerOverPet?.Invoke() == true); };
-        Disposed+=(_,_)=>{shortcutTips.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
+        Disposed+=(_,_)=>{shortcutTips.Dispose();shortcutOverflowMenu.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
         observer.Tick += (_, _) => Observe();
         LoadCatalog();
     }
@@ -328,6 +333,7 @@ sealed partial class LauncherForm : Form
         status.Text = memory.LastSaveError != null ? "历史保存失败，本次记录仅保存在内存" : "";
         status.Visible = status.Text.Length > 0;
         ClientSize = new Size(600, status.Visible ? 276 : 248);
+        UpdatePathCompletion();
     }
     List<AppEntry> VisibleEntries() => string.IsNullOrWhiteSpace(query.Text)
         ? FavoriteOrder.Merge(AllApplications.ToList(), prefs.Favorites, prefs.RememberHistory ? memory.Recent(AllApplications.ToList()) : new List<AppEntry>())
@@ -335,7 +341,7 @@ sealed partial class LauncherForm : Form
 
     bool CanRunCommand(string text)=>IsCommand(text)||RecognizesCommand?.Invoke(text.Trim())==true;
     internal static bool IsCommand(string text)=>LocalPath.LooksLike(text)||text.StartsWith(":")||text.StartsWith("：")||QuickRouter.Route(text).Kind is not(QuickKind.Ai or QuickKind.SearchApp)||NaturalTodo.Parse(text,DateTime.Now,DateOnly.FromDateTime(DateTime.Today))!=null;
-    async Task RunCommand(){var text=query.Text.Trim().TrimStart(':','：').Trim();try{query.Enabled=false;var result=await CommandRequested!(text,CancellationToken.None);if(!IsDisposed){query.Clear();Hide();OperationFeedback.Show(result);}}catch(Exception e){if(!IsDisposed){status.Visible=true;status.Text=e.Message;ClientSize=new Size(600,280);}}finally{if(!IsDisposed){query.Enabled=true;query.Focus();}}}
+    async Task RunCommand(){debounce.Stop();pathLookup?.Cancel();var text=query.Text.Trim().TrimStart(':','：').Trim();try{query.Enabled=false;var result=await CommandRequested!(text,CancellationToken.None);if(!IsDisposed){query.Clear();Hide();OperationFeedback.Show(result);}}catch(Exception e){if(!IsDisposed){status.Visible=true;status.Text=e.Message;ClientSize=new Size(600,280);}}finally{if(!IsDisposed){query.Enabled=true;query.Focus();}}}
     void LaunchSelected()
     {
         var entries = VisibleEntries();
@@ -343,14 +349,14 @@ sealed partial class LauncherForm : Form
     }
     public void LaunchFromAssistant(AppEntry app)
     {
-        launchApplication(app);
+        var module=(prefs.ApplicationModules??[]).FirstOrDefault(a=>a.Enabled&&a.Path.Equals(app.Target,StringComparison.OrdinalIgnoreCase));if(module!=null&&!preview){if(!File.Exists(module.Path)&&RepairApplication!=null)module=RepairApplication(module);Process.Start(LocalApplications.Start(module));}else launchApplication(app);
         if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
     }
     public bool VerifyMusicEntry(){if(!Visible)Show();var icon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public void ReloadImportedConfiguration(){FootballFollowing.Current.Reload();football?.Close();football=null;RefreshModules();Filter();}
     public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview){MediaRequested=()=>MediaRequested?.Invoke()};music.ConfigureMedia(prefs.MediaModule);return music;}
     public MusicForm OpenMusicFromAssistant(string query=""){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview){MediaRequested=()=>MediaRequested?.Invoke()};if(!music.Visible)WindowPositions.Prepare(music,"music",PetBounds?.Invoke()??Bounds,preview);music.OpenQuery(query);music.ConfigureMedia(prefs.MediaModule);return music;}
-    public void OpenFootballFromAssistant(){Modules.Require(prefs,"football");var button=shortcutRow.Controls.OfType<GlyphButton>().Single(x=>x.AccessibleName=="足球赛程");button.PerformClick();}
+    public void OpenFootballFromAssistant(){Modules.Require(prefs,"football");openFootball();}
     public string PinClipboardText(string text){if(clipboard==null)throw new InvalidOperationException("剪贴板尚未就绪");if(string.IsNullOrWhiteSpace(text)||text.Length>100000)throw new ArgumentException("文字为空或过长");var item=new ClipItem("text",text,text.Replace('\n',' ')[..Math.Min(100,text.Length)],DateTimeOffset.Now);clipboard.History.Add(item);if(!clipboard.History.Pin(item,true))throw new InvalidOperationException("剪贴板收藏已达上限");if(clipboard.History.Error!=null)throw new IOException(clipboard.History.Error);return "已收藏这段文字到剪贴板。";}
     public void OpenClipboardFromAssistant(){Hide();ClipboardTool.Open(clipboard);if(prefs.RememberHistory)memory.Record(ClipboardTool.Entry,activationContext,DateTimeOffset.UtcNow);}
     async void Launch(AppEntry app)
@@ -372,6 +378,7 @@ sealed partial class LauncherForm : Form
         if(key==Keys.Escape){Hide();return true;}
         if(key==(Keys.Control|Keys.L)||key==(Keys.Control|Keys.F)){query.Focus();query.SelectAll();return true;}
         if(key==(Keys.Control|Keys.Z)&&query.TextLength==0&&undoFavorite!=null){try{undoFavorite();}catch(Exception e){OperationFeedback.Error(e.Message);}return true;}
+        if(key==Keys.Tab&&LocalPath.LooksLike(query.Text)){FillChosenPath();return true;}
         if(key==Keys.Tab||key==(Keys.Shift|Keys.Tab)){
             debounce.Stop();FilterIfChanged();int count=VisibleEntries().Count;if(count>0){selection=(selection+(key==Keys.Tab?1:count-1))%count;keyboardNavigation=true;PopulateRecent();}query.Focus();return true;
         }
