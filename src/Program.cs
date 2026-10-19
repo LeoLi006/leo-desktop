@@ -12,6 +12,7 @@ sealed class Preferences
 {
     public Dictionary<string,string> ModuleExecutables {get;set;}=new();
     public List<LocalApplication> ApplicationModules {get;set;}=[];
+    public Dictionary<string,InstalledApplicationPackage> ApplicationPackages {get;set;}=new();
     public List<string> ShortcutOrder {get;set;}=[];
     public Dictionary<string,string> EntryDisplayModes {get;set;}=new();
     public Dictionary<string,string> ModuleIcons {get;set;}=new();
@@ -67,7 +68,7 @@ static class Store
         try {return AtomicJson.Read(FilePath,Validate);}
         catch { LoadFailed=File.Exists(FilePath)||File.Exists(FilePath+".bak");return new(); }
     }
-    internal static Preferences Validate(string text){using var document=JsonDocument.Parse(text);var result=document.RootElement.Deserialize<Preferences>()??throw new IOException("设置内容为空");if(result.PetSize is <80 or >230||result.Favorites==null||result.Aliases==null||result.ModuleExecutables==null||result.SkinThemes==null||result.DisabledExtensions==null)throw new IOException("设置内容不完整");PlannerPhrases.Validate(result.PlannerQuotes);QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
+    internal static Preferences Validate(string text){using var document=JsonDocument.Parse(text);var result=document.RootElement.Deserialize<Preferences>()??throw new IOException("设置内容为空");if(result.PetSize is <80 or >230||result.Favorites==null||result.Aliases==null||result.ModuleExecutables==null||result.SkinThemes==null||result.DisabledExtensions==null)throw new IOException("设置内容不完整");ApplicationPackages.ValidateState(result);PlannerPhrases.Validate(result.PlannerQuotes);QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
     static void Migrate()
     {
         var parent = Directory.GetParent(Root.TrimEnd(Path.DirectorySeparatorChar))?.FullName;
@@ -210,6 +211,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--q6-package-test"){Q6PackageTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q5-brain-test"){Q5BrainTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q4-workflow-test"){Q4WorkflowTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q3-notes-test"){Q3NotesTests.Run(args[1]);return;}

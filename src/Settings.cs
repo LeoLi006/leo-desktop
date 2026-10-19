@@ -167,7 +167,7 @@ sealed partial class PetForm
     }
     void ApplySettings(Preferences next, bool startup)
     {
-        PlannerPhrases.Validate(next.PlannerQuotes);EntryDisplay.Validate(next.EntryDisplayModes);next.DisplayName=UiTheme.ValidateName(next.DisplayName);foreach(var options in next.SkinThemes.Values)options.Validate();if(next.PetSize is <80 or >230)throw new ArgumentException("大小范围80至230");
+        ApplicationPackages.ValidateState(next);PlannerPhrases.Validate(next.PlannerQuotes);EntryDisplay.Validate(next.EntryDisplayModes);next.DisplayName=UiTheme.ValidateName(next.DisplayName);foreach(var options in next.SkinThemes.Values)options.Validate();if(next.PetSize is <80 or >230)throw new ArgumentException("大小范围80至230");
         var previousKeys = LeoHotkeys.Values(prefs); var nextKeys = LeoHotkeys.Values(next);
         if (!previewMode)
         {
@@ -177,7 +177,7 @@ sealed partial class PetForm
             catch { if(LeoStartup.Enabled!=wasStartup)LeoStartup.SetEnabled(wasStartup); LeoHotkeys.Replace(nextKeys, previousKeys, id => Native.UnregisterHotKey(Handle, id), (id, chord) => LeoHotkeys.Register(Handle, id, chord)); throw; }
         }
         prefs.ApplicationIndexing=next.ApplicationIndexing;prefs.ActiveProfile=next.ActiveProfile;prefs.ContextAware=next.ContextAware;prefs.ClipboardHistory=next.ClipboardHistory;
-        prefs.AutoUpdateNotifications=next.AutoUpdateNotifications;updateNotifications?.Configure(next.AutoUpdateNotifications);prefs.EntryDisplayModes=new(next.EntryDisplayModes);prefs.ShortcutOrder=(next.ShortcutOrder??[]).Distinct().ToList();prefs.ApplicationModules=(next.ApplicationModules??[]).ToList();prefs.ModuleIcons=new(next.ModuleIcons??new());prefs.MediaModule=next.MediaModule;prefs.DisabledExtensions=next.DisabledExtensions.ToList();prefs.SkinThemes=next.SkinThemes.ToDictionary();
+        prefs.AutoUpdateNotifications=next.AutoUpdateNotifications;updateNotifications?.Configure(next.AutoUpdateNotifications);prefs.EntryDisplayModes=new(next.EntryDisplayModes);prefs.ShortcutOrder=(next.ShortcutOrder??[]).Distinct().ToList();prefs.ApplicationModules=(next.ApplicationModules??[]).ToList();prefs.ApplicationPackages=new(next.ApplicationPackages);prefs.ModuleIcons=new(next.ModuleIcons??new());prefs.MediaModule=next.MediaModule;prefs.DisabledExtensions=next.DisabledExtensions.ToList();prefs.SkinThemes=next.SkinThemes.ToDictionary();
         prefs.PlannerQuotes=next.PlannerQuotes?.ToArray();PlannerPhrases.Configure(prefs.PlannerQuotes);prefs.DisplayName=UiTheme.ValidateName(next.DisplayName);prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
