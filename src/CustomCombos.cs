@@ -54,7 +54,7 @@ sealed class ComboStore
     {
         if (Error != null) throw new IOException(Error);
         if (next.Count > 24) throw new ArgumentException("最多保存24个组合");
-        if (path != null) { File.WriteAllText(path+".tmp",JsonSerializer.Serialize(next)); File.Move(path+".tmp",path,true); }
+        if (path != null) AtomicJson.Write(path,JsonSerializer.Serialize(next));
         Items = next;
     }
     public void Put(CustomCombo item)
@@ -68,37 +68,60 @@ sealed class ComboStore
 
 sealed partial class PetForm
 {
-    bool comboBusy;
-    Task<string> PrepareWatch()=>RunComboByName("准备看球");
-    Task<string> RunComboByName(string name)
-    {
-        var item=new ComboStore(previewMode?null:ComboStore.FilePath).Items.SingleOrDefault(i=>i.Name.Equals(name.Trim(),StringComparison.OrdinalIgnoreCase));
-        if(item==null){OperationFeedback.Error("未找到组合："+name);return Task.FromResult("未找到自定义组合，请在右键 → 自定义中创建。");}
-        return RunCombo(item.Id);
-    }
+    ReliableWorkflow? comboWorkflow;CancellationTokenSource? comboCancellation;
+    Task<string> PrepareWatch()=>commands.ExecuteAsync(new("scene_watch","","combo"));
+    Task<string> RunComboByName(string name)=>commands.ExecuteAsync(new("combo_name",name,"combo"));
     async Task<string> RunCombo(string id)
     {
-        if(comboBusy)return "已有组合正在执行，请稍候";
-        if(previewMode)return "示例模式，不执行组合的外部操作";
-        try
-        {
-            var store=new ComboStore(ComboStore.FilePath);
-            if(store.Error!=null)throw new IOException(store.Error);
-            var combo=store.Items.SingleOrDefault(i=>i.Id==id)??throw new ArgumentException("组合已删除");
-            ComboStore.Validate(combo);
-            var steps=combo.Steps.Select(BuildComboStep).ToArray();
-            var run=new SceneRun(steps);
-            async Task<string> Continue()
-            {
-                if(comboBusy||IsDisposed)return "组合正在执行或Leo已关闭";
-                comboBusy=true;
-                try{await run.Execute(step=>OperationFeedback.Pending(combo.Name+" · "+step));OperationFeedback.Show(combo.Name+" · 已完成");return combo.Name+"已执行；音乐仅确认已发送客户端。";}
-                catch(Exception e){OperationFeedback.Error($"{combo.Name}：已完成 {run.Completed}/{steps.Length} 步 · "+e.Message,()=>Continue());return "组合未完成："+e.Message;}
-                finally{comboBusy=false;}
-            }
-            return await Continue();
+        bool submitted=false;
+        try{var store=new ComboStore(previewMode?null:ComboStore.FilePath);if(store.Error!=null)throw new IOException(store.Error);var combo=store.Items.SingleOrDefault(i=>i.Id==id)??throw new ArgumentException("组合已删除");submitted=true;return await RunComboByName(combo.Name);}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!submitted)OperationFeedback.Error(e.Message);return "组合未完成："+e.Message;}
+    }
+    void RegisterWorkflowCapability()
+    {
+        var ui=new ModuleWindowService(this);
+        commands.Registry.Register(new WorkflowCapability(async(request,token)=>{
+            Task<ActionPayload>? task=null;await ui.ShowAsync(()=>task=ExecuteWorkflow(request,token),token);return await task!;
+        }));
+    }
+    async Task<ActionPayload> ExecuteWorkflow(ActionRequest request,CancellationToken token)
+    {
+        string name=request.Action=="scene_watch"?"准备看球":request.Value;bool confirmed=false;
+        if(request.Action=="combo_resume"){using var doc=JsonDocument.Parse(request.Value);name=doc.RootElement.GetProperty("name").GetString()??"";confirmed=doc.RootElement.GetProperty("confirmUnknown").GetBoolean();}
+        if(previewMode)return new("示例模式，不执行组合的外部操作");
+        if(comboCancellation!=null)throw new InvalidOperationException("已有组合正在执行，请稍候");
+        using var linked=CancellationTokenSource.CreateLinkedTokenSource(token);comboCancellation=linked;
+        try{
+            var store=new ComboStore(ComboStore.FilePath);if(store.Error!=null)throw new IOException(store.Error);
+            var combo=store.Items.SingleOrDefault(i=>i.Name.Equals(name.Trim(),StringComparison.OrdinalIgnoreCase))??throw new ArgumentException("未找到自定义组合，请在右键菜单中创建");ComboStore.Validate(combo);
+            var steps=combo.Steps.Select(PlanComboStep).ToArray();
+            foreach(var step in steps)if(!commands.Registry.Resolve(step.Request.Action).Enabled)throw new InvalidOperationException("组合使用的模块已停用，请先启用或编辑组合");
+            comboWorkflow??=new(new WorkflowJournal(Path.Combine(Store.Root,"leo-flow-runs.json")),commands.ExecuteDetailedAsync,VerifyWorkflowStep);
+            var result=await comboWorkflow.Run(combo.Id,steps,(index,step)=>OperationFeedback.Sink?.Invoke(new(combo.Name+" · "+(index+1)+"/"+steps.Length+" · "+step.Label,Retry:()=>{if(ReferenceEquals(comboCancellation,linked))try{linked.Cancel();}catch(ObjectDisposedException){}return Task.CompletedTask;},Busy:true,ActionLabel:"停止",Module:"workflows",OperationId:combo.Id)),linked.Token,confirmed);
+            OperationFeedback.Show(combo.Name+" · 已完成");return new("组合已完成；客户端操作仅确认已提交。",JsonSerializer.SerializeToElement(new{result.RunId,completed=result.Steps.Count(s=>s.State=="succeeded")}),"steps-completed");
+        }catch(OperationCanceledException){OperationFeedback.Show("组合已停止，已完成的步骤保留；不会继续执行后续操作。");throw;}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){
+            bool explicitRetry=e is WorkflowRecoveryRequired;
+            OperationFeedback.Error(e.Message,async()=>{try{await commands.ExecuteAsync(new("combo_resume",JsonSerializer.Serialize(new{name,confirmUnknown=explicitRetry}),"workflow-retry"));}catch(Exception failure)when(FeatureFaults.Recoverable(failure)){}},explicitRetry?"确认重试此步":"检查并重试",module:"workflows");throw;
+        }finally{if(ReferenceEquals(comboCancellation,linked))comboCancellation=null;}
+    }
+    WorkflowStep PlanComboStep(ComboStep step,int index)
+    {
+        var request=step.Kind=="command"?new ActionRequest("command_text",step.Value,"combo"):ComboRequest(step);
+        if(request.Action=="watch_open"){
+            var link=new WatchLinkStore(previewMode?null:Path.Combine(Store.Root,"leo-watch-links.json")).Items[int.Parse(request.Value)-1];
+            request=new("web_open",link.Url,"combo"); // Pin the actual target into this plan's fingerprint.
         }
-        catch(Exception e){OperationFeedback.Error(e.Message,()=>{EditCombo(id);return Task.CompletedTask;},"编辑");return "组合未执行："+e.Message;}
+        return new("step-"+(index+1),request,step.Label.Length>0?step.Label:step.Kind);
+    }
+    async Task<WorkflowVerification> VerifyWorkflowStep(ActionRequest request,CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if(request.Action is "proxy_on" or "proxy_off"){var status=await Task.Run(ClashProxy.ReadStatus,token);return (request.Action=="proxy_on"?status.Running&&status.Enabled==true:status.Enabled==false)?WorkflowVerification.Confirmed:WorkflowVerification.NotApplied;}
+        if(request.Action=="music_client"){var processes=Process.GetProcessesByName("QQMusic");try{return processes.Length>0?WorkflowVerification.Confirmed:WorkflowVerification.Unknown;}finally{foreach(var process in processes)process.Dispose();}}
+        if(request.Action=="match_add")return WorkflowVerification.NotApplied; // The bridge deduplicates by persisted provider/event identity.
+        if(request.Action is "todos_open" or "football_open" or "chat_open" or "match_lookup")return WorkflowVerification.NotApplied;
+        return WorkflowVerification.Unknown;
     }
     (string,Func<Task>) BuildComboStep(ComboStep step)
     {

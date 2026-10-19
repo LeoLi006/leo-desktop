@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
 sealed record Club(string Name,string Id,string League,string LeagueName,string English="",string[]? Aliases=null,string Kind="club")
@@ -98,7 +98,7 @@ sealed class TeamView:UserControl
             foreach(bool completed in new[]{true,false}){
                 Heading(completed?"近期赛果":"即将开赛");
                 var rows=completed?data.Matches.Where(m=>m.State=="post").OrderByDescending(m=>m.Kickoff):data.Matches.Where(m=>m.State!="post").OrderBy(m=>m.Kickoff);
-                foreach(var m in rows){var card=new MatchCard(m,club.Name,tasks){Width=width};card.Click+=(_,_)=>OpenSource("https://www.espn.com/soccer/match/_/gameId/"+m.Id);list.Controls.Add(card);}
+                foreach(var m in rows){var card=new MatchCard(m,club.Name,tasks,data.MatchesUpdated){Width=width};card.Click+=(_,_)=>OpenSource("https://www.espn.com/soccer/match/_/gameId/"+m.Id);list.Controls.Add(card);}
                 if(!rows.Any())list.Controls.Add(new Label{Text="暂无已公布的数据",Width=width,Height=42,Padding=new Padding(5,10,0,0),ForeColor=BarcaUi.Muted});
             }
         }else{

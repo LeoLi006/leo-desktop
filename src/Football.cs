@@ -170,7 +170,7 @@ sealed class FootballForm : BarcaWindow,IWindowBack
         if(rows.Length==0)list.Controls.Add(new Label{Text="暂无已公布的匹配赛程\n可稍后刷新",Width=480,Height=100,Padding=new Padding(22,30,0,0),ForeColor=BarcaUi.Muted});
         string day="";
         foreach(var row in rows){var m=row.Match;string next=m.Kickoff.ToLocalTime().ToString("MM月dd日 dddd");if(next!=day){day=next;list.Controls.Add(new Label{Text=day,Width=Math.Max(400,list.ClientSize.Width-35),Height=34,Padding=new Padding(3,8,0,0),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});}
-            string tag=row.Tags.Length>0?string.Join(" · ",row.Tags):"焦点对阵";var card=new MatchCard(m,tag,tasks){Width=Math.Max(500,list.ClientSize.Width-38)};
+            string tag=row.Tags.Length>0?string.Join(" · ",row.Tags):"焦点对阵";var card=new MatchCard(m,tag,tasks,cache.Updated){Width=Math.Max(500,list.ClientSize.Width-38)};
             card.Click+=(_,_)=>{if(preview)return;try{if(m.Id.Length>0&&m.Id.All(char.IsAsciiDigit))Process.Start(new ProcessStartInfo("https://www.espn.com/soccer/match/_/gameId/"+m.Id){UseShellExecute=true});}catch{status.Text="无法打开浏览器";}};list.Controls.Add(card);
         }list.ResumeLayout();
     }

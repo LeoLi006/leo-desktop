@@ -109,7 +109,7 @@ sealed partial class ActionDispatcher
             work.Token.ThrowIfCancellationRequested();if(!work.Module.Enabled)throw new OperationCanceledException();
             var payload=work.Module is IStructuredLeoModule structured?await structured.ExecuteStructuredAsync(work.Request,work.Token).ConfigureAwait(false):new ActionPayload(await work.Module.ExecuteAsync(work.Request,work.Token));
             work.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,payload.Message);
-            work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",payload.Message,null,payload.Data,payload.Evidence){PrivateData=payload.PrivateData});
+            work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",payload.Message,null,payload.Data,payload.Evidence){PrivateData=payload.PrivateData,DiagnosticMessage=payload.DiagnosticMessage});
         }catch(OperationCanceledException e){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,"等待已结束，可确认状态后重新操作。");work.Completion.TrySetResult(Cancelled(work.Request,work.Module.Id,work.Id,e is ApplicationConfigurationChangedException?"configuration_changed":Reason(work)));}
         catch(Exception e)when(FeatureFaults.Recoverable(e)){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Failed,e.Message);work.Completion.TrySetResult(Failure(work.Request,work.Module.Id,work.Id,FailureCode(work.Module,e),e));}
         finally{
@@ -125,7 +125,8 @@ sealed partial class ActionDispatcher
     static ActionResult Cancelled(ActionRequest r,string module,string execution,string code)=>new(r.RequestId!,r.TraceId!,r.Source,r.Action,module,execution,"cancelled",code=="timeout"?"等待已超时，请先确认操作状态。":code is "module_disabled" or "configuration_changed"?"模块已停用、移除或更改，已停止后续操作。":r.Action.StartsWith("local:")?"已停止等待；已提交的启动请求不会撤回。":"已停止等待；已提交的操作可能已经生效，请确认结果。",code,null,"unknown");
     ActionResult Record(ActionResult result)
     {
-        lock(pending){if(result.Status=="succeeded")succeeded++;else if(result.Status=="cancelled"){cancelled++;if(result.ErrorCode=="timeout")timedOut++;}else failed++;receipts.Enqueue(new(DateTimeOffset.Now,result.ActionId,result.Source,result.Status=="succeeded",result.Message));results.Enqueue(result.PrivateData?result with{Data=null}:result);while(receipts.Count>60)receipts.Dequeue();while(results.Count>60)results.Dequeue();}return result;
+        var recorded=result with{Data=result.PrivateData?null:result.Data,Message=result.DiagnosticMessage??result.Message};
+        lock(pending){if(result.Status=="succeeded")succeeded++;else if(result.Status=="cancelled"){cancelled++;if(result.ErrorCode=="timeout")timedOut++;}else failed++;receipts.Enqueue(new(DateTimeOffset.Now,result.ActionId,result.Source,result.Status=="succeeded",recorded.Message));results.Enqueue(recorded);while(receipts.Count>60)receipts.Dequeue();while(results.Count>60)results.Dequeue();}return result;
     }
     static void Cancel(Execution work,string reason){if(!work.Token.IsCancellationRequested||reason!="cancelled")work.CancelReason=reason;try{work.Cancellation.Cancel();}catch(ObjectDisposedException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("动作取消",e);}}
     public void CancelDisabled()
