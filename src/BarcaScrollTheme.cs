@@ -6,12 +6,16 @@ namespace LeoLauncher;
 static class BarcaScrollTheme
 {
     static readonly ConditionalWeakTable<Control, ScrollSkin> skins=new();
-    public static void Start() => Application.Idle+=(_,_)=>{foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())FeatureFaults.Run("滚动条主题",()=>Attach(form));};
+    static bool started;
+    internal static int AttachmentCount{get;private set;}
+    public static void Start(){if(started)return;started=true;Application.Idle+=(_,_)=>{foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())if(!skins.TryGetValue(form,out _))FeatureFaults.Run("滚动条主题",()=>Attach(form));};}
     internal static void Attach(Control control)
     {
         if(control.IsDisposed)return;
+        if(skins.TryGetValue(control,out _))return;
         if(!skins.TryGetValue(control,out _)){
             skins.Add(control,new ScrollSkin(control));
+            AttachmentCount++;
             control.ControlAdded+=(_,e)=>{if(e.Control!=null)Attach(e.Control);};
         }
         foreach(Control child in control.Controls)Attach(child);
@@ -19,14 +23,14 @@ static class BarcaScrollTheme
     sealed class ScrollSkin:NativeWindow
     {
         readonly Control control;
-        bool painting;
+        bool painting,disabled;
         public ScrollSkin(Control owner){control=owner;owner.HandleCreated+=(_,_)=>Connect();owner.HandleDestroyed+=(_,_)=>ReleaseHandle();if(owner.IsHandleCreated)Connect();}
         void Connect(){AssignHandle(control.Handle);try{SetWindowTheme(Handle,"DarkMode_Explorer",null);}catch{}}
         protected override void WndProc(ref Message m)
         {
             base.WndProc(ref m);
-            if(!painting&&m.Msg is 0x85 or 0xF or 0x115 or 0x114 or 0x20A or 0xA0 or 0xA1 or 0xA2 or 0x200 or 0x2A2 or 0x113 or 0x5){
-                painting=true;try{Paint(-5,true);Paint(-6,false);}finally{painting=false;}
+            if(!painting&&!disabled&&m.Msg is 0x85 or 0xF or 0x115 or 0x114 or 0x20A or 0xA0 or 0xA1 or 0xA2 or 0x200 or 0x2A2 or 0x113 or 0x5){
+                painting=true;try{Paint(-5,true);Paint(-6,false);}catch(Exception e)when(FeatureFaults.Recoverable(e)){disabled=true;FeatureFaults.Report("单个滚动条绘制",e);}finally{painting=false;}
             }
         }
         void Paint(int id,bool vertical)

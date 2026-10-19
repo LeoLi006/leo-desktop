@@ -59,12 +59,14 @@ static class Store
     // Portable: keep preferences beside the executable, not in the user's home.
     public static readonly string Root = AppContext.BaseDirectory;
     public static string FilePath => Path.Combine(Root, "leo-settings.json");
+    public static bool LoadFailed{get;private set;}
     public static Preferences Load()
     {
         Migrate();
-        try {using var document=JsonDocument.Parse(File.ReadAllText(FilePath));var result=document.RootElement.Deserialize<Preferences>()??new();QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
-        catch { return new(); }
+        try {return AtomicJson.Read(FilePath,Validate);}
+        catch { LoadFailed=File.Exists(FilePath)||File.Exists(FilePath+".bak");return new(); }
     }
+    internal static Preferences Validate(string text){using var document=JsonDocument.Parse(text);var result=document.RootElement.Deserialize<Preferences>()??throw new IOException("设置内容为空");if(result.PetSize is <80 or >230||result.Favorites==null||result.Aliases==null||result.ModuleExecutables==null||result.SkinThemes==null||result.DisabledExtensions==null)throw new IOException("设置内容不完整");QuickNoteCompatibility.Migrate(document.RootElement,result);return result;}
     static void Migrate()
     {
         var parent = Directory.GetParent(Root.TrimEnd(Path.DirectorySeparatorChar))?.FullName;
@@ -84,7 +86,7 @@ static class Store
     }
     public static void Save(Preferences p)
     {
-        try { File.WriteAllText(FilePath, JsonSerializer.Serialize(p, new JsonSerializerOptions { WriteIndented = true })); }
+        try { AtomicJson.Write(FilePath, JsonSerializer.Serialize(p, new JsonSerializerOptions { WriteIndented = true })); }
         catch (Exception e) { MessageBox.Show("无法保存设置：" + e.Message, "Leo"); }
     }
 }
@@ -207,6 +209,9 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--soak-test"){SoakProbe.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--robustness-test"){RobustnessTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--performance-test"){PerformanceProbe.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--feedback-pointer-test"){FeedbackPointerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
@@ -461,6 +466,8 @@ sealed partial class PetForm : Form
     readonly Preferences prefs;
     readonly Bitmap atlas;
     readonly Bitmap verticalAtlas;
+    readonly LayeredPet.Surface layeredSurface=new();
+    Bitmap? paintSurface;
     readonly System.Windows.Forms.Timer animation = new();
     readonly Stopwatch clock = Stopwatch.StartNew();
     readonly LauncherForm launcher;
@@ -548,7 +555,7 @@ sealed partial class PetForm : Form
             }
         };
         hit.MouseCaptureChanged+=(_,_)=>{if(!hit.Capture)CancelPetPress();};
-        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();};
+        Shown+=(_,_)=>{StartHoverSummary();StartDockAnimation();StartUpdateNotifications();if(!previewMode&&Store.LoadFailed)PresentFeedback(new("设置文件无法读取，已使用默认设置；损坏原文件仍保留。",true));else if(!previewMode&&AtomicJson.Recovered.Count>0)PresentFeedback(new("已从本地备份恢复数据，损坏原文件已保留。请核对最近的设置和记录。"));};
         Shown += (_, _) => { Location = Clamp(Location); hit.Bounds = Bounds; if(!hit.Visible)hit.Show(this); PositionFoot(); if(!foot.Visible)foot.Show(this); };
         LocationChanged += (_, _) => OnDockLocationChanged();
         ClientSizeChanged += (_, _) => { SyncDockHit(); PositionFoot(); };
@@ -583,10 +590,11 @@ sealed partial class PetForm : Form
         hiddenForFullscreen = hide;
         if (hide) { hoverCard?.Hide();feedback?.Hide();if(reminders?.Visible==true)reminders.Hide();launcher.Hide(); foot.CollapseSearch(); hit.Hide(); foot.Hide(); Hide(); }
         else { Show(); if(!hit.Visible)hit.Show(this); PositionFoot(); if(dockMotion.Progress<.001f&&!foot.Visible)foot.Show(this);if(reminders!=null&&!reminders.IsDisposed&&reminders.PendingCount>0&&!QuietHours.Load().Contains(DateTime.Now))reminders.Present([]); }
+        if(hide){animation.Stop();dockTimer.Stop();hoverTimer.Stop();}else{animation.Start();if(!previewMode&&!dockDisabled)dockTimer.Start();if(!previewMode)hoverTimer.Start();}
     }
     void Animate()
     {
-        if(resourcesDisposed||IsDisposed||Disposing)return;
+        if(resourcesDisposed||IsDisposed||Disposing||hiddenForFullscreen||dockMotion.Progress>=.999f)return;
         if (dragging) { int next = dragTransition.Advance(clock.ElapsedMilliseconds); if (row != next) { row = next; frame = 0; } }
         bool thinking = launcher.HasTextInput || foot.HasTextInput || chat?.IsThinking == true;
         if(focus.Active(DateTimeOffset.Now)&&!dragging&&!thinking){row=frame=0;animation.Interval=1000;Invalidate();return;}
@@ -656,18 +664,23 @@ sealed partial class PetForm : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         if(resourcesDisposed||ClientSize.Width<1||ClientSize.Height<1)return;
-        using var surface=RenderPetSurface();
-        LayeredPet.Present(Handle,Location,surface);LayeredFrames++;
+        if(paintSurface?.Size!=ClientSize){paintSurface?.Dispose();paintSurface=new Bitmap(ClientSize.Width,ClientSize.Height,System.Drawing.Imaging.PixelFormat.Format32bppArgb);}
+        PaintPetSurface(paintSurface);
+        layeredSurface.Present(Handle,Location,paintSurface);LayeredFrames++;
     }
     internal Bitmap RenderPetSurface()
     {
         var surface=new Bitmap(ClientSize.Width,ClientSize.Height,System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        PaintPetSurface(surface);return surface;
+    }
+    void PaintPetSurface(Bitmap surface)
+    {
         using(var drawing=Graphics.FromImage(surface)){
+            drawing.Clear(Color.Transparent);
             drawing.InterpolationMode=InterpolationMode.HighQualityBicubic;
             DrawPet(drawing,PetDrawingBounds(ClientSize));
         }
         PetTransparency.ResolveCoverage(surface);
-        return surface;
     }
     void DrawPet(Graphics graphics, RectangleF destination)
     {
@@ -871,11 +884,12 @@ sealed partial class PetForm : Form
     void ReleaseResources()
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
+        layeredSurface.Dispose();paintSurface?.Dispose();paintSurface=null;
         updateNotifications?.Dispose();quickNoteWindow?.Dispose();companionTimer.Stop();companionTimer.Dispose();noticeWindow?.Dispose();focusWindow?.Dispose();dockBridge?.Dispose();foreach(var skin in animationSkins.Values)skin.Dispose();animationSkins.Clear();
         dockTimer.Stop();dockTimer.Dispose();dockSprites?.Dispose();var pickup=dragPickup;dragPickup=null;pickup?.Dispose();
         fullscreenTimer.Stop();fullscreenTimer.Dispose();animation.Stop();animation.Dispose();hoverTimer.Stop();reminderTimer.Stop();matchSyncTimer.Stop();
-        commands.Dispose();if(!previewMode)OwnedHelpers.Shutdown();
-        hoverTimer.Dispose();hoverCard?.Dispose();notesWindow?.Dispose();dropWindow?.Dispose();if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
+        commands.Dispose();if(!previewMode){ClientOperations.Hub.Dispose();OwnedHelpers.Shutdown();}
+        hoverTimer.Dispose();hoverCard?.Dispose();notesWindow?.Dispose();dropWindow?.Dispose();if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}feedback?.Dispose();settingsWindow?.Dispose();mediaWindow?.Dispose();matchSyncTimer.Dispose();matchSyncLife.Cancel();matchSyncLife.Dispose();reminders?.Close();reminders?.Dispose();reminderTimer.Dispose();todoWindow?.Close();todoWindow?.Dispose();chat?.Close(); chat?.Dispose(); foot.Dispose(); hit.Dispose(); launcher.Dispose(); tray.Dispose(); atlas.Dispose(); verticalAtlas.Dispose();
     }
     protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
     protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}

@@ -147,6 +147,7 @@ sealed partial class PetForm
     {
         if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated||previewMode||hiddenForFullscreen||dockDisabled)return;
         AdvanceDock(clock.ElapsedMilliseconds,Cursor.Position);
+        dockTimer.Interval=dockMotion.Progress is >0 and <1?32:dockMotion.Progress>=1?80:160;
     }
     void AdvanceDock(long now,Point pointer)
     {
@@ -161,7 +162,7 @@ sealed partial class PetForm
         if(dockMotion.Progress>.001f){if(foot.Visible){foot.CollapseSearch();foot.Hide();}hoverCard?.Hide();feedback?.Hide();dockFootShownAt=0;}
         else if(!foot.Visible){foot.Opacity=0;PositionFoot();foot.Show(this);dockFootShownAt=now;}
         if(foot.Visible){foot.Opacity=UiTheme.WindowOpacity*(dockFootShownAt==0?1:Math.Clamp((now-dockFootShownAt)/180d,0,1));}
-        SyncDockHit();if(dragPickup!=null)Invalidate();if(before!=dockMotion.Progress||dockMotion.Progress>.995f)Invalidate();
+        SyncDockHit();if(dragPickup!=null||before!=dockMotion.Progress)Invalidate();
     }
     internal static float DockProgress(float progress,DockSide side)
     {

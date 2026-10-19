@@ -1,4 +1,4 @@
-﻿param([string]$OutputDirectory,[string]$RuntimeVersion='9.0.21')
+param([string]$OutputDirectory,[string]$RuntimeVersion='9.0.21')
 $ErrorActionPreference='Stop'
 $root=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if(-not $OutputDirectory){$OutputDirectory=Join-Path $root '.build/distribution'}
@@ -33,14 +33,14 @@ $documentation=Join-Path $payload 'assets/docs'
 $screenshotDir=Join-Path $documentation 'screenshots'
 New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $root 'src/docs/screenshots') -Filter '*.png' -File | Copy-Item -Destination $screenshotDir
-foreach($name in @('ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md')){
+foreach($name in @('ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md')){
  $content=Get-Content -LiteralPath (Join-Path $root ('src/'+$name)) -Raw
  $content.Replace('](Assets/MatchDay/','](../MatchDay/') | Set-Content -LiteralPath (Join-Path $documentation $name) -Encoding utf8
 }
 foreach($name in @('USER_GUIDE.md','RELEASE_NOTES.md')){
  $path=Join-Path $payload $name
  $content=Get-Content -LiteralPath $path -Raw
- foreach($extra in @('ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md')){$content=$content.Replace(']('+$extra+')','](assets/docs/'+$extra+')')}
+ foreach($extra in @('ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md')){$content=$content.Replace(']('+$extra+')','](assets/docs/'+$extra+')')}
  $content.Replace('](docs/screenshots/','](assets/docs/screenshots/').Replace('](Assets/docs/','](assets/docs/') | Set-Content -LiteralPath $path -Encoding utf8
 }
 Get-ChildItem -LiteralPath $payload -File | Where-Object {$_.Extension -in '.pdb','.xml'} | Remove-Item

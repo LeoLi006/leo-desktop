@@ -5,7 +5,8 @@ sealed class NoteStore
 {
     public event Action? Changed;
     readonly string? file;public List<StickyNote> Items{get;private set;}=[];
-    public NoteStore(string? path){file=path;if(file!=null&&File.Exists(file)){Items=JsonSerializer.Deserialize<List<StickyNote>>(File.ReadAllText(file))??[];if(Items.Count>1000||Items.Any(n=>n==null||n.Text==null||n.Text.Length>20000||string.IsNullOrWhiteSpace(n.Id))||Items.Select(n=>n.Id).Distinct().Count()!=Items.Count)throw new IOException("便签文件格式无效，请保留原文件后恢复备份。");}}
+    public NoteStore(string? path){file=path;if(file!=null&&(File.Exists(file)||File.Exists(file+".bak")))Items=AtomicJson.Read(file,Validate);}
+    internal static List<StickyNote> Validate(string text){var items=JsonSerializer.Deserialize<List<StickyNote>>(text)??throw new IOException("便签内容为空");if(items.Count>1000||items.Any(n=>n==null||n.Text==null||n.Text.Length>20000||string.IsNullOrWhiteSpace(n.Id))||items.Select(n=>n.Id).Distinct().Count()!=items.Count)throw new IOException("便签文件格式无效，请保留原文件后恢复备份。");return items;}
     public StickyNote Save(string? id,string text){text=text.Trim();if(text.Length is <1 or >20000)throw new ArgumentException("便签须为1～20000个字符");var previous=Items.ToList();var old=Items.FirstOrDefault(n=>n.Id==id);if(old==null&&Items.Count>=1000)throw new InvalidOperationException("便签已达1000条，请先清理");var now=DateTimeOffset.Now;var item=old==null?new StickyNote(Guid.NewGuid().ToString("N"),text,now,now):old with{Text=text,Updated=now};if(old!=null)Items.Remove(old);Items.Insert(0,item);Commit(previous);return item;}
     public void Remove(string id){var previous=Items.ToList();Items.RemoveAll(n=>n.Id==id);Commit(previous);}
     public void Link(string id,string task){var previous=Items.ToList();int at=Items.FindIndex(n=>n.Id==id);if(at<0)throw new InvalidOperationException("便签已删除");Items[at]=Items[at] with{TaskId=task};Commit(previous);}

@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 namespace LeoLauncher;
 
 sealed class ApiSettingsForm : Form
@@ -68,7 +68,8 @@ sealed class ApiSettingsForm : Form
         if (key.Text.Trim().Length > 0) text = text.Replace(key.Text.Trim(), "[Key 已隐藏]", StringComparison.Ordinal);
         return text.Length > 260 ? text[..260] : text;
     }
-    protected override void OnFormClosed(FormClosedEventArgs e) { lifetime.Cancel(); lifetime.Dispose(); base.OnFormClosed(e); }
+    bool released;
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
 }
 
 sealed class ChatTurn
@@ -94,6 +95,7 @@ sealed partial class ChatForm : BarcaWindow
     readonly bool preview;
     ChatSettings settings;
     readonly List<ChatTurn> turns = new();
+    readonly CancellationTokenSource chatLife=new();bool chatReleased;
     CancellationTokenSource? pending;
     readonly BarcaButton retryReply=new(){Text="重试",Dock=DockStyle.Right,Width=55,Visible=false};string retryPrompt="";bool retryHasTools;
     bool dirty;
@@ -183,7 +185,7 @@ sealed partial class ChatForm : BarcaWindow
     {
         if(InvokeRequired){await (Task)Invoke(new Func<Task>(SendAsync));return;}
         if(SynchronizationContext.Current is not WindowsFormsSynchronizationContext)SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
-        if (pending != null || string.IsNullOrWhiteSpace(input.Text)) return;
+        if (chatReleased || IsDisposed || pending != null || string.IsNullOrWhiteSpace(input.Text)) return;
         voice.Stop();
         string prompt = input.Text.Trim();retryReply.Visible=false;
         if (prompt.Length > 100_000) { state.Text = "本条消息过长，请缩短后发送"; return; }
@@ -198,7 +200,7 @@ sealed partial class ChatForm : BarcaWindow
         var tools = useTools.Checked ? appTools : null;
         var context = Context(turns, prompt, tools != null);
         var turn = new ChatTurn { User = prompt, Status = "生成中" }; turns.Add(turn); input.Clear();
-        var request = new CancellationTokenSource(); pending = request;
+        var request = CancellationTokenSource.CreateLinkedTokenSource(chatLife.Token); pending = request;
         request.CancelAfter(TimeSpan.FromMinutes(3));
         send.Enabled = configure.Enabled = reset.Enabled = microphone.Enabled = useTools.Enabled = false; stop.Enabled = true; state.Text = "AI 回复中…"; Render();
         try
@@ -268,5 +270,7 @@ sealed partial class ChatForm : BarcaWindow
     internal void PreviewRetryReply()=>retryReply.PerformClick();
     public void PreviewStop() => stop.PerformClick();
     public bool PreviewWasStopped => turns.LastOrDefault()?.Status == "已停止" && send.Enabled && !stop.Enabled;
-    protected override void OnFormClosed(FormClosedEventArgs e) { pending?.Cancel(); voice.Dispose(); renderTimer.Dispose(); base.OnFormClosed(e); }
+    void ReleaseChat(){if(chatReleased)return;chatReleased=true;chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();voice.Dispose();chatLife.Dispose();}
+    protected override void OnFormClosed(FormClosedEventArgs e) { ReleaseChat(); base.OnFormClosed(e); }
+    protected override void Dispose(bool disposing){if(disposing)ReleaseChat();base.Dispose(disposing);}
 }

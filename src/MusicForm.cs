@@ -73,6 +73,7 @@ sealed partial class MusicForm:BarcaWindow
     public async Task<bool> TryPlayCandidate(string id){var song=latest.Concat(history.Items).FirstOrDefault(s=>s.Id==id);if(song==null)return false;if(!await Play(song))return false;queue=latest.Any(s=>s.Id==id)?latest:history.Items.ToArray();queueIndex=Array.FindIndex(queue,s=>s.Id==id);return true;}
     public async Task<string> Step(int direction){if(direction is not(-1 or 1))throw new ArgumentException("请选择上一首或下一首");if(queue.Length==0)throw new ArgumentException("还没有点过歌曲，请先搜索并选择一首歌");int next=(queueIndex+direction+queue.Length)%queue.Length;if(!await Play(queue[next]))throw new IOException(state.Text);queueIndex=next;return "已发送"+(direction>0?"下一首":"上一首")+"："+queue[next].Name;}
     public void OpenQuery(string query){input.Text=query;WindowInteraction.Show(this);if(query.Length>0)_=SearchAsync(query);}
-    protected override void Dispose(bool disposing){if(disposing){pending?.Cancel();lifetime.Cancel();}base.Dispose(disposing);}
+    bool released;
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;pending?.Cancel();lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
     protected override void OnFormClosing(FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;pending?.Cancel();Hide();return;}base.OnFormClosing(e);}
 }

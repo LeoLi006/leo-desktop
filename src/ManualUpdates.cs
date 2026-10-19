@@ -66,5 +66,6 @@ sealed class UpdateForm:BarcaWindow
         Shown+=(_,_)=>{notes.Select(0,0);check.Focus();};
         check.Click+=async(_,_)=>await Run(false);install.Click+=async(_,_)=>await Run(true);Controls.AddRange([version,notes,state,progress,check,page,install,cancel,chrome]);MinimumSize=MaximumSize=Size;
     }
-    protected override void Dispose(bool disposing){if(disposing){life.Cancel();life.Dispose();http.Dispose();}base.Dispose(disposing);}
+    bool released;
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;life.Cancel();life.Dispose();http.Dispose();}base.Dispose(disposing);}
 }

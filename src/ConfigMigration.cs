@@ -18,7 +18,7 @@ sealed class ConfigMigration
         return new("LeoConfig",1,DateTimeOffset.Now,copy,combos,Read("leo-watch-links.json",()=>new WatchLinkStore(null).Items),Read("leo-reminder-settings.json",()=>new QuietHours()),Read("leo-api-budget.json",()=>new ApiUsageConfig()),tasks?Read("leo-todos.json",()=>new List<DailyTask>()):null,hints,Read("leo-football-following.json",()=>FootballFollowing.Defaults.ToList()));
     }
     public void Export(string destination,Preferences prefs,bool tasks)=>Write(destination,JsonSerializer.Serialize(Capture(prefs,tasks),json));
-    public static void Write(string path,string content){File.WriteAllText(path+".tmp",content);File.Move(path+".tmp",path,true);}
+    public static void Write(string path,string content)=>AtomicJson.Write(path,content);
     public ConfigImport Inspect(string file)
     {
         if(new FileInfo(file).Length>16_000_000)throw new ArgumentException("配置文件过大，最多支持16MB。");

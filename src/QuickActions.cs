@@ -13,17 +13,17 @@ sealed partial class ChatForm
     readonly Action? openClipboard;
     readonly TodoStore? planStore;
     string lastAnswer="";
-    void ShowView(Control view){foreach(Control c in bodyHost.Controls)c.Visible=c==view;view.BringToFront();}
-    void ClearResults(){foreach(Control c in results.Controls.Cast<Control>().ToArray())c.Dispose();ShowView(results);}
+    void ShowView(Control view){if(IsDisposed||Disposing)return;foreach(Control c in bodyHost.Controls)c.Visible=c==view;view.BringToFront();}
+    void ClearResults(){if(IsDisposed||Disposing)return;foreach(Control c in results.Controls.Cast<Control>().ToArray())c.Dispose();ShowView(results);}
     int ResultWidth=>Math.Max(250,results.ClientSize.Width-30);
-    void ResultText(string text,bool heading=false){results.Controls.Add(new Label{Text=text,Width=ResultWidth,Height=heading?39:Math.Clamp(TextRenderer.MeasureText(text,Font,new Size(ResultWidth-12,2000),TextFormatFlags.WordBreak).Height+16,35,400),Padding=new Padding(4,heading?8:4,4,3),ForeColor=heading?BarcaUi.Text:BarcaUi.Muted,Font=heading?BarcaUi.Font(13,true):Font});}
-    void Choice(string text,Action action){var button=new BarcaButton{Text=text,Width=ResultWidth,Height=41,Margin=new Padding(0,2,0,6)};button.Click+=(_,_)=>{try{action();}catch(Exception e){state.Text=e.Message;}};results.Controls.Add(button);}
+    void ResultText(string text,bool heading=false){if(IsDisposed||Disposing)return;results.Controls.Add(new Label{Text=text,Width=ResultWidth,Height=heading?39:Math.Clamp(TextRenderer.MeasureText(text,Font,new Size(ResultWidth-12,2000),TextFormatFlags.WordBreak).Height+16,35,400),Padding=new Padding(4,heading?8:4,4,3),ForeColor=heading?BarcaUi.Text:BarcaUi.Muted,Font=heading?BarcaUi.Font(13,true):Font});}
+    void Choice(string text,Action action){if(IsDisposed||Disposing)return;var button=new BarcaButton{Text=text,Width=ResultWidth,Height=41,Margin=new Padding(0,2,0,6)};button.Click+=(_,_)=>{try{action();}catch(Exception e){state.Text=e.Message;}};results.Controls.Add(button);}
     void ShowHome(){ClearResults();ResultText("有什么交给我？",true);ResultText("打开应用、安排清单、查比赛，直接说就好。");Choice("看看今晚的比赛",()=>{input.Text="今晚看球";_=SendAsync();});Choice("看看今天的清单",()=>{input.Text="看看今天的清单";_=SendAsync();});Choice("准备看球",()=>{input.Text="准备看球";_=SendAsync();});if(turns.Count>0)Choice("继续刚才的话题",()=>ShowView(transcript));lastAnswer="";}
     void ShowTeamChoices(){ClearResults();ResultText("想看看哪支球队？",true);if(FootballForm.FollowingNames.Length==0)ResultText("还没有关注球队，可在足球窗口的管理关注中添加。");foreach(string name in FootballForm.FollowingNames)Choice(name,()=>{input.Text=name+"近况";_=SendAsync();});}
-    void LocalDone(string text){lastAnswer=text;state.Text="本地完成 · 无 AI 请求";}
+    void LocalDone(string text){if(IsDisposed||Disposing)return;lastAnswer=text;state.Text="本地完成 · 无 AI 请求";}
     async Task HandleQuickAsync(QuickIntent intent,string prompt)
     {
-        var request=new CancellationTokenSource(TimeSpan.FromSeconds(90));pending=request;send.Enabled=false;stop.Enabled=true;UpdateVoice();
+        var request=CancellationTokenSource.CreateLinkedTokenSource(chatLife.Token);request.CancelAfter(TimeSpan.FromSeconds(90));pending=request;send.Enabled=false;stop.Enabled=true;UpdateVoice();
         try{
             var unified=CommandTranslation.From(intent,"chat");if(appTools?.HasLeo==true&&unified!=null&&intent.Kind is not(QuickKind.Football or QuickKind.SearchApp)){string message=await appTools.ExecuteLeoAsync(unified.Action,unified.Value,request.Token);ClearResults();ResultText(message);LocalDone(message);return;}
             switch(intent.Kind){
@@ -39,7 +39,7 @@ sealed partial class ChatForm
                     else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,async()=>{try{LocalDone(await appTools.OpenLocalAsync(app));}catch(Exception e){if(!IsDisposed)state.Text=e.Message;}});}break;
                 case QuickKind.Football:Modules.RequireFootball();await ShowFootball(intent,request.Token);break;
             }
-        }catch(OperationCanceledException){state.Text="已停止";}catch(Exception e){state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
+        }catch(OperationCanceledException){if(!IsDisposed)state.Text="已停止";}catch(Exception e){if(!IsDisposed)state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
         finally{pending=null;request.Dispose();if(!IsDisposed){send.Enabled=true;UpdateVoice();input.Focus();}}
     }
     async Task<(TeamData Data,Club Club,bool Stale)> TeamFacts(string name,CancellationToken token)

@@ -35,7 +35,8 @@ sealed class HealthChecksView:Panel
         foreach(var failure in FeatureFaults.Snapshot())lines.Add("本次运行已隔离："+failure.Feature+" · "+failure.ErrorType+" · "+failure.Count+"次（其他功能保留）");
         result.Text=string.Join("\n\n",lines);
     }
-    protected override void Dispose(bool disposing){if(disposing){lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
+    bool released;
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
 }
 
 sealed class ModulesView:Panel

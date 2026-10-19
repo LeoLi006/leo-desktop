@@ -24,10 +24,10 @@ sealed class ChatSettings
         catch { return ""; }
     }
     public void SetKey(string key) => EncryptedKey = key.Length == 0 ? "" : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(key.Trim()), null, DataProtectionScope.CurrentUser));
-    public void Save() { File.WriteAllText(SettingsPath + ".tmp", JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true })); File.Move(SettingsPath + ".tmp", SettingsPath, true); }
+    public void Save()=>AtomicJson.Write(SettingsPath,JsonSerializer.Serialize(this,new JsonSerializerOptions{WriteIndented=true}));
     public static ChatSettings Load()
     {
-        try { return JsonSerializer.Deserialize<ChatSettings>(File.ReadAllText(SettingsPath)) ?? new(); }
+        try { return AtomicJson.Read(SettingsPath,text=>{var value=JsonSerializer.Deserialize<ChatSettings>(text)??throw new IOException("API 配置为空");if(value.BaseUrl==null||value.Model==null||value.Protocol==null||value.EncryptedKey==null)throw new IOException("API 配置不完整");return value;}); }
         catch { return new(); }
     }
     public static string NormalizeBase(string value)

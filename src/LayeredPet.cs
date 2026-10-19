@@ -18,28 +18,38 @@ static class LayeredPet
     [DllImport("user32.dll",SetLastError=true)] static extern bool UpdateLayeredWindow(IntPtr window,IntPtr screen,ref Point position,ref Size size,IntPtr memory,ref Point origin,uint key,ref Blend blend,uint flags);
     [DllImport("user32.dll",EntryPoint="GetWindowLongW")] static extern int GetStyle(IntPtr window,int index);
     [DllImport("user32.dll",EntryPoint="SetWindowLongW")] static extern int SetStyle(IntPtr window,int index,int style);
-    public static void Present(IntPtr window,Point position,Bitmap frame)
+    internal sealed class Surface:IDisposable
     {
-        IntPtr screen=GetDC(IntPtr.Zero),memory=IntPtr.Zero,bitmap=IntPtr.Zero,previous=IntPtr.Zero;
-        try{
-            memory=CreateCompatibleDC(screen);var info=new Info{Size=40,Width=frame.Width,Height=-frame.Height,Planes=1,Bits=32};
-            bitmap=CreateDIBSection(memory,ref info,0,out var target,IntPtr.Zero,0);if(bitmap==IntPtr.Zero)throw new Win32Exception(Marshal.GetLastWin32Error());
+        IntPtr memory,bitmap,previous,pixels;Size size;byte[] data=[];bool disposed;
+        void Ensure(Size wanted)
+        {
+            if(disposed)throw new ObjectDisposedException(nameof(Surface));
+            if(size==wanted&&bitmap!=IntPtr.Zero)return;
+            Release();memory=CreateCompatibleDC(IntPtr.Zero);
+            if(memory==IntPtr.Zero)throw new Win32Exception(Marshal.GetLastWin32Error());
+            var info=new Info{Size=40,Width=wanted.Width,Height=-wanted.Height,Planes=1,Bits=32};
+            bitmap=CreateDIBSection(memory,ref info,0,out pixels,IntPtr.Zero,0);
+            if(bitmap==IntPtr.Zero){Release();throw new Win32Exception(Marshal.GetLastWin32Error());}
+            previous=SelectObject(memory,bitmap);size=wanted;data=new byte[wanted.Width*wanted.Height*4];
+        }
+        public void Present(IntPtr window,Point position,Bitmap frame)
+        {
+            Ensure(frame.Size);
             var bits=frame.LockBits(new Rectangle(Point.Empty,frame.Size),ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);
             try{
-                int stride=Math.Abs(bits.Stride);var source=new byte[stride*frame.Height];Marshal.Copy(bits.Scan0,source,0,source.Length);var data=new byte[frame.Width*frame.Height*4];
-                for(int y=0;y<frame.Height;y++)for(int x=0;x<frame.Width;x++){
-                    int s=y*stride+x*4,d=(y*frame.Width+x)*4,a=source[s+3];
-                    for(int c=0;c<3;c++)data[d+c]=(byte)((source[s+c]*a+127)/255);data[d+3]=(byte)a;
-                }
-                Marshal.Copy(data,0,target,data.Length);
+                if(bits.Stride==frame.Width*4)Marshal.Copy(bits.Scan0,data,0,data.Length);
+                else for(int y=0;y<frame.Height;y++)Marshal.Copy(IntPtr.Add(bits.Scan0,y*bits.Stride),data,y*frame.Width*4,frame.Width*4);
+                for(int at=0;at<data.Length;at+=4){int a=data[at+3];data[at]=(byte)((data[at]*a+127)/255);data[at+1]=(byte)((data[at+1]*a+127)/255);data[at+2]=(byte)((data[at+2]*a+127)/255);}
+                Marshal.Copy(data,0,pixels,data.Length);
             }finally{frame.UnlockBits(bits);}
-            previous=SelectObject(memory,bitmap);var origin=Point.Empty;var size=frame.Size;var blend=new Blend{Opacity=255,Format=1};
+            var origin=Point.Empty;var blend=new Blend{Opacity=255,Format=1};
             int style=GetStyle(window,-20);if((style&Style)==0)SetStyle(window,-20,style|Style);
-            if(!UpdateLayeredWindow(window,screen,ref position,ref size,memory,ref origin,0,ref blend,2)){
-                // Recover if Windows Forms previously set a uniform opacity on this HWND.
+            if(!UpdateLayeredWindow(window,IntPtr.Zero,ref position,ref size,memory,ref origin,0,ref blend,2)){
                 SetStyle(window,-20,style&~Style);SetStyle(window,-20,style|Style);
-                if(!UpdateLayeredWindow(window,screen,ref position,ref size,memory,ref origin,0,ref blend,2))throw new Win32Exception(Marshal.GetLastWin32Error());
+                if(!UpdateLayeredWindow(window,IntPtr.Zero,ref position,ref size,memory,ref origin,0,ref blend,2))throw new Win32Exception(Marshal.GetLastWin32Error());
             }
-        }finally{if(previous!=IntPtr.Zero)SelectObject(memory,previous);if(bitmap!=IntPtr.Zero)DeleteObject(bitmap);if(memory!=IntPtr.Zero)DeleteDC(memory);if(screen!=IntPtr.Zero)ReleaseDC(IntPtr.Zero,screen);}
+        }
+        void Release(){if(previous!=IntPtr.Zero&&memory!=IntPtr.Zero)SelectObject(memory,previous);if(bitmap!=IntPtr.Zero)DeleteObject(bitmap);if(memory!=IntPtr.Zero)DeleteDC(memory);previous=bitmap=memory=pixels=IntPtr.Zero;size=Size.Empty;data=[];}
+        public void Dispose(){if(disposed)return;disposed=true;Release();}
     }
 }
