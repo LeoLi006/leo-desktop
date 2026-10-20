@@ -6,20 +6,38 @@ sealed record LocalApplication(string Id,string Name,string Path,bool Enabled=tr
 sealed class LocalApplicationModule:IStructuredLeoModule,IBrainContributor,IModuleContractSource
 {
     public ModuleContract DescribeModule()=>ModuleContracts.Application(this);
-    public DependencyState[] ReadDependencies()=>[new("application-file",File.Exists(configuration.Path)?"ready":"missing"),new("working-directory",configuration.WorkingDirectory.Length==0||Directory.Exists(configuration.WorkingDirectory)?"ready":"missing")];
-
-    readonly LocalApplication app;readonly Func<string,string,CancellationToken,Task<string>> execute;readonly ApplicationCapabilityHost? host;readonly Func<LocalApplication?>? current;
+    public DependencyState[] ReadDependencies()
+    {
+        try{return services.ReadDependencies(configuration);}catch(Exception e)when(FeatureFaults.Recoverable(e)){Fault(ApplicationHostPhase.Dependencies,e);throw;}
+    }
+    readonly LocalApplication app;readonly Func<string,string,CancellationToken,Task<string>> execute;readonly ApplicationCapabilityHost? host;
+    readonly IApplicationHostServices services;
     LocalApplication configuration;
-    public LocalApplicationModule(LocalApplication app,Func<string,string,CancellationToken,Task<string>> execute,ApplicationCapabilityHost? host=null,Func<LocalApplication?>? current=null){this.app=app;this.execute=execute;this.host=host;this.current=current;configuration=app;}
-    public bool BrainAvailable=>File.Exists(configuration.Path)&&(configuration.WorkingDirectory.Length==0||Directory.Exists(configuration.WorkingDirectory));
+    public LocalApplicationModule(LocalApplication app,Func<string,string,CancellationToken,Task<string>> execute,ApplicationCapabilityHost? host=null,Func<LocalApplication?>? current=null,IApplicationHostServices? services=null)
+    {this.app=app;this.execute=execute;this.host=host;this.services=services??new ApplicationHostServices(app.Id,current??(()=>app));configuration=app;}
+    LocalApplication? Current()
+    {
+        try{var latest=services.ReadConfiguration();if(latest!=null&&latest.Id!=app.Id)throw new InvalidOperationException("宿主服务配置归属不一致。");return latest;}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){Fault(ApplicationHostPhase.Configuration,e);throw;}
+    }
+    void Fault(ApplicationHostPhase phase,Exception error)
+    {
+        if(error is OperationCanceledException)return;
+        try{services.RecordFault(phase,error.GetType());}catch(Exception secondary)when(FeatureFaults.Recoverable(secondary)){/* Diagnostics cannot replace the original failure. */}
+    }
+    public bool BrainAvailable=>ReadDependencies().All(d=>d.State=="ready");
     public string BrainStamp=>BrainCatalog.Hash(JsonSerializer.Serialize(configuration));
     public IReadOnlyList<BrainAction> BrainActions=>[new(Id,"启动应用 · "+Name,"none",Hint:"只按已保存配置启动，不接受路径或启动参数",Check:value=>{if(value.Length!=0)throw new ArgumentException("应用启动不接受外来参数");},Preview:_=>"启动应用 · "+Name+(configuration.Administrator?"（管理员）":"")+"\r\n程序："+configuration.Path+"\r\n参数："+configuration.Arguments+"\r\n工作目录："+configuration.WorkingDirectory)];
     public LocalApplication Configuration=>configuration;
-    public bool ConfigurationIsCurrent=>current==null||current()==configuration;
+    public bool ConfigurationIsCurrent=>Current()==configuration;
     public CapabilityDefinition Describe(string action)=>new(action,Id,"application-adapter","application-id/v1","external","coalesce-inflight",15000);
     public string FailureCode(Exception error)=>error is ArgumentException?"invalid_configuration":"launch_failed";
-    public string Id=>"local:"+app.Id;public string Name=>app.Name;public string Version=>"1.0";public bool Enabled=>current==null?app.Enabled:current()?.Enabled==true;public IReadOnlyList<string> Actions=>[Id];
-    public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest request,CancellationToken token){if(!Enabled)throw new InvalidOperationException(Name+"已停用");if(host!=null)return await host.Execute(app,current??(()=>app),token,a=>configuration=a);return new(await execute("local_app_open",app.Id,token));}
+    public string Id=>"local:"+app.Id;public string Name=>app.Name;public string Version=>"1.0";public bool Enabled=>Current()?.Enabled==true;public IReadOnlyList<string> Actions=>[Id];
+    public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest request,CancellationToken token)
+    {
+        try{if(!Enabled)throw new InvalidOperationException(Name+"已停用");if(host!=null)return await host.Execute(app,Current,token,a=>configuration=a);return new(await execute("local_app_open",app.Id,token));}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){Fault(ApplicationHostPhase.Execution,e);throw;}
+    }
     public async Task<string> ExecuteAsync(ActionRequest request,CancellationToken token)=>(await ExecuteStructuredAsync(request,token)).Message;
 }
 static class LocalPath

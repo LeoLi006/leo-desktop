@@ -240,6 +240,7 @@ static class Program
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--application-host-test"){ApplicationHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-consistency-test"){EntryConsistencyTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-inventory"){EntryInventory.ExportExample(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}

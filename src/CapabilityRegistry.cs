@@ -5,6 +5,7 @@ sealed record CapabilityDefinition(string Id,string ModuleId,string Runtime,stri
 sealed class CapabilityRegistry
 {
     readonly object gate=new();
+    internal ApplicationHostFaults ApplicationFaults{get;}=new();
     readonly Preferences prefs;readonly Func<string,string,CancellationToken,Task<string>> legacy;
     readonly Func<ILeoModule[]> extensions;readonly ApplicationCapabilityHost? applicationHost;
     sealed record BuiltinSnapshot(ILeoModule[] Modules,Dictionary<string,ILeoModule> Actions);
@@ -47,7 +48,7 @@ sealed class CapabilityRegistry
         var duplicateIds=next.GroupBy(a=>a.Id,StringComparer.OrdinalIgnoreCase).Where(g=>g.Count()>1).Select(g=>g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var valid=next.Where(a=>!duplicateIds.Contains(a.Id)&&Guid.TryParseExact(a.Id,"N",out _)).ToArray();
         var accepted=new List<ILeoModule>();
-        foreach(var app in valid){try{var module=new LocalApplicationModule(app,legacy,applicationHost,()=>FindApplication(app.Id));ModuleContracts.Validate(module);accepted.Add(module);}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Keep unrelated applications usable. */}}
+        foreach(var app in valid){try{var module=new LocalApplicationModule(app,legacy,applicationHost,services:new ApplicationHostServices(app.Id,()=>FindApplication(app.Id),ApplicationFaults));ModuleContracts.Validate(module);accepted.Add(module);}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Keep unrelated applications usable. */}}
         var modules=accepted.ToArray();var index=Index(modules);
         applications=next;locals=modules;localActions=index;
     }
