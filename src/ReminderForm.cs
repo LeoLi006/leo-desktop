@@ -1,11 +1,11 @@
 ﻿namespace LeoLauncher;
 sealed class ReminderForm:BarcaWindow
 {
-    readonly TodoStore store;readonly Action<DailyTask> open;readonly HashSet<string> ids=new();
+    readonly TodoClient store;readonly Action<DailyTask> open;readonly HashSet<string> ids=new();
     readonly FlowLayoutPanel list=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(16,8,12,8)};
     public int PendingCount=>ids.Count;
     protected override bool ShowWithoutActivation=>true;
-    public ReminderForm(TodoStore tasks,Action<DailyTask> openTask){store=tasks;open=openTask;Text="Leo · 到时间了";ClientSize=new Size(490,360);TopMost=true;ShowInTaskbar=false;var chrome=BarcaUi.Chrome(this,"到时间了","先做一件，或给自己多一点时间。");chrome.Height=82;Controls.Add(list);Controls.Add(chrome);MaximizeBox=false;MinimumSize=MaximumSize=Size;store.Changed+=Changed;}
+    public ReminderForm(TodoStore tasks,Action<DailyTask> openTask){store=tasks.Client.From("reminder-ui");open=openTask;Text="Leo · 到时间了";ClientSize=new Size(490,360);TopMost=true;ShowInTaskbar=false;var chrome=BarcaUi.Chrome(this,"到时间了","先做一件，或给自己多一点时间。");chrome.Height=82;Controls.Add(list);Controls.Add(chrome);MaximizeBox=false;MinimumSize=MaximumSize=Size;store.Changed+=Changed;}
     bool queued;
     void Changed(){if(IsDisposed||!IsHandleCreated||queued)return;queued=true;try{BeginInvoke((Action)(()=>{queued=false;if(!IsDisposed){Render();if(ids.Count==0)Close();}}));}catch(InvalidOperationException){queued=false;}}
     protected override void Dispose(bool disposing){if(disposing)store.Changed-=Changed;base.Dispose(disposing);}

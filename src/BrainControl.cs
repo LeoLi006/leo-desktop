@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -32,10 +32,11 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
     readonly HashSet<string> matches=new(StringComparer.Ordinal);readonly Dictionary<string,string> knownCombos=new();
     readonly ReliableWorkflow workflow=new(new WorkflowJournal(null),execute,verify);
     readonly Dictionary<string,string> mediaTargets=new();readonly Dictionary<string,(string Name,string Artist)> musicTargets=new();
+    readonly Dictionary<string,DailyTask> todoTargets=new();bool todosRequested;
     bool disposed,notesRequested;int calls;DateTimeOffset turnStarted;public BrainPlan? Pending{get;private set;}
     DateTimeOffset Now=>(clock??(()=>DateTimeOffset.UtcNow))();
-    public void BeginTurn(string prompt=""){userPrompt=prompt;notesRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"便签|笔记|随手记|记事|记录的|我的想法")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不需要|不用|别|不许|禁止|无需).{0,12}(便签|笔记|随手记|记录)|(便签|笔记).{0,8}(不要|不需要|不用|别|无需)");if(disposed)throw new ObjectDisposedException(nameof(BrainSession));Pending=null;musicTargets.Clear();mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();calls=0;turnStarted=Now;}
-    public void Clear(){userPrompt="";notesRequested=false;turnStarted=DateTimeOffset.MinValue;Pending=null;musicTargets.Clear();mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();}
+    public void BeginTurn(string prompt=""){userPrompt=prompt;todosRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"清单|待办|事项|我的.{0,8}(计划|任务)|(今天|明天|本周).{0,8}(计划|任务)")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不用|不许|禁止|无需|别).{0,12}(读取|查看|查询|清单|待办)|(清单|待办).{0,8}(不要|不用|别)");notesRequested=System.Text.RegularExpressions.Regex.IsMatch(prompt,"便签|笔记|随手记|记事|记录的|我的想法")&&!System.Text.RegularExpressions.Regex.IsMatch(prompt,"(不要|不需要|不用|别|不许|禁止|无需).{0,12}(便签|笔记|随手记|记录)|(便签|笔记).{0,8}(不要|不需要|不用|别|无需)");if(disposed)throw new ObjectDisposedException(nameof(BrainSession));Pending=null;todoTargets.Clear();musicTargets.Clear();mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();calls=0;turnStarted=Now;}
+    public void Clear(){userPrompt="";notesRequested=todosRequested=false;turnStarted=DateTimeOffset.MinValue;Pending=null;todoTargets.Clear();musicTargets.Clear();mediaTargets.Clear();matches.Clear();matchLabels.Clear();matchTargets.Clear();knownCombos.Clear();}
     public void Dispose(){disposed=true;Clear();}
     public object[] Definitions(bool responses)
     {
@@ -52,6 +53,14 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
     void Check(BrainAction action,string value)
     {
         if(action.InputKind=="notes-query"&&!notesRequested)throw new ArgumentException("读取私人便签需要用户本轮明确提出，请先询问用户");
+        if(action.InputKind=="todos-query"&&!todosRequested)throw new ArgumentException("读取清单需要用户本轮明确要求，请先询问用户");
+        if(action.InputKind is "todo-id" or "todo-target"){
+            string id=value;if(action.InputKind=="todo-target"){using var d=JsonDocument.Parse(value);id=d.RootElement.GetProperty("id").GetString()??"";}
+            if(!todoTargets.TryGetValue(id,out var target))throw new ArgumentException("请先查询清单，使用本轮实际返回的事项编号");
+            var candidates=todoTargets.Values.Where(t=>userPrompt.Contains(t.Title,StringComparison.OrdinalIgnoreCase)).ToArray();
+            if(todoTargets.Count>1&&!userPrompt.Contains(id,StringComparison.Ordinal)&&(candidates.Length!=1||candidates[0].Id!=id))throw new ArgumentException("有多个事项，请先询问具体标题或日期");
+            if(action.Id=="todo_skip_repeat"&&target.SeriesId==null)throw new ArgumentException("该事项不是重复事项");
+        }
         if(value.Length>4000)throw new ArgumentException("动作参数过长");action.Check?.Invoke(value);
         if(action.InputKind.StartsWith("match-")&&!matches.Contains(value))throw new ArgumentException("请先查询足球赛程，再使用实际返回的比赛编号");
         if(action.InputKind.StartsWith("match-")&&matches.Count>1&&!userPrompt.Contains(value,StringComparison.Ordinal)){
@@ -97,7 +106,7 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
             if(call.Name!="leo_action")throw new ArgumentException("模型请求了未提供的工具");Fields(p,"action","value");var requested=catalog.Require(Text(p,"action")).Action;string argument=Text(p,"value");if(!requested.ReadOnly)throw new ArgumentException("写操作必须生成计划，并由用户确认后执行");Check(requested,argument);
             var result=await execute(new(requested.Id,argument,"brain-query:"+Origin),token);result.ToLegacy(token);
             string raw=result.Data?.GetRawText()??result.Message;var node=JsonNode.Parse(raw);Shape(node,0);string answer=node?.ToJsonString(ToolJson)??"null";
-            if(answer.Length>10000)throw new InvalidOperationException("查询结果过多，请缩小范围");if(requested.Id=="football_facts")CollectMatches(node);if(requested.Id=="media_status"){mediaTargets.Clear();if(node is JsonArray rows)foreach(var row in rows)if(row is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Provider"]?.ToString() is string provider)mediaTargets[id]=provider;}if(requested.Id=="music_search"){musicTargets.Clear();if(node is JsonArray songRows)foreach(var song in songRows)if(song is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Name"]?.ToString() is string name)musicTargets[id]=(name,obj["Artist"]?.ToString()??"");}return answer;
+            if(answer.Length>10000)throw new InvalidOperationException("查询结果过多，请缩小范围");if(requested.Id=="todo_list"){todoTargets.Clear();if(node is JsonArray tasks)foreach(var row in tasks)if(row!=null){var task=row.Deserialize<DailyTask>();if(task!=null)todoTargets[task.Id]=task;}}if(requested.Id=="football_facts")CollectMatches(node);if(requested.Id=="media_status"){mediaTargets.Clear();if(node is JsonArray rows)foreach(var row in rows)if(row is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Provider"]?.ToString() is string provider)mediaTargets[id]=provider;}if(requested.Id=="music_search"){musicTargets.Clear();if(node is JsonArray songRows)foreach(var song in songRows)if(song is JsonObject obj&&obj["Id"]?.ToString() is string id&&obj["Name"]?.ToString() is string name)musicTargets[id]=(name,obj["Artist"]?.ToString()??"");}return answer;
         }catch(Exception e)when(e is ArgumentException or JsonException or InvalidOperationException or KeyNotFoundException){return JsonSerializer.Serialize(new{error=e.Message,note="没有执行本地写操作；请补充参数或重新选择目标"});}
     }
     void CollectMatches(JsonNode? node)

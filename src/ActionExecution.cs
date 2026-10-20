@@ -94,7 +94,7 @@ sealed partial class ActionDispatcher
             if(request.Deadline is {} deadline)waiting.CancelAfter(TimeSpan.FromMilliseconds(Math.Clamp((deadline-DateTimeOffset.UtcNow).TotalMilliseconds,0,int.MaxValue)));
             var result=await work.Completion.Task.WaitAsync(waiting.Token).ConfigureAwait(false);
             return Record(result with{RequestId=request.RequestId!,TraceId=request.TraceId!,Source=request.Source});
-        }catch(OperationCanceledException){string reason=caller.IsCancellationRequested?"cancelled":request.Deadline<=DateTimeOffset.UtcNow?"timeout":Reason(work);return Record(Cancelled(request,work.Module.Id,work.Id,reason));}
+        }catch(OperationCanceledException){if(work.Module is ICommittedActionModule committed&&committed.TryCommitted(work.Request,out var saved))return Record(new(request.RequestId!,request.TraceId!,request.Source,request.Action,work.Module.Id,work.Id,"succeeded",saved.Message,null,saved.Data,saved.Evidence){PrivateData=saved.PrivateData,DiagnosticMessage=saved.DiagnosticMessage});string reason=caller.IsCancellationRequested?"cancelled":request.Deadline<=DateTimeOffset.UtcNow?"timeout":Reason(work);return Record(Cancelled(request,work.Module.Id,work.Id,reason));}
         finally{
             bool cancel;lock(pending){work.Subscribers--;cancel=work.Module is IStructuredLeoModule&&work.Subscribers==0&&!work.Completion.Task.IsCompleted;}
             if(cancel)Cancel(work,"cancelled");
@@ -108,9 +108,14 @@ sealed partial class ActionDispatcher
             ticket=ModuleActivity.Begin(work.Module.Id);
             work.Token.ThrowIfCancellationRequested();if(!work.Module.Enabled)throw new OperationCanceledException();
             var payload=work.Module is IStructuredLeoModule structured?await structured.ExecuteStructuredAsync(work.Request,work.Token).ConfigureAwait(false):new ActionPayload(await work.Module.ExecuteAsync(work.Request,work.Token));
-            work.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,payload.DiagnosticMessage??payload.Message);
+            if(!(work.Module is ICommittedActionModule committed&&committed.TryCommitted(work.Request,out _)))work.Token.ThrowIfCancellationRequested();ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,payload.DiagnosticMessage??payload.Message);
             work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",payload.Message,null,payload.Data,payload.Evidence){PrivateData=payload.PrivateData,DiagnosticMessage=payload.DiagnosticMessage});
-        }catch(OperationCanceledException e){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,"等待已结束，可确认状态后重新操作。");work.Completion.TrySetResult(Cancelled(work.Request,work.Module.Id,work.Id,e is ApplicationConfigurationChangedException?"configuration_changed":Reason(work)));}
+        }catch(OperationCanceledException e){
+            if(work.Module is ICommittedActionModule committed&&committed.TryCommitted(work.Request,out var saved)){
+                ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,saved.DiagnosticMessage??"本地操作已保存。");
+                work.Completion.TrySetResult(new(work.Request.RequestId!,work.Request.TraceId!,work.Request.Source,work.Request.Action,work.Module.Id,work.Id,"succeeded",saved.Message,null,saved.Data,saved.Evidence){PrivateData=saved.PrivateData,DiagnosticMessage=saved.DiagnosticMessage});
+            }else{ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Ready,"等待已结束，可确认状态后重新操作。");work.Completion.TrySetResult(Cancelled(work.Request,work.Module.Id,work.Id,e is ApplicationConfigurationChangedException?"configuration_changed":Reason(work)));}
+        }
         catch(Exception e)when(FeatureFaults.Recoverable(e)){ModuleActivity.Complete(work.Module.Id,ticket,ModuleState.Failed,e.Message);work.Completion.TrySetResult(Failure(work.Request,work.Module.Id,work.Id,FailureCode(work.Module,e),e));}
         finally{
             ancestry.Value=previous;context.Value=previousContext;

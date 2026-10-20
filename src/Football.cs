@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
@@ -156,7 +156,7 @@ sealed class FootballForm : BarcaWindow,IWindowBack
     {
         if(busy||preview)return;if(!force&&cache.SchemaVersion>=2&&cache.FailedSources==0&&cache.Updated>DateTimeOffset.UtcNow.AddMinutes(-10)){UpdateStatus();return;}
         busy=true;refresh.Enabled=false;status.Text="正在更新公开赛程…";
-        try{cache=await FootballFeed.FetchAsync(cache,lifetime.Token);if(cache.FailedSources==0)tasks.SyncMatches(cache.Matches,cache.Updated);if(!IsDisposed){Render();UpdateStatus();}}
+        try{cache=await FootballFeed.FetchAsync(cache,lifetime.Token);if(cache.FailedSources==0)tasks.Client.From("football-sync").SyncMatches(cache.Matches,cache.Updated);if(!IsDisposed){Render();UpdateStatus();}}
         catch(OperationCanceledException){}
         catch{if(!IsDisposed){Render();status.Text=cache.Updated==default?"暂时无法联网 · 暂无缓存，请稍后刷新":"联网失败 · 显示旧缓存 "+cache.Updated.ToLocalTime().ToString("MM-dd HH:mm");}}
         finally{busy=false;if(!IsDisposed)refresh.Enabled=true;}

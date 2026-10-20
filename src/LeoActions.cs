@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 namespace LeoLauncher;
@@ -12,17 +12,19 @@ sealed partial class PetForm
 {
     readonly System.Windows.Forms.Timer reminderTimer=new(){Interval=15000};
     readonly TodoStore todoStore;
+    readonly HashSet<string> presentedReminders=new();
+    static string ReminderKey(DailyTask t)=>t.Id+":"+t.Reminder?.ToString("O")+":"+t.SnoozedUntil?.ToString("O");
     void CheckReminders()
     {
         bool concentrating=focus.Active(DateTimeOffset.Now);
         if(concentrating&&reminders!=null&&!reminders.IsDisposed)reminders.Retain(t=>focus.AllowImportant&&(t.Important||t.MatchId!=null));
-        if(hiddenForFullscreen||QuietHours.Load().Contains(DateTime.Now)){if(reminders?.Visible==true)reminders.Hide();return;}
+        if(hiddenForFullscreen||todoClient.Quiet().Contains(DateTime.Now)){if(reminders?.Visible==true)reminders.Hide();return;}
         if(reminders!=null&&!reminders.IsDisposed&&!reminders.Visible&&reminders.PendingCount>0)reminders.Present([]);
-        try{todoStore.EnsureThrough(DateOnly.FromDateTime(DateTime.Today).AddDays(35));var due=todoStore.Due(DateTimeOffset.Now).Where(t=>!matchSyncBusy||t.MatchId==null).ToArray();if(due.Length==0)return;
-            foreach(var task in due)notices.Add(task.Title,"reminder",task.Id,"reminder:"+task.Id+":"+task.Reminder?.ToString("O")+":"+task.SnoozedUntil?.ToString("O"));
-            var visible=due.Where(t=>focus.ShouldInterrupt(t,DateTimeOffset.Now)).ToArray();
-            if(visible.Length>0){if(reminders==null||reminders.IsDisposed)reminders=new ReminderForm(todoStore,OpenReminderTask);reminders.Present(visible);tray.BalloonTipTitle="Leo · 清单提醒";tray.BalloonTipText=string.Join("\n",visible.Take(3).Select(t=>t.Title))+"\n可在通知收纳盒再次查看";tray.ShowBalloonTip(10000);}
-            var delivered=notices.Error==null?due:visible;if(delivered.Length>0)todoStore.MarkNotified(delivered.Select(t=>t.Id),DateTimeOffset.Now);
+        try{todoClient.EnsureThrough(DateOnly.FromDateTime(DateTime.Today).AddDays(35));var due=todoClient.Due(DateTimeOffset.Now).Where(t=>!matchSyncBusy||t.MatchId==null).ToArray();if(due.Length==0)return;
+            foreach(var task in due){string key="reminder:"+ReminderKey(task);if(!notices.Items.Any(i=>i.UniqueKey==key)||notices.Error!=null)notices.Add(task.Title,"reminder",task.Id,key);}
+            presentedReminders.IntersectWith(due.Select(ReminderKey));var visible=due.Where(t=>focus.ShouldInterrupt(t,DateTimeOffset.Now)&&!presentedReminders.Contains(ReminderKey(t))).ToArray();
+            if(visible.Length>0){if(reminders==null||reminders.IsDisposed)reminders=new ReminderForm(todoStore,OpenReminderTask);reminders.Present(visible);tray.BalloonTipTitle="Leo · 清单提醒";tray.BalloonTipText=string.Join("\n",visible.Take(3).Select(t=>t.Title))+"\n可在通知收纳盒再次查看";tray.ShowBalloonTip(10000);foreach(var task in visible)presentedReminders.Add(ReminderKey(task));}
+            var delivered=notices.Error==null?due:visible;if(delivered.Length>0)todoClient.From("reminder-scheduler").Acknowledge(delivered);
         }catch{/* Failed reminder saves remain eligible for the next check. */}
     }
     Task<string> ExecuteLeoAction(string action,string value,CancellationToken token)=>commands.ExecuteAsync(new(action,value,"chat"),token);
@@ -41,26 +43,12 @@ sealed partial class PetForm
             case "app_search":return JsonSerializer.Serialize(new{apps=new AppTools(()=>launcher.FileApplications,launcher.LaunchFromAssistant,()=>prefs.Aliases).FindLocal(value).Select(a=>new{app_id=AppTools.Id(a),name=a.Name})});
             case "app_open":{var app=launcher.FileApplications.Where(AppTools.Launchable).SingleOrDefault(a=>AppTools.Id(a)==value)??throw new ArgumentException("应用不在当前索引，请重新搜索");return await launcher.LaunchFromAssistantAsync(app,commands.CurrentSource,token);}
             case "app_open_name":{var found=new AppTools(()=>launcher.FileApplications,launcher.LaunchFromAssistant,()=>prefs.Aliases).FindLocal(value);var exact=found.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(value)).ToArray();if(found.Length!=1&&exact.Length!=1){ShowLauncher();launcher.PreviewTyping(value);return found.Length==0?"未找到应用，请检查名称或等待索引完成。":"找到多个应用，请在搜索框中选择。";}var app=exact.Length==1?exact[0]:found[0];return await launcher.LaunchFromAssistantAsync(app,commands.CurrentSource,token);}
-            case "todo_complete_title":{var matches=todoStore.ForDay(DateOnly.FromDateTime(DateTime.Today)).Where(t=>t.Completed==null&&t.Title==value).ToArray();if(matches.Length!=1)throw new ArgumentException("没有唯一匹配的事项，请在清单中选择");todoStore.Toggle(matches[0].Id);return "已完成："+value;}
-            case "todo_natural":{var draft=JsonSerializer.Deserialize<NaturalTodoDraft>(value)??throw new ArgumentException("安排无效");using var dialog=new NaturalTodoForm(draft);if(dialog.ShowDialog()!=DialogResult.OK)return "已取消添加";draft=dialog.Draft;DateTimeOffset? reminder=draft.Time is {} at?new DateTimeOffset(draft.Day.ToDateTime(at)):null;if(draft.Frequency.Length>0)todoStore.AddRepeating(draft.Title,draft.Day,draft.Frequency,reminder);else todoStore.Add(draft.Title,draft.Day,reminder);return "已添加："+draft.Title;}
             case "web_open":{FootTools.ValidateUrl(value);string url=value;if(!previewMode)Process.Start(FootTools.EdgeUrlStart(url));return "已打开网址";}
             case "launcher_open":ShowLauncher();if(value=="web")launcher.PreviewTyping("网页搜索 ");return "已打开应用搜索，可以查看收藏、设置简称与排序。";
             case "football_open":launcher.OpenFootballFromAssistant();return "已打开足球日程、球队详情与观赛网址。";
-            case "todos_open":ShowTodos();todoWindow!.View.SetWeek(value=="week");return "已打开清单。";
-            case "todo_list":{bool week=value.StartsWith("week:");string date=week?value[5..]:value;var day=string.IsNullOrWhiteSpace(date)?DateOnly.FromDateTime(DateTime.Today):DateOnly.ParseExact(date,"yyyy-MM-dd",CultureInfo.InvariantCulture);todoStore.EnsureThrough(day.AddDays(7));return JsonSerializer.Serialize(week?todoStore.ForWeek(day):todoStore.ForDay(day));}
-            case "todo_add":{using var doc=JsonDocument.Parse(value);var r=doc.RootElement;var day=DateOnly.ParseExact(r.GetProperty("day").GetString()!,"yyyy-MM-dd",CultureInfo.InvariantCulture);DateTimeOffset? time=null;if(r.TryGetProperty("reminder",out var at)&&!string.IsNullOrWhiteSpace(at.GetString()))time=FutureTime(at.GetString()!);var task=todoStore.Add(r.GetProperty("title").GetString()!,day,time);todoWindow?.View.Render();return JsonSerializer.Serialize(new{success=true,task=todoStore.Items.Single(t=>t.Id==task.Id)});}
-            case "todo_skip_repeat":todoStore.SkipOccurrence(value);return "已仅跳过本次，后续重复不变。";
-            case "todo_undo":return todoStore.Undo()?"已撤销上一次清单操作。":"没有可以撤销的清单操作。";
-            case "todo_edit":{using var doc=JsonDocument.Parse(value);todoStore.Rename(doc.RootElement.GetProperty("id").GetString()!,doc.RootElement.GetProperty("title").GetString()!);return "已修改事项标题。";}
-            case "todo_move":{using var doc=JsonDocument.Parse(value);todoStore.MoveTo(doc.RootElement.GetProperty("id").GetString()!,DateOnly.ParseExact(doc.RootElement.GetProperty("day").GetString()!,"yyyy-MM-dd",CultureInfo.InvariantCulture));return "已修改日期，提醒时间同步移动。";}
-            case "todo_snooze":{using var doc=JsonDocument.Parse(value);int minutes=doc.RootElement.GetProperty("minutes").GetInt32();todoStore.Snooze(doc.RootElement.GetProperty("id").GetString()!,minutes,DateTimeOffset.Now);return "已安排"+minutes+"分钟后再次提醒。";}
+            case "todos_open":case "todo_list":case "todo_add":case "todo_repeat":case "todo_edit":case "todo_move":case "todo_snooze":case "todo_complete":case "todo_remind":case "todo_postpone":case "todo_stop_repeat":case "todo_skip_repeat":case "todo_undo":case "todo_natural":case "todo_complete_title":throw new InvalidOperationException("清单动作必须经过已注册模块");
             case "combo_name":case "scene_watch":throw new InvalidOperationException("组合必须经过已注册执行器");
-            case "todo_repeat":{using var doc=JsonDocument.Parse(value);var r=doc.RootElement;var start=DateOnly.ParseExact(r.GetProperty("day").GetString()!,"yyyy-MM-dd",CultureInfo.InvariantCulture);DateTimeOffset? remind=null;if(r.TryGetProperty("reminder",out var at)&&!string.IsNullOrWhiteSpace(at.GetString()))remind=FutureTime(at.GetString()!);var task=todoStore.AddRepeating(r.GetProperty("title").GetString()!,start,r.GetProperty("frequency").GetString()!,remind);return JsonSerializer.Serialize(new{success=true,task});}
-            case "todo_postpone":{if(value.StartsWith("day:")){var date=DateOnly.ParseExact(value[4..],"yyyy-MM-dd",CultureInfo.InvariantCulture);int count=todoStore.Postpone(todoStore.ForDay(date).Where(t=>t.Completed==null).Select(t=>t.Id));return "已顺延"+count+"项，提醒时间同步移动。";}var task=todoStore.Items.SingleOrDefault(t=>t.Id==value)??throw new ArgumentException("事项不存在，请先查询清单");if(task.Completed!=null)throw new ArgumentException("已完成事项无需顺延");var next=todoStore.PostponeDay(value);todoStore.Postpone([value]);return "已顺延至"+next.ToString("yyyy-MM-dd")+"，提醒时间同步移动。";}
-            case "todo_stop_repeat":{using var doc=JsonDocument.Parse(value);todoStore.StopRepeating(doc.RootElement.GetProperty("series_id").GetString()!,DateOnly.ParseExact(doc.RootElement.GetProperty("after").GetString()!,"yyyy-MM-dd",CultureInfo.InvariantCulture));return "已停止后续重复，已完成记录和此前事项保留。";}
-            case "match_add":throw new InvalidOperationException("比赛安排必须经过已注册的桥接能力");
-            case "todo_complete":{var task=todoStore.Items.SingleOrDefault(t=>t.Id==value)??throw new ArgumentException("事项ID不存在，请先查询清单");if(task.Completed==null)todoStore.Toggle(task.Id);todoWindow?.View.Render();return "已完成："+task.Title;}
-            case "todo_remind":{using var doc=JsonDocument.Parse(value);string id=doc.RootElement.GetProperty("id").GetString()!;var task=todoStore.Items.SingleOrDefault(t=>t.Id==id)??throw new ArgumentException("事项ID不存在");string time=doc.RootElement.GetProperty("time").GetString()??"";todoStore.SetReminder(id,time.Length==0?null:FutureTime(time));todoWindow?.View.Render();return time.Length==0?"已取消提醒":"已设置提醒："+task.Title+"，"+FutureTime(time).ToLocalTime().ToString("MM-dd HH:mm")+"。Leo运行时生效。";}
+            case "match_add":throw new InvalidOperationException("比赛安排必须经过已注册桥接能力");
             case "web_search":if(string.IsNullOrWhiteSpace(value))throw new ArgumentException("请输入搜索内容");if(!previewMode)Process.Start(FootTools.EdgeStart(value));return "已用Edge搜索："+value;
             case "watch_open":{if(!int.TryParse(value,out var index)||index<1||index>4)throw new ArgumentException("观赛入口为1到4");var link=new WatchLinkStore(previewMode?null:Path.Combine(Store.Root,"leo-watch-links.json")).Items[index-1];if(link.Url.Length==0)throw new ArgumentException("这个观赛入口还没填写网址，请在足球窗口编辑");if(!previewMode)Process.Start(FootTools.EdgeUrlStart(link.Url));return "已用Edge打开："+link.Name;}
 
@@ -73,5 +61,4 @@ sealed partial class PetForm
         }throw new ArgumentException("不支持的功能");
     }
     public async Task<Dictionary<string,bool>> VerifyBrainActions(){var checks=new Dictionary<string,bool>();var token=CancellationToken.None;string day=DateTime.Today.AddDays(2).ToString("yyyy-MM-dd");await ExecuteLeoAction("todo_add",JsonSerializer.Serialize(new{title="工具测试事项",day,reminder=DateTimeOffset.Now.AddDays(2).ToString("O")}),token);var task=todoStore.Items.Single();checks["brain_creates_dated_task_and_reminder"]=task.Day==DateOnly.FromDateTime(DateTime.Today.AddDays(2))&&task.Reminder!=null;await ExecuteLeoAction("todos_open","week",token);checks["brain_and_planner_share_same_store"]=todoWindow?.Count==1&&todoWindow.View.IsWeekly;string listed=await ExecuteLeoAction("todo_list",day,token);checks["brain_reads_actual_task_ids"]=listed.Contains(task.Id);await ExecuteLeoAction("todo_complete",task.Id,token);checks["brain_completes_task_in_planner"]=todoStore.Items.Single().Completed!=null&&todoWindow?.CompletedCount==1;await ExecuteLeoAction("todo_remind",JsonSerializer.Serialize(new{id=task.Id,time=""}),token);checks["brain_cancels_existing_reminder"]=todoStore.Items.Single().Reminder==null;try{await ExecuteLeoAction("todo_remind",JsonSerializer.Serialize(new{id="missing",time=""}),token);checks["brain_rejects_unknown_task_id"]=false;}catch(ArgumentException){checks["brain_rejects_unknown_task_id"]=true;}todoWindow?.Close();return checks;}
-    static DateTimeOffset FutureTime(string value){if(!System.Text.RegularExpressions.Regex.IsMatch(value,@"(?:Z|[+-]\d{2}:\d{2})$"))throw new ArgumentException("提醒时间应带时区，例如+08:00");var time=DateTimeOffset.Parse(value,CultureInfo.InvariantCulture);if(time<=DateTimeOffset.Now)throw new ArgumentException("提醒时间必须在未来");return time;}
 }

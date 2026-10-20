@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 namespace LeoLauncher;
 sealed record StickyNote(string Id,string Text,DateTimeOffset Created,DateTimeOffset Updated,string? TaskId=null,bool Pinned=false);
 sealed class NoteStore
@@ -51,7 +51,7 @@ sealed partial class PetForm
     void ShowNotes(string initial="")=>RunNotesEntry("notes_open",initial,"notes-entry");
     void ShowNotesCore(string initial="")
     {
-        RevealDock(true);launcher.Hide();if(notesWindow==null||notesWindow.IsDisposed)notesWindow=new NotesForm(new NotesClient(Notes,commands),(note,day)=>{using var confirm=new QuickTextForm("便签转待办",note.Text,"确认标题后加入 "+day.ToString("yyyy-MM-dd")+" 的清单，原便签保留。");WindowPositions.Prepare(confirm,"note-todo",Bounds,previewMode);if(confirm.ShowDialog()!=DialogResult.OK)throw new OperationCanceledException("已取消转为待办");var task=todoStore.Add(confirm.Value,day,null);todoWindow?.View.Render();return task.Id;},pendingNoteLinks);if(!notesWindow.Visible)WindowPositions.Prepare(notesWindow,"notes",Bounds,previewMode);if(initial.Length>0)notesWindow.New(initial);WindowInteraction.Show(notesWindow);
+        RevealDock(true);launcher.Hide();if(notesWindow==null||notesWindow.IsDisposed)notesWindow=new NotesForm(new NotesClient(Notes,commands),(note,day)=>{using var confirm=new QuickTextForm("便签转待办",note.Text,"确认标题后加入 "+day.ToString("yyyy-MM-dd")+" 的清单，原便签保留。");WindowPositions.Prepare(confirm,"note-todo",Bounds,previewMode);if(confirm.ShowDialog()!=DialogResult.OK)throw new OperationCanceledException("已取消转为待办");var task=todoClient.From("note-conversion").Add(confirm.Value,day,null,note.Id);todoWindow?.View.Render();return task.Id;},pendingNoteLinks);if(!notesWindow.Visible)WindowPositions.Prepare(notesWindow,"notes",Bounds,previewMode);if(initial.Length>0)notesWindow.New(initial);WindowInteraction.Show(notesWindow);
     }
 }
 

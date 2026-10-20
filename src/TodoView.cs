@@ -1,7 +1,7 @@
-namespace LeoLauncher;
+﻿namespace LeoLauncher;
 sealed partial class TodoView:UserControl
 {
-    readonly TodoStore store;DateOnly day=DateOnly.FromDateTime(DateTime.Today);DailyTask? deleted;bool weekly,rendering,overdue;
+    readonly TodoClient store;DateOnly day=DateOnly.FromDateTime(DateTime.Today);DailyTask? deleted;bool weekly,rendering,overdue;
     readonly PlannerCalendar calendar=new();
     readonly BarcaButton repeatButton=new(){Text="单次 ▾",AccessibleName="选择重复方式",Dock=DockStyle.Right,Width=86};
     readonly BarcaButton postponeButton=new(){Text="顺延未完成",Width=94,Height=31};
@@ -25,7 +25,7 @@ sealed partial class TodoView:UserControl
     public string Heading=>heading.Text+" "+dayInfo.Text;
     public bool IsWeekly=>weekly;
     public PlannerCalendar Calendar=>calendar;
-    public TodoView(TodoStore data){BarcaMenus.Apply(repeatMenu);BarcaMenus.Apply(seriesMenu);store=data;Dock=DockStyle.Fill;BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;Font=BarcaUi.Font(9);
+    public TodoView(TodoStore data){BarcaMenus.Apply(repeatMenu);BarcaMenus.Apply(seriesMenu);store=data.Client;Dock=DockStyle.Fill;BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;Font=BarcaUi.Font(9);
         var sidebar=new Panel{Dock=DockStyle.Left,Width=290};calendar.Bounds=new Rectangle(18,14,252,324);sidebar.Controls.Add(calendar);calendar.DateSelected+=ShowDay;calendar.TaskDropped+=(id,date)=>Run(()=>{store.MoveTo(id,date);ShowDay(date);hint.Text="已改期至 "+date.ToString("MM月dd日")+"，提醒同步移动";});
         var today=new BarcaButton{Text="回到今天",Bounds=new Rectangle(18,349,252,32),Font=BarcaUi.Font(9)};today.Click+=(_,_)=>ShowToday();sidebar.Controls.Add(today);sidebar.Controls.Add(new PlannerIdentity{Location=new Point(18,397)});
         var safety=new BarcaButton{Text="提醒时段 · 备份",Bounds=new Rectangle(18,525,252,29),Font=BarcaUi.Font(8.5f)};safety.Click+=(_,_)=>{using var settings=new PlannerSettings(store);settings.StartPosition=FormStartPosition.CenterParent;settings.ShowDialog(FindForm());};sidebar.Controls.Add(safety);

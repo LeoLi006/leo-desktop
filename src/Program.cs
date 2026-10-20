@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -211,6 +211,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--m05-todo-test"){TodoCapabilityTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m05-music-clipboard-test"){MusicClipboardTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m05-client-test"){M05ClientTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--q6-package-test"){Q6PackageTests.Run(args[1]);return;}
@@ -523,7 +524,7 @@ sealed partial class PetForm : Form
         constructionProbe?.Invoke("assets_and_window_ready");
         var applicationHost=applicationOverride??new ApplicationCapabilityHost((app,token)=>{token.ThrowIfCancellationRequested();return Task.FromResult(!preview&&!File.Exists(app.Path)?RepairLocalApplication(app):app);},ApplicationCapabilityHost.StartProcess,app=>launcher?.RememberConfiguredLaunch(app),preview);
         commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null,applicationHost);
-        RegisterNotesCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();
+        RegisterNotesCapability();RegisterTodoCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();
         constructionProbe?.Invoke("dispatcher_ready");
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
         commands.ApplicationAliases=launcher.ResolveApplicationRequest;RegisterMusicCapability();launcher.SharedMusicClient=new MusicClient(musicSession!,commands);RegisterClipboardCapability();

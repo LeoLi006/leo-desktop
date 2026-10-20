@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 namespace LeoLauncher;
 sealed class DropContent:IDisposable
 {
@@ -39,6 +39,6 @@ sealed partial class PetForm
     DropActionForm? dropWindow;
     void AcceptDrop(IDataObject data)
     {
-        DropContent? content=null;try{content=DropContent.Read(data);launcher.Hide();RevealDock(true);dropWindow?.Close();dropWindow=new DropActionForm(content,prefs,(a,v)=>commands.ExecuteAsync(new(a,v,"drop")),AddApplicationModules,ShowNotes,text=>{using var confirm=new QuickTextForm("添加待办",text);WindowPositions.Prepare(confirm,"drop-todo",Bounds,previewMode);if(confirm.ShowDialog()==DialogResult.OK){todoStore.Add(confirm.Value,DateOnly.FromDateTime(DateTime.Today),null);todoWindow?.View.Render();OperationFeedback.Show("已添加到今天的清单");}},launcher.FileApplications);WindowPositions.Prepare(dropWindow,"drop-actions",Bounds,previewMode);dropWindow.Show();dropWindow.Activate();}catch(Exception e){content?.Dispose();OperationFeedback.Error(e.Message);}
+        DropContent? content=null;try{content=DropContent.Read(data);launcher.Hide();RevealDock(true);dropWindow?.Close();dropWindow=new DropActionForm(content,prefs,(a,v)=>commands.ExecuteAsync(new(a,v,"drop")),AddApplicationModules,ShowNotes,text=>{using var confirm=new QuickTextForm("添加待办",text);WindowPositions.Prepare(confirm,"drop-todo",Bounds,previewMode);if(confirm.ShowDialog()==DialogResult.OK){todoClient.From("drop-ui").Add(confirm.Value,DateOnly.FromDateTime(DateTime.Today),null);todoWindow?.View.Render();OperationFeedback.Show("已添加到今天的清单");}},launcher.FileApplications);WindowPositions.Prepare(dropWindow,"drop-actions",Bounds,previewMode);dropWindow.Show();dropWindow.Activate();}catch(Exception e){content?.Dispose();OperationFeedback.Error(e.Message);}
     }
 }

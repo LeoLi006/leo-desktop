@@ -12,6 +12,6 @@ static class MatchSyncService
 sealed partial class PetForm
 {
     ReminderForm? reminders;readonly System.Windows.Forms.Timer matchSyncTimer=new(){Interval=600000};readonly CancellationTokenSource matchSyncLife=new();bool matchSyncBusy;
-    async Task SyncMatchesAsync(){if(previewMode||!prefs.FootballModule||matchSyncBusy||IsDisposed)return;matchSyncBusy=true;try{var cached=FootballFeed.LoadCache();todoStore.HydrateMatchMetadata(cached.Matches,cached.Updated);var matches=await MatchSyncService.Fetch(todoStore,matchSyncLife.Token);if(!IsDisposed&&prefs.FootballModule&&!matchSyncLife.IsCancellationRequested)todoStore.SyncMatches(matches,DateTimeOffset.Now);}catch(OperationCanceledException){}catch{/* Keep saved reminders when a source or local save is unavailable. */}finally{matchSyncBusy=false;}}
+    async Task SyncMatchesAsync(){if(previewMode||!prefs.FootballModule||matchSyncBusy||IsDisposed)return;matchSyncBusy=true;try{var cached=FootballFeed.LoadCache();todoClient.From("football-sync").HydrateMatchMetadata(cached.Matches,cached.Updated);var matches=await MatchSyncService.Fetch(todoStore,matchSyncLife.Token);if(!IsDisposed&&prefs.FootballModule&&!matchSyncLife.IsCancellationRequested)todoClient.From("football-sync").SyncMatches(matches,DateTimeOffset.Now);}catch(OperationCanceledException){}catch{/* Keep saved reminders when a source or local save is unavailable. */}finally{matchSyncBusy=false;}}
     void OpenReminderTask(DailyTask task){ShowTodos();todoWindow!.View.ShowDay(task.Day);}
 }

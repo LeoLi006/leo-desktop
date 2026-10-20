@@ -1,4 +1,4 @@
-using System.Runtime.ExceptionServices;
+﻿using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace LeoLauncher;
@@ -7,6 +7,8 @@ sealed class CapabilityException(string code,string message):InvalidOperationExc
 sealed class ApplicationConfigurationChangedException():OperationCanceledException("应用配置已改变");
 
 sealed record ActionPayload(string Message,JsonElement? Data=null,string Evidence="unknown",bool PrivateData=false,string? DiagnosticMessage=null);
+// Host evidence for already committed local writes; never supplied by a caller.
+interface ICommittedActionModule { bool TryCommitted(ActionRequest request,out ActionPayload payload); }
 interface IActionRequestAdapter{ActionRequest Adapt(StructuredActionRequest request);}
 interface IStructuredLeoModule:ILeoModule
 {

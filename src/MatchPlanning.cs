@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace LeoLauncher;
 
@@ -41,7 +41,7 @@ sealed class MatchPlanningCapability(Func<bool> enabled,MatchPlanningHost host,T
         await ui.ShowAsync(()=>{
             token.ThrowIfCancellationRequested();if(!Enabled)throw new OperationCanceledException(token);var envelope=host.Resolve(reference);
             if(request.Action=="match_lookup"){result=new("已取得比赛来源与安排参数。",JsonSerializer.SerializeToElement(envelope),"cached",true);return;}
-            var plan=tasks.AddMatch(envelope,DateTimeOffset.Now,token);
+            var plan=tasks.Client.From("match-bridge").AddMatch(envelope);
             result=new(JsonSerializer.Serialize(new{success=true,plan.Added,plan.Task}),JsonSerializer.SerializeToElement(new{plan.Added,plan.Task,reference=envelope.Reference,envelope.ObservedAt,envelope.SourceUrl,kickoffUtc=envelope.Match.Kickoff.ToUniversalTime()}),"committed",true,"比赛清单操作已完成");
         },token);return result!;
     }
@@ -50,7 +50,7 @@ sealed class MatchPlanningCapability(Func<bool> enabled,MatchPlanningHost host,T
 sealed partial class TodoStore
 {
     internal Func<FootballMatch,DateTimeOffset?,Task<MatchPlan>>? MatchImporter;
-    public Task<MatchPlan> ImportMatchAsync(FootballMatch match,DateTimeOffset? observed=null)=>MatchImporter?.Invoke(match,observed)??Task.FromResult(AddMatch(match,DateTimeOffset.Now));
+    public Task<MatchPlan> ImportMatchAsync(FootballMatch match,DateTimeOffset? observed=null)=>MatchImporter?.Invoke(match,observed)??Task.FromResult(Client.From("football-ui").AddMatch(new(new("espn",match.Id,TimeZoneInfo.Local.Id),match,observed,"https://www.espn.com/soccer/match/_/gameId/"+Uri.EscapeDataString(match.Id))));
     public MatchPlan AddMatch(MatchEnvelope input,DateTimeOffset now,CancellationToken token=default)
     {
         MatchPlanningHost.Validate(input.Reference);if(input.Reference.EventId!=input.Match.Id)throw new ArgumentException("比赛编号不一致");token.ThrowIfCancellationRequested();
