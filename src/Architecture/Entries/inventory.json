@@ -1,0 +1,100 @@
+{
+  "format": "leo-entry/1",
+  "entries": [
+    {
+      "entry": "football",
+      "module": "football-data",
+      "action": "football_open",
+      "editor": "football-icon",
+      "menu": [
+        {
+          "action": "football_open",
+          "value": "",
+          "owner": "football-data"
+        }
+      ]
+    },
+    {
+      "entry": "music",
+      "module": "music",
+      "action": "music_open",
+      "editor": "builtin-application",
+      "menu": [
+        {
+          "action": "music_open",
+          "value": "",
+          "owner": "music"
+        }
+      ]
+    },
+    {
+      "entry": "media",
+      "module": "media",
+      "action": "media_open",
+      "editor": "builtin-application",
+      "menu": [
+        {
+          "action": "media_open",
+          "value": "",
+          "owner": "media"
+        }
+      ]
+    },
+    {
+      "entry": "terminal",
+      "module": "terminal",
+      "action": "terminal_open",
+      "editor": "builtin-application",
+      "menu": [
+        {
+          "action": "terminal_open",
+          "value": "",
+          "owner": "terminal"
+        }
+      ]
+    },
+    {
+      "entry": "clash",
+      "module": "clash",
+      "action": "proxy_status",
+      "editor": "builtin-application",
+      "menu": [
+        {
+          "action": "proxy_on",
+          "value": "",
+          "owner": "clash"
+        },
+        {
+          "action": "proxy_off",
+          "value": "",
+          "owner": "clash"
+        },
+        {
+          "action": "proxy_status",
+          "value": "",
+          "owner": "clash"
+        }
+      ]
+    },
+    {
+      "entry": "edge",
+      "module": "edge",
+      "action": "web_search",
+      "editor": "builtin-application",
+      "menu": [
+        {
+          "action": "launcher_open",
+          "value": "web",
+          "owner": "core"
+        }
+      ]
+    },
+    {
+      "entry": "example-01",
+      "module": "local:example-01",
+      "action": "local:example-01",
+      "editor": "local-application",
+      "menu": []
+    }
+  ]
+}

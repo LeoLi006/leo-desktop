@@ -44,13 +44,22 @@ sealed class CapabilityRegistry
     {
         var next=(prefs.ApplicationModules??[]).ToArray();if(applications.SequenceEqual(next))return;
         // Build completely before replacing the snapshot. Disabled definitions remain discoverable.
-        var modules=next.Select(a=>(ILeoModule)new LocalApplicationModule(a,legacy,applicationHost,()=>FindApplication(a.Id))).ToArray();foreach(var contracted in modules.OfType<IModuleContractSource>())ModuleContracts.Validate(contracted);var index=Index(modules);
+        var duplicateIds=next.GroupBy(a=>a.Id,StringComparer.OrdinalIgnoreCase).Where(g=>g.Count()>1).Select(g=>g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var valid=next.Where(a=>!duplicateIds.Contains(a.Id)&&Guid.TryParseExact(a.Id,"N",out _)).ToArray();
+        var accepted=new List<ILeoModule>();
+        foreach(var app in valid){try{var module=new LocalApplicationModule(app,legacy,applicationHost,()=>FindApplication(app.Id));ModuleContracts.Validate(module);accepted.Add(module);}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Keep unrelated applications usable. */}}
+        var modules=accepted.ToArray();var index=Index(modules);
         applications=next;locals=modules;localActions=index;
     }
-    internal LocalApplication? FindApplication(string id)=>(prefs.ApplicationModules??[]).SingleOrDefault(a=>a.Id==id);
+    internal LocalApplication? FindApplication(string id){var matches=(prefs.ApplicationModules??[]).Where(a=>a.Id.Equals(id,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();return matches.Length==1?matches[0]:null;}
     public ILeoModule Resolve(string action)
     {
         lock(gate){var replacement=registered.Values.FirstOrDefault(m=>m.Actions.Contains(action));if(replacement!=null)return replacement;if(action.StartsWith("local:",StringComparison.Ordinal)){RefreshLocal();return localActions.GetValueOrDefault(action)??throw new CapabilityException("module_removed","应用模块已移除");}if(builtins.Value.Actions.TryGetValue(action,out var builtin))return builtin;return Index(extensions()).GetValueOrDefault(action)??throw new ArgumentException("操作不存在，或对应扩展未安装");}
+    }
+    // Passive lookup for entry validation. No dependency probes or action execution.
+    internal string? EntryOwner(string action)
+    {
+        try{return Resolve(action).Id;}catch(Exception e)when(FeatureFaults.Recoverable(e)){return null;}
     }
     public ILeoModule[] Read(){lock(gate){RefreshLocal();var result=(remainingBuiltins??builtins.Value.Modules).Concat(registered.Values).Concat(locals).Concat(extensions()).ToArray();Index(result);return result;}}
     public ModuleContractSnapshot[] ReadContracts()=>Read().OfType<IModuleContractSource>().Select(ModuleContracts.Snapshot).ToArray();

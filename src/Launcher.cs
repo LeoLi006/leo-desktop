@@ -52,7 +52,7 @@ sealed partial class LauncherForm : Form
     }
     string lastExternal = "", lastObservedIdentity = "", activationContext = "";
     public bool IsIndexing => loading;
-    IEnumerable<AppEntry> AllApplications=>apps.Concat(EntryContributions.Read(prefs).Where(a=>a.Enabled).Select(a=>a.SearchEntry)).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
+    IEnumerable<AppEntry> AllApplications=>apps.Concat(EntryContributions.ReadAvailable(prefs).Where(a=>a.Enabled).Select(a=>a.SearchEntry)).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
     public IEnumerable<AppEntry> FileApplications => AllApplications;
     public bool HasTextInput => Visible && query.Focused && !string.IsNullOrWhiteSpace(query.Text);
     public void PreviewTyping(string text) { query.Text = text; query.Focus(); }

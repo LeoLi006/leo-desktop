@@ -11,7 +11,7 @@ static class EntryDisplay
     public static void Validate(Dictionary<string,string>? modes){if(modes==null||modes.Count>512||modes.Any(p=>p.Key.Length is <1 or >100||!Regex.IsMatch(p.Key,@"^[A-Za-z0-9:_-]+$")||!Modes.Any(m=>m.Value==p.Value)))throw new ArgumentException("入口显示配置无效，请重新选择显示方式。");}
     public static OptionalEntry[] Entries(Preferences p)=>EntryContributions.ReadBuiltins(p).Select(e=>new OptionalEntry(e.Id,e.SettingsName,e.Enabled,e.Hint))
         .OrderBy(e=>Array.IndexOf(new[]{"terminal","clash","music","edge","football","media"},e.Id))
-        .Concat(EntryContributions.Read(p).Select(a=>new OptionalEntry(a.Id,a.Name,a.Enabled,"搜索应用名："+a.Name))).ToArray();
+        .Concat(EntryContributions.ReadAvailable(p).Select(a=>new OptionalEntry(a.Id,a.Name,a.Enabled,"搜索应用名："+a.Name))).ToArray();
 }
 sealed class EntryDisplayForm:BarcaWindow
 {
@@ -44,7 +44,7 @@ sealed partial class PetForm
                 if(entry.MenuActions.Length==1){var action=entry.MenuActions[0];parent.DropDownItems.Add(Item(entry.MenuName,action.ActionId,action.Value,entry.Id));}
                 else{var group=new ToolStripMenuItem(entry.MenuName){Tag="optional-entry"};foreach(var action in entry.MenuActions)group.DropDownItems.Add(Item(action.Name,action.ActionId,action.Value,entry.Id));BarcaMenus.StyleSubmenu(group,menu.Font);parent.DropDownItems.Add(group);}
             }
-            var apps=EntryContributions.Read(prefs).Where(a=>a.Menu).ToArray();if(apps.Length>0){var root=new ToolStripMenuItem("自定义应用"){Tag="optional-entry"};foreach(var app in apps){var item=Item(app.Name,app.ActionId);root.DropDownItems.Add(item);}BarcaMenus.StyleSubmenu(root,menu.Font);parent.DropDownItems.Add(root);}
+            var apps=EntryContributions.ReadAvailable(prefs).Where(a=>a.Menu).ToArray();if(apps.Length>0){var root=new ToolStripMenuItem("自定义应用"){Tag="optional-entry"};foreach(var app in apps){var item=Item(app.Name,app.ActionId);root.DropDownItems.Add(item);}BarcaMenus.StyleSubmenu(root,menu.Font);parent.DropDownItems.Add(root);}
         };
     }
 }

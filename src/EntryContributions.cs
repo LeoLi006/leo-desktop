@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 namespace LeoLauncher;
 
 // Host-owned data only. No delegates, controls, launch arguments or executable payloads.
@@ -12,13 +13,44 @@ sealed record EntryContribution(string Id,string ModuleId,string ActionId,string
     public string Glyph{get;init;}="terminal";
     // Passive configured-path status; never a second execution permission gate.
     public string Dependency{get;init;}="unknown";
-    public bool Shortcut=>Enabled&&Mode==EntryDisplay.Shortcut;
-    public bool Menu=>Enabled&&Mode!=EntryDisplay.Search;
+    public string Fault{get;init;}="";
+    public bool Available=>Enabled&&Fault.Length==0;
+    public bool Shortcut=>Available&&Mode==EntryDisplay.Shortcut;
+    public bool Menu=>Available&&Mode!=EntryDisplay.Search;
     public AppEntry SearchEntry=>new(Name,Target,"自定义应用",Target);
 }
 static class EntryContributions
 {
     public const string Protocol="leo-entry/1";
+    sealed record Binding(CapabilityRegistry Registry);
+    static readonly ConditionalWeakTable<Preferences,Binding> bindings=new();
+    public static void Bind(Preferences prefs,CapabilityRegistry registry){bindings.Remove(prefs);bindings.Add(prefs,new(registry));}
+    public static string Check(EntryContribution entry,Func<string,string?> owner)
+    {
+        try{
+            if(owner(entry.ActionId)!=entry.ModuleId)return "action_owner_mismatch";
+            foreach(var menu in entry.MenuActions){
+                // Explicit host transfer, not an action owned by Edge.
+                string expected=entry.Id=="edge"&&menu.ActionId=="launcher_open"&&menu.Value=="web"?"core":entry.ModuleId;
+                if(owner(menu.ActionId)!=expected)return "menu_owner_mismatch";
+            }
+            return "";
+        }catch(Exception e)when(FeatureFaults.Recoverable(e)){return "registry_unavailable";}
+    }
+    static EntryContribution Checked(Preferences prefs,EntryContribution entry)=>!bindings.TryGetValue(prefs,out var binding)?entry:
+        entry with{Fault=Check(entry,binding.Registry.EntryOwner)};
+    public static EntryContribution[] ReadAvailable(Preferences prefs)
+    {
+        var apps=prefs.ApplicationModules??[];
+        var duplicates=apps.GroupBy(a=>a.Id,StringComparer.OrdinalIgnoreCase).Where(g=>g.Count()>1).Select(g=>g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var result=new List<EntryContribution>();
+        foreach(var app in apps){
+            if(duplicates.Contains(app.Id))continue;
+            try{var entry=Describe(prefs,app);Validate(entry,app);entry=Checked(prefs,entry);if(entry.Fault.Length==0)result.Add(entry);}
+            catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Isolate malformed entry; strict draft validation remains available. */}
+        }
+        return result.ToArray();
+    }
     static readonly (string Id,string Owner,string Action,string Name,string Menu,string Settings,string Hint,string Glyph)[] builtins=[
         ("football","football-data","football_open","足球赛程","足球赛程…","足球","打开足球","football"),
         ("music","music","music_open","QQ音乐点歌","音乐","QQ 音乐","点歌","music"),
@@ -33,11 +65,11 @@ static class EntryContributions
     {
         var definition=builtins.Single(b=>b.Id==id);
         var path=prefs.ModuleExecutables.GetValueOrDefault(id)??"";
-        return new(id,definition.Owner,definition.Action,definition.Name,prefs.ModuleIcons.GetValueOrDefault(id)??"",
+        return Checked(prefs,new EntryContribution(id,definition.Owner,definition.Action,definition.Name,prefs.ModuleIcons.GetValueOrDefault(id)??"",
             Modules.Enabled(prefs,id),EntryDisplay.Mode(prefs,id),"",[],id=="football"?"football-icon":"builtin-application")
         {MenuName=definition.Menu,SettingsName=definition.Settings,Hint=definition.Hint,Glyph=definition.Glyph,
             MenuActions=BuiltinMenu(id,definition.Menu,definition.Action),
-            Dependency=path.Length==0?"unknown":File.Exists(path)?"ready":"missing"};
+            Dependency=path.Length==0?"unknown":File.Exists(path)?"ready":"missing"});
     }
     public static void ValidateBuiltin(EntryContribution entry)
     {
@@ -52,6 +84,7 @@ static class EntryContributions
     public static string BuiltinAction(Preferences prefs,string id)
     {
         var entry=Builtin(prefs,id);ValidateBuiltin(entry);
+        if(entry.Fault.Length>0)throw new InvalidOperationException("此入口暂不可用，请运行检查。");
         if(!entry.Enabled)throw new InvalidOperationException(entry.SettingsName+"已停用");
         return entry.ActionId;
     }
@@ -74,17 +107,18 @@ static class EntryContributions
         return entries;
     }
     public static LocalApplication? Configuration(Preferences prefs,string id)=>
-        Read(prefs).Any(e=>e.Id==id)?prefs.ApplicationModules.Single(a=>a.Id==id):null;
+        ReadAvailable(prefs).Any(e=>e.Id==id)?prefs.ApplicationModules.Single(a=>a.Id==id):null;
     public static LocalApplication? ForTarget(Preferences prefs,string target)
     {
-        var entries=Read(prefs);
-        var entry=entries.LastOrDefault(e=>e.Enabled&&e.Target.Equals(target,StringComparison.OrdinalIgnoreCase))
-            ??entries.LastOrDefault(e=>e.Target.Equals(target,StringComparison.OrdinalIgnoreCase));
-        return entry==null?null:prefs.ApplicationModules.Single(a=>a.Id==entry.Id);
+        var matches=(prefs.ApplicationModules??[]).Where(a=>a.Path.Equals(target,StringComparison.OrdinalIgnoreCase)).ToArray();
+        var candidate=matches.LastOrDefault(a=>a.Enabled)??matches.LastOrDefault();
+        if(candidate==null)return null;
+        if(!ReadAvailable(prefs).Any(e=>e.Id==candidate.Id))throw new InvalidOperationException("此应用入口暂不可用，请检查模块配置。");
+        return candidate;
     }
     public static string CurrentAction(Preferences prefs,string id)
     {
-        var entry=Read(prefs).SingleOrDefault(e=>e.Id==id)??throw new InvalidOperationException("应用已移除，请重新选择。");
+        var entry=ReadAvailable(prefs).SingleOrDefault(e=>e.Id==id)??throw new InvalidOperationException("应用已移除，请重新选择。");
         if(!entry.Enabled)throw new InvalidOperationException(entry.Name+"已停用");
         return entry.ActionId;
     }

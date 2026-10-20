@@ -51,7 +51,7 @@ static class Q2CapabilityTests
             var future=await bus.ExecuteStructuredAsync(typed with{Deadline=DateTimeOffset.UtcNow.AddYears(2)});c["far_future_deadline_does_not_break_wait_cleanup"]=future.Status=="succeeded"&&calls==2;
             var expired=await bus.ExecuteDetailedAsync(Request() with{Deadline=DateTimeOffset.UtcNow.AddSeconds(-1)});c["expired_request_never_launches"]=expired.ErrorCode=="timeout"&&calls==2;
             c["empty_request_identity_rejected"]=(await bus.ExecuteDetailedAsync(Request() with{RequestId=""})).Status=="failed";
-            p.ApplicationModules.Add(app);bool duplicate=false;try{_ =bus.Modules;}catch(InvalidOperationException){duplicate=true;}c["duplicate_registration_rejected"]=duplicate;
+            p.ApplicationModules.Add(app);c["duplicate_registration_isolated"]=!bus.Modules.Any(m=>m.Id=="local:"+app.Id)&&bus.Registry.EntryOwner("local:"+app.Id)==null;
         }
         {
             int calls=0;using var bus=new ActionDispatcher(Prefs(),(_,_,_)=>Task.FromResult("legacy"),Empty(),Host((_,_)=>{calls++;throw new IOException("fixture launch failure");}));
