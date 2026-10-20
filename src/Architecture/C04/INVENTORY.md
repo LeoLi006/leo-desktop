@@ -58,3 +58,8 @@
 ## 第七批增量：主题试点
 
 音乐、媒体的主题归属已接入[只读快照和窗口订阅](THEMES.md)，隐藏退订、重开刷新，字体和DPI仍由窗口/WinForms拥有。其余窗口保持原主题适配；此增量不改变上文已交付的窗口/反馈服务边界。
+
+
+## 第八批增量：清单、便签与足球主题
+
+[接入详情](PLANNER-FOOTBALL-THEMES.md)：TodoForm、NotesForm、QuickNoteForm、FootballForm复用主题绑定；TeamView及动态比赛卡片由父窗控件树适配。宿主提醒、赛程后台校时和模块启停的资源归属不变。

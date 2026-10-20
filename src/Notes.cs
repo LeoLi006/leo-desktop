@@ -18,6 +18,7 @@ sealed class NoteStore
 }
 sealed class NotesForm:BarcaWindow
 {
+    readonly ModuleThemeBinding theme;
     readonly NotesClient store;readonly Dictionary<string,string> pendingLinks;readonly Func<StickyNote,DateOnly,string> convert;readonly ListBox list=new();readonly TextBox input=new(),search=new();readonly ComboBox filter=new();readonly Label status=new();readonly BarcaButton turn=new(){Text="转为待办"},pin=new(){Text="置顶"};readonly NoteDateButton date=new();string? selected;bool changing,discardOnClose,disposed;
     public NotesForm(NoteStore notes,Func<StickyNote,DateOnly,string> addTodo):this(NotesClient.Standalone(notes),addTodo){}
     public NotesForm(NotesClient notes,Func<StickyNote,DateOnly,string> addTodo,Dictionary<string,string>? links=null)
@@ -32,13 +33,13 @@ sealed class NotesForm:BarcaWindow
         var fresh=new BarcaButton{Text="新便签",Bounds=new(24,520,112,34)};fresh.Click+=(_,_)=>New();var remove=new BarcaButton{Text="删除",Bounds=new(152,520,112,34)};remove.Click+=(_,_)=>{try{if(selected==null)return;store.Remove(selected);input.Clear();selected=null;Reload();New();}catch(Exception e){status.Text=e.Message;}};
         pin.Bounds=new(24,562,240,32);pin.Click+=(_,_)=>{try{var n=store.Items.FirstOrDefault(n=>n.Id==selected);if(n==null){status.Text="先选择一条便签。";return;}store.Pin(n.Id,!n.Pinned);pin.Text=n.Pinned?"置顶":"取消置顶";}catch(Exception e){status.Text=e.Message;}};
         var save=new BarcaButton{Text="记下 / 保存",Bounds=new(286,520,140,34)};save.Click+=(_,_)=>SaveNote();FormClosing+=(_,e)=>{if(!ConfirmPending())e.Cancel=true;else discardOnClose=true;};date.Bounds=new(438,522,166,30);turn.Bounds=new(616,520,160,34);turn.Click+=(_,_)=>{try{var n=SaveNote();if(n==null)return;if(n.TaskId!=null){status.Text="这条便签已经转为待办。";return;}if(!pendingLinks.TryGetValue(n.Id,out string? id)){id=convert(n,DateOnly.FromDateTime(date.Value));pendingLinks[n.Id]=id;}store.Link(n.Id,id);pendingLinks.Remove(n.Id);Reload(n.Id);turn.Enabled=false;status.Text="已加入 "+date.Value.ToString("yyyy-MM-dd")+" 的清单；原文可在“已转待办”查看。";}catch(OperationCanceledException){status.Text="已取消转为待办，原文保留。";}catch(Exception e){status.Text=e.Message;}};
-        status.Bounds=new(286,566,490,42);status.ForeColor=BarcaUi.Muted;status.Font=BarcaUi.Font(9);Controls.AddRange([search,filter,list,input,fresh,remove,pin,save,date,turn,status]);MinimumSize=MaximumSize=Size;store.Changed+=StoreChanged;Reload();New();
+        status.Bounds=new(286,566,490,42);status.ForeColor=BarcaUi.Muted;status.Font=BarcaUi.Font(9);Controls.AddRange([search,filter,list,input,fresh,remove,pin,save,date,turn,status]);MinimumSize=MaximumSize=Size;store.Changed+=StoreChanged;Reload();New();theme=new(this);
     }
     void StoreChanged(){if(IsDisposed||disposed)return;if(InvokeRequired){try{BeginInvoke((Action)StoreChanged);}catch(InvalidOperationException){}return;}FeatureFaults.Run("便签列表",()=>Reload(selected));}
     public void New(string text=""){if(!ConfirmPending())return;selected=null;changing=true;list.ClearSelected();changing=false;input.Text=text;turn.Enabled=true;pin.Text="置顶";status.Text="Ctrl+Enter快速记下 · 无需填写日期";input.Focus();}
     bool Dirty=>input.Text.Trim()!=(store.Items.FirstOrDefault(n=>n.Id==selected)?.Text??"");
     bool ConfirmPending(){if(!Dirty)return true;using var confirm=new PendingNoteForm();var answer=confirm.ShowDialog(this);return answer==DialogResult.No||answer==DialogResult.Yes&&SaveNote()!=null;}
-    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;store.Changed-=StoreChanged;try{if(!discardOnClose&&Dirty)store.Save(selected,input.Text);}catch{}store.Dispose();}base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;theme.Dispose();store.Changed-=StoreChanged;try{if(!discardOnClose&&Dirty)store.Save(selected,input.Text);}catch{}store.Dispose();}base.Dispose(disposing);}
     StickyNote? SaveNote(){try{var n=store.Save(selected,input.Text);selected=n.Id;Reload(n.Id);status.Text="已保存到本机";return n;}catch(Exception e){status.Text=e.Message;return null;}}
     void Reload(string? id=null){changing=true;list.Items.Clear();list.Items.AddRange(store.Query(search.Text,(filter.SelectedItem as ComboChoice)?.Value??"active").ToArray());list.SelectedItem=list.Items.Cast<StickyNote>().FirstOrDefault(n=>n.Id==id);changing=false;}
     protected override bool ProcessCmdKey(ref Message message,Keys key){if(key==(Keys.Control|Keys.Enter)||key==(Keys.Control|Keys.S)){SaveNote();return true;}if(key==(Keys.Control|Keys.F)){search.Focus();search.SelectAll();return true;}if(key==(Keys.Control|Keys.N)){New();return true;}return base.ProcessCmdKey(ref message,key);}

@@ -96,6 +96,7 @@ static class FootballFeed
 
 sealed class FootballForm : BarcaWindow,IWindowBack
 {
+    readonly ModuleThemeBinding theme;
     readonly bool preview;
     readonly FootballClient queries;readonly bool ownsQueries;
     readonly TodoStore tasks;
@@ -132,7 +133,7 @@ sealed class FootballForm : BarcaWindow,IWindowBack
         refresh.Anchor=AnchorStyles.Top|AnchorStyles.Right;toolbar.Controls.Add(refresh);toolbar.Resize+=(_,_)=>refresh.Location=new Point(toolbar.Width-123,3);
         refresh.Click+=async(_,_)=>await LoadAsync(true);main.Controls.Add(list);main.Controls.Add(toolbar);content.Controls.Add(main);content.Controls.Add(sidebar);
         home.Controls.Add(content);home.Controls.Add(status);pages.Controls.Add(home);Controls.Add(pages);Controls.Add(chrome);Shown+=async(_,_)=>{Render();if(!preview)await LoadAsync(false);};
-        KeyPreview=true;KeyDown+=(_,e)=>{if(detail!=null&&(e.KeyCode==Keys.BrowserBack||e.Alt&&e.KeyCode==Keys.Left)){BackToSchedule();e.Handled=true;e.SuppressKeyPress=true;}};Render();
+        KeyPreview=true;KeyDown+=(_,e)=>{if(detail!=null&&(e.KeyCode==Keys.BrowserBack||e.Alt&&e.KeyCode==Keys.Left)){BackToSchedule();e.Handled=true;e.SuppressKeyPress=true;}};Render();theme=new(this);
     }
     void RenderFollowing(){foreach(Control c in followed.Controls.Cast<Control>().ToArray())c.Dispose();follows.Clear();foreach(var club in following.Clubs){var button=new FollowButton(club.Name,club.Id){Width=157};button.Click+=(_,_)=>OpenTeam(club.Name);follows[club.Name]=button;followed.Controls.Add(button);}followed.Height=Math.Clamp(following.Clubs.Length*76,42,250);if(follows.Count==0)followed.Controls.Add(new Label{Text="尚未关注球队",ForeColor=BarcaUi.Muted,Width=170,Height=35});}
     internal int QueryCacheCount=>cache.Matches.Count;
@@ -188,5 +189,5 @@ sealed class FootballForm : BarcaWindow,IWindowBack
     public bool PreviewTeam(){OpenTeam("巴塞罗那");Application.DoEvents();return detail!.VerifySwitching();}
     public void PreviewTeamTable()=>detail?.PreviewTable();
     protected override void OnFormClosed(FormClosedEventArgs e){lifetime.Cancel();base.OnFormClosed(e);}
-    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;lifetime.Cancel();lifetime.Dispose();if(ownsQueries)queries.Dispose();}base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;theme.Dispose();lifetime.Cancel();lifetime.Dispose();if(ownsQueries)queries.Dispose();}base.Dispose(disposing);}
 }
