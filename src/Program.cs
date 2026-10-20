@@ -240,6 +240,7 @@ static class Program
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--presentation-service-test"){PresentationServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--client-host-test"){ClientHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--application-host-test"){ApplicationHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-consistency-test"){EntryConsistencyTests.Run(args[1]);return;}
@@ -537,9 +538,12 @@ sealed partial class PetForm : Form
         constructionProbe?.Invoke("assets_and_window_ready");
         var applicationHost=applicationOverride??new ApplicationCapabilityHost((app,token)=>{token.ThrowIfCancellationRequested();return Task.FromResult(!preview&&!File.Exists(app.Path)?RepairLocalApplication(app):app);},ApplicationCapabilityHost.StartProcess,app=>launcher?.RememberConfiguredLaunch(app),preview);
         commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null,applicationHost);
+        presentation=new(new ModuleWindowService(this),target=>target switch{ModuleWindowTarget.Football=>prefs.FootballModule,ModuleWindowTarget.Music=>prefs.MusicModule,ModuleWindowTarget.Media=>prefs.MediaModule,_=>true},OpenPresentation,notice=>OperationFeedback.Sink?.Invoke(notice),DismissPresentationFeedback);
+        presentation.Configure();musicCapabilityQueue.Feedback=t=>new(presentation.Feedback(ModuleWindowTarget.Music,t),"music");mediaCapabilityQueue.Feedback=t=>new(presentation.Feedback(ModuleWindowTarget.Media,t),"media");
         RegisterNotesCapability();RegisterConversationCapability();RegisterTodoCapability();RegisterFootballCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();
         constructionProbe?.Invoke("dispatcher_ready");
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
+        launcher.WindowClosed=target=>presentation.Invalidate(target);launcher.VisibleChanged+=(_,_)=>{if(!launcher.Visible)presentation.Invalidate(ModuleWindowTarget.Applications);};
         launcher.SharedFootballClient=footballClient;commands.ApplicationAliases=launcher.ResolveApplicationRequest;RegisterMusicCapability();launcher.SharedMusicClient=new MusicClient(musicSession!,commands);RegisterClipboardCapability();
         EntryContributions.Bind(prefs,commands.Registry);launcher.RefreshModules();
         if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}

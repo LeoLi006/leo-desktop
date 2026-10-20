@@ -18,7 +18,7 @@ sealed partial class PetForm
     void RegisterMusicCapability()
     {
         string Stamp()=>BrainCatalog.Hash(JsonSerializer.Serialize(new{enabled=prefs.MusicModule,path=prefs.ModuleExecutables.GetValueOrDefault("music")}));
-        if(musicCapabilityStamp==Stamp())return;musicSession??=new(new(previewMode?null:Path.Combine(Store.Root,"leo-music.json")));musicSession.Invalidate();var ui=new ModuleWindowService(this);
-        commands.Registry.ReplaceBuiltin(MusicCapabilityHost.Create(()=>prefs.MusicModule,Stamp,musicSession,musicCapabilityQueue,t=>ui.ShowAsync(()=>launcher.OpenMusicCore(),t),previewMode,faults:commands.Registry.ClientFaults));musicCapabilityStamp=Stamp();
+        if(musicCapabilityStamp==Stamp())return;musicSession??=new(new(previewMode?null:Path.Combine(Store.Root,"leo-music.json")));musicSession.Invalidate();var window=presentation.For(ModuleWindowTarget.Music);
+        commands.Registry.ReplaceBuiltin(MusicCapabilityHost.Create(()=>prefs.MusicModule,Stamp,musicSession,musicCapabilityQueue,window.ShowAsync,previewMode,faults:commands.Registry.ClientFaults));musicCapabilityStamp=Stamp();
     }
 }

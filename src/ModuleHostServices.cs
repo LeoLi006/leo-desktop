@@ -18,16 +18,17 @@ sealed class ModuleJsonData<T>
 sealed class ModuleWindowService(Control owner)
 {
     readonly int ownerThread=Environment.CurrentManagedThreadId;
-    public async Task ShowAsync(Action show,CancellationToken token)
+    public Task ShowAsync(Action show,CancellationToken token)=>ShowAsync(show,token,null);
+    public async Task ShowAsync(Action show,CancellationToken token,Func<bool>? current)
     {
-        token.ThrowIfCancellationRequested();if(owner.IsDisposed||owner.Disposing)throw new ObjectDisposedException("module window host");
-        if(Environment.CurrentManagedThreadId==ownerThread){show();return;}
+        token.ThrowIfCancellationRequested();if(current?.Invoke()==false)throw new OperationCanceledException();if(owner.IsDisposed||owner.Disposing)throw new ObjectDisposedException("module window host");
+        if(Environment.CurrentManagedThreadId==ownerThread){token.ThrowIfCancellationRequested();if(current?.Invoke()==false)throw new OperationCanceledException();show();return;}
         if(!owner.IsHandleCreated)throw new InvalidOperationException("窗口宿主尚未就绪");
         var done=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration=token.Register(()=>done.TrySetCanceled(token));
         EventHandler closed=(_,_)=>done.TrySetException(new ObjectDisposedException("module window host"));
         owner.Disposed+=closed;
-        try{owner.BeginInvoke((Action)(()=>{try{if(!done.Task.IsCompleted){token.ThrowIfCancellationRequested();if(owner.IsDisposed||owner.Disposing)throw new ObjectDisposedException("module window host");show();done.TrySetResult();}}catch(Exception e)when(FeatureFaults.Recoverable(e)){done.TrySetException(e);}}));await done.Task.ConfigureAwait(false);}
+        try{owner.BeginInvoke((Action)(()=>{try{if(!done.Task.IsCompleted){token.ThrowIfCancellationRequested();if(current?.Invoke()==false)throw new OperationCanceledException();if(owner.IsDisposed||owner.Disposing)throw new ObjectDisposedException("module window host");show();done.TrySetResult();}}catch(Exception e)when(FeatureFaults.Recoverable(e)){done.TrySetException(e);}}));await done.Task.ConfigureAwait(false);}
         finally{owner.Disposed-=closed;}
     }
 }

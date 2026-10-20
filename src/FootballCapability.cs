@@ -71,7 +71,7 @@ sealed partial class PetForm
     void RegisterFootballCapability()
     {
         footballQueries=new(()=>prefs.FootballModule,()=>previewMode?"preview":string.Join(',',FootballFollowing.Current.Ids),previewMode);
-        footballClient=new(commands,footballQueries);var ui=new ModuleWindowService(this);
-        commands.Registry.Register(new FootballCapability(()=>prefs.FootballModule,footballQueries,commands.ExecuteDetailedAsync,t=>ui.ShowAsync(()=>launcher.OpenFootballFromAssistant(),t),()=>previewMode?new FootballFollowing(null).Names:FootballForm.FollowingNames));
+        footballClient=new(commands,footballQueries);var window=presentation.For(ModuleWindowTarget.Football);
+        commands.Registry.Register(new FootballCapability(()=>prefs.FootballModule,footballQueries,commands.ExecuteDetailedAsync,window.ShowAsync,()=>previewMode?new FootballFollowing(null).Names:FootballForm.FollowingNames));
     }
 }

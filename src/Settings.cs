@@ -181,6 +181,7 @@ sealed partial class PetForm
         prefs.PlannerQuotes=next.PlannerQuotes?.ToArray();PlannerPhrases.Configure(prefs.PlannerQuotes);prefs.DisplayName=UiTheme.ValidateName(next.DisplayName);prefs.ClipboardPauseUntil=next.ClipboardPauseUntil;prefs.ClipboardExpireDays=next.ClipboardExpireDays;prefs.ClipboardBlockSecrets=next.ClipboardBlockSecrets;prefs.ClipboardBlockedApps=(next.ClipboardBlockedApps??[]).ToList();prefs.SkinId=SkinSelection.Id(next);SkinSelection.Migrate(prefs);ClipboardPrivacy.Notify();UpdateSkin();
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
+        presentation.Configure();
         if(!prefs.MediaModule)mediaWindow?.Close();
         ConfigureBackgroundActivities();
         if(!previewMode)ConfigureClientActivity();

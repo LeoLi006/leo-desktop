@@ -4,16 +4,17 @@ namespace LeoLauncher;
 // One resource queue per native client, shared across configuration generations.
 sealed class NativeCapabilityQueue
 {
+    internal Func<CancellationToken,ModuleProgressLease>? Feedback;
     readonly SemaphoreSlim gate=new(1,1);
     public async Task<T> Run<T>(string resource,Func<CancellationToken,Action<string>,Task<T>> work,CancellationToken token,bool feedback=true)
     {
         using var linked=CancellationTokenSource.CreateLinkedTokenSource(token);
-        string operationId=resource+":"+Guid.NewGuid().ToString("N");bool cancelShown=false;
-        var context=new ClientOperation(n=>{if(feedback)try{if(n.Retry!=null)cancelShown=true;OperationFeedback.Sink?.Invoke(n with{Module=resource,OperationId=operationId});}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("客户端操作反馈",e);}});
+        string operationId=resource+":"+Guid.NewGuid().ToString("N");bool cancelShown=false;using var feedbackLease=feedback?Feedback?.Invoke(linked.Token):null;
+        var context=new ClientOperation(n=>{if(feedback)try{if(n.Retry!=null)cancelShown=true;if(feedbackLease!=null)feedbackLease.Publish(n with{Module=resource,OperationId=operationId});else OperationFeedback.Sink?.Invoke(n with{Module=resource,OperationId=operationId});}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("客户端操作反馈",e);}});
         using var caller=token.Register(context.Cancel);using var cancelled=context.Token.Register(linked.Cancel);
         if(feedback)_=context.OfferCancel();bool entered=false;
         try{context.Report("正在等待前一个操作…");await gate.WaitAsync(linked.Token);entered=true;linked.Token.ThrowIfCancellationRequested();return await work(linked.Token,context.Report);}
-        finally{context.Finish();if(entered)gate.Release();if(cancelShown)try{OperationFeedback.Sink?.Invoke(new("操作等待已结束，请查看执行结果。",Module:resource,OperationId:operationId));}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("客户端操作反馈",e);}}
+        finally{context.Finish();if(entered)gate.Release();if(cancelShown&&feedbackLease==null)try{OperationFeedback.Sink?.Invoke(new("操作等待已结束，请查看执行结果。",Module:resource,OperationId:operationId));}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("客户端操作反馈",e);}}
     }
 }
 sealed class ProxyCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,Func<CancellationToken,Task<ProxyStatus>> read,Func<bool,CancellationToken,Action<string>,Task<ProxyStatus>> set,NativeCapabilityQueue queue,bool preview=false,IClientHostServices? services=null):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource

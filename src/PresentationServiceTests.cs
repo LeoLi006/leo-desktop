@@ -1,0 +1,70 @@
+using System.Text.Json;
+namespace LeoLauncher;
+static class PresentationServiceTests
+{
+    static Task Queued(Func<Task> action)
+    {
+        using var queued=new ManualResetEventSlim();
+        var task=Task.Run(async()=>{Task pending;try{pending=action();}finally{queued.Set();}await pending;});
+        if(!queued.Wait(3000))throw new TimeoutException("dispatch did not queue");return task;
+    }
+    static async Task<bool> Cancelled(Task task){try{await task;return false;}catch(OperationCanceledException){return true;}}
+    static ActionResult Result(string module,string status="succeeded")=>new("request","trace","fixture","fixture",module,"operation",status,"fixture",null,null,"unknown");
+    static bool Rejected(Action action){try{action();return false;}catch(ArgumentException){return true;}}
+    public static void Run(string report)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(report)!);using var ui=new Form{Opacity=0,ShowInTaskbar=false};ui.Shown+=async(_,_)=>{var c=new Dictionary<string,bool>();try{await Check(ui,c);File.WriteAllText(report,JsonSerializer.Serialize(new{ok=c.Values.All(v=>v),checks=c,external_process_starts=0}));}catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString(),checks=c}));}finally{ui.Close();}};Application.Run(ui);
+    }
+    static async Task Check(Form ui,Dictionary<string,bool> c)
+    {
+        var enabled=Enum.GetValues<ModuleWindowTarget>().ToDictionary(t=>t,_=>true);var shown=new List<ModuleWindowRequest>();var notices=new List<LeoNotice>();var dismissed=new List<string>();bool failWindow=false,failFeedback=false;
+        var legacy=new ModuleWindowService(ui);var host=new ModulePresentationService(legacy,t=>enabled[t],r=>{if(failWindow)throw new IOException("fixture window");shown.Add(r);},n=>{if(failFeedback)throw new IOException("fixture feedback");notices.Add(n);},dismissed.Add);
+        host.Configure();
+        c["port_does_not_expose_controls"]=typeof(IModuleWindowPort).GetMethods().All(m=>m.GetParameters().All(p=>!typeof(Control).IsAssignableFrom(p.ParameterType)&&p.ParameterType!=typeof(Action)));
+        int oldCalls=0;Func<Action,CancellationToken,Task> oldMethod=legacy.ShowAsync;await oldMethod(()=>oldCalls++,CancellationToken.None);c["old_window_method_group_compatible"]=oldCalls==1;
+        foreach(var target in Enum.GetValues<ModuleWindowTarget>()){
+            var port=host.For(target);int before=shown.Count;await port.ShowAsync(CancellationToken.None);c[target+"_fixed_target"]=shown.Count==before+1&&shown.Last().Target==target;
+            var pending=Queued(()=>port.ShowAsync(CancellationToken.None));host.Invalidate(target);c[target+"_closed_generation_drops_queued_show"]=await Cancelled(pending)&&shown.Count==before+1;
+            using(var stop=new CancellationTokenSource()){pending=Queued(()=>port.ShowAsync(stop.Token));stop.Cancel();c[target+"_cancel_drops_queued_show"]=await Cancelled(pending)&&shown.Count==before+1;}
+            pending=Queued(()=>port.ShowAsync(CancellationToken.None));enabled[target]=false;host.Configure();enabled[target]=true;host.Configure();c[target+"_disable_reenable_drops_old_request"]=await Cancelled(pending)&&shown.Count==before+1;
+            await port.ShowAsync(CancellationToken.None);c[target+"_fresh_request_recovers"]=shown.Count==before+2;
+        }
+        await host.ShowAsync(new(ModuleWindowTarget.Applications,"fixture query",true),CancellationToken.None);
+        c["application_query_web_options_preserved"]=shown.Last() is {Query:"fixture query",Web:true};
+        c["other_window_query_rejected"]=Rejected(()=>host.ShowAsync(new(ModuleWindowTarget.Football,"invalid"),CancellationToken.None));
+        c["unknown_window_rejected"]=Rejected(()=>host.For((ModuleWindowTarget)99).ShowAsync(CancellationToken.None));
+        failWindow=true;bool failed=false;try{await host.For(ModuleWindowTarget.Football).ShowAsync(CancellationToken.None);}catch(IOException){failed=true;}failWindow=false;await host.For(ModuleWindowTarget.Media).ShowAsync(CancellationToken.None);c["one_window_failure_isolated"]=failed&&shown.Last().Target==ModuleWindowTarget.Media;
+        var delivery=host.Feedback(ModuleWindowTarget.Music,CancellationToken.None);int count=notices.Count;await delivery.ReportAsync(Result("music"));c["success_stays_quiet_without_ack"]=notices.Count==count;
+        await delivery.ReportAsync(Result("music"),true);c["ack_keeps_normal_notice_policy"]=notices.Last() is {Error:false,Module:"music"}&&!FeedbackPolicy.ShouldPopup(notices.Last());
+        await delivery.ReportAsync(Result("music","failed"));c["error_remains_attention"]=notices.Last().Error&&FeedbackPolicy.ShouldPopup(notices.Last());
+        count=notices.Count;await delivery.ReportAsync(Result("music","cancelled"),true);c["cancelled_result_not_published"]=notices.Count==count;
+        c["foreign_result_rejected"]=Rejected(()=>delivery.ReportAsync(Result("media"),true));
+        var pendingFeedback=Queued(()=>delivery.ReportAsync(Result("music","failed")));host.Invalidate(ModuleWindowTarget.Music);await pendingFeedback;c["closed_window_drops_old_feedback"]=notices.Count==count;
+        using(var stop=new CancellationTokenSource()){delivery=host.Feedback(ModuleWindowTarget.Music,stop.Token);pendingFeedback=Queued(()=>delivery.ReportAsync(Result("music","failed")));stop.Cancel();await pendingFeedback;c["cancel_drops_queued_feedback"]=notices.Count==count;}
+        delivery=host.Feedback(ModuleWindowTarget.Music,CancellationToken.None);failFeedback=true;await delivery.ReportAsync(Result("music","failed"));failFeedback=false;await delivery.ReportAsync(Result("music"),true);c["feedback_sink_failure_does_not_poison_host"]=notices.Count==count+1;
+        count=notices.Count;
+        var progress=new ModuleProgressLease(host.Feedback(ModuleWindowTarget.Media,CancellationToken.None),"media");
+        var queuedProgress=Task.Run(()=>{progress.Publish(new("waiting",Busy:true,Module:"foreign",OperationId:"owned-operation"));});queuedProgress.Wait(3000);progress.Dispose();await Task.Delay(30);c["disposed_progress_cannot_reappear"]=notices.Count==count&&dismissed.Contains("owned-operation");
+        var originalSink=OperationFeedback.Sink;var liveNotices=new List<LeoNotice>();OperationFeedback.Sink=liveNotices.Add;
+        try{
+            using var pet=new PetForm(new Preferences{ApplicationIndexing=false},true,true);pet.Opacity=0;pet.ShowInTaskbar=false;pet.Show();
+            const System.Reflection.BindingFlags flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+            var live=(ModulePresentationService)typeof(PetForm).GetField("presentation",flags)!.GetValue(pet)!;
+            var launcher=(LauncherForm)typeof(PetForm).GetField("launcher",flags)!.GetValue(pet)!;
+            foreach(var target in Enum.GetValues<ModuleWindowTarget>()){
+                await live.For(target).ShowAsync(CancellationToken.None);
+                Form window=target==ModuleWindowTarget.Applications?launcher:target==ModuleWindowTarget.Media?(Form)typeof(PetForm).GetField("mediaWindow",flags)!.GetValue(pet)!:(Form)typeof(LauncherForm).GetField(target==ModuleWindowTarget.Music?"music":"football",flags)!.GetValue(launcher)!;
+                c[target+"_real_host_opens_existing_window"]=window.Visible;
+                var oldFeedback=live.Feedback(target,CancellationToken.None);int before=liveNotices.Count;
+                EscapeWindows.Dismiss(window);
+                string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",_=>"football-data"};
+                await oldFeedback.ReportAsync(Result(module),true);
+                c[target+"_real_close_invalidates_feedback"]=!window.Visible&&liveNotices.Count==before;
+            }
+            c["production_progress_uses_host"]=new[]{"musicCapabilityQueue","mediaCapabilityQueue"}.All(name=>((NativeCapabilityQueue)typeof(PetForm).GetField(name,flags)!.GetValue(pet)!).Feedback!=null);
+        }finally{OperationFeedback.Sink=originalSink;}
+        using(var owner=new Form{Opacity=0,ShowInTaskbar=false}){
+            owner.Show();var dying=new ModuleWindowService(owner);int shows=0;var pending=Queued(()=>dying.ShowAsync(()=>shows++,CancellationToken.None));owner.Dispose();bool disposed=false;try{await pending;}catch(ObjectDisposedException){disposed=true;}c["disposed_owner_drops_pending_show"]=disposed&&shows==0;
+        }
+    }
+}

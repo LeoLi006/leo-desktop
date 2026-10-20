@@ -25,5 +25,5 @@ sealed partial class PetForm
 {
     MediaForm? mediaWindow;
     async void ShowMedia(){try{await commands.ExecuteAsync(new("media_open","","media-shortcut"));}catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!IsDisposed)OperationFeedback.Error(e.Message);}}
-    void ShowMediaCore(){Modules.Require(prefs,"media");if(mediaWindow==null||mediaWindow.IsDisposed)mediaWindow=new MediaForm((a,v,t)=>commands.ExecuteAsync(new(a,v,"media-ui"),t),previewMode);if(!mediaWindow.Visible)WindowPositions.Prepare(mediaWindow,"media",Bounds,previewMode);WindowInteraction.Show(mediaWindow);}
+    void ShowMediaCore(){Modules.Require(prefs,"media");if(mediaWindow==null||mediaWindow.IsDisposed){mediaWindow=new MediaForm((a,v,t)=>commands.ExecuteAsync(new(a,v,"media-ui"),t),previewMode);mediaWindow.FormClosed+=(_,_)=>presentation.Invalidate(ModuleWindowTarget.Media);}if(!mediaWindow.Visible)WindowPositions.Prepare(mediaWindow,"media",Bounds,previewMode);WindowInteraction.Show(mediaWindow);}
 }

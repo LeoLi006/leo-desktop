@@ -8,6 +8,7 @@ sealed partial class LauncherForm : Form
     internal Action? MediaRequested;
     internal Action<string>? ManageShortcut;
     internal Func<LocalApplication,LocalApplication>? RepairApplication;internal Action<string[]>? ApplicationsDropped;
+    internal Action<ModuleWindowTarget>? WindowClosed;
     Action openFootball=null!;
     FlowLayoutPanel shortcutRow=null!;GlyphButton footballShortcut=null!;
     internal Func<string,string,CancellationToken,Task<string>>? ActionRequested;
@@ -126,7 +127,7 @@ sealed partial class LauncherForm : Form
         footballButton.FlatAppearance.BorderSize = 0;
         openFootball = () => {
             if(!prefs.FootballModule)return;
-            if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks,sharedQueries:SharedFootballClient);
+            if (football == null || football.IsDisposed){football = new FootballForm(preview,tasks,sharedQueries:SharedFootballClient);football.FormClosed+=(_,_)=>WindowClosed?.Invoke(ModuleWindowTarget.Football);}
             SetWatchVisibility(football);
             var area = Screen.FromControl(this).WorkingArea;
             football.StartPosition = FormStartPosition.Manual;
@@ -417,7 +418,7 @@ sealed partial class LauncherForm : Form
     }
     public bool VerifyMusicEntry(){if(!Visible)Show();var icon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="QQ音乐点歌");var footballIcon=shortcutRow.Controls.OfType<GlyphButton>().Single(b=>b.AccessibleName=="足球赛程");icon.PerformClick();Application.DoEvents();bool ok=icon.Visible&&icon.Left>footballIcon.Right&&music?.Visible==true&&music.Owner==null&&!music.TopMost;music?.Close();return ok;}
     public void ReloadImportedConfiguration(){FootballFollowing.Current.Reload();football?.Close();football=null;RefreshModules();Filter();}
-    public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed)music=new MusicForm(preview,shared:SharedMusicClient){MediaRequested=()=>MediaRequested?.Invoke()};music.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));return music;}
+    public MusicForm MusicWithoutOpening(){Modules.Require(prefs,"music");if(music==null||music.IsDisposed){music=new MusicForm(preview,shared:SharedMusicClient){MediaRequested=()=>MediaRequested?.Invoke()};music.FormClosed+=(_,_)=>WindowClosed?.Invoke(ModuleWindowTarget.Music);music.VisibleChanged+=(sender,_)=>{if(sender is Form{Visible:false})WindowClosed?.Invoke(ModuleWindowTarget.Music);};}music.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));return music;}
     public MusicForm OpenMusicFromAssistant(string query=""){var form=MusicWithoutOpening();if(SharedMusicClient!=null){_ = OpenRegisteredMusic(query);}else OpenMusicCore(query);return form;}
     async Task OpenRegisteredMusic(string query){try{await SharedMusicClient!.Run("music_open",query);}catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed)OperationFeedback.Error(e.Message);}}
     internal void OpenMusicCore(string query=""){var form=MusicWithoutOpening();if(!form.Visible)WindowPositions.Prepare(form,"music",PetBounds?.Invoke()??Bounds,preview);form.OpenQuery(query);}
