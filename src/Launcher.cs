@@ -38,7 +38,7 @@ sealed partial class LauncherForm : Form
     List<AppEntry> apps = new(), filtered = new();
     readonly ActivityOwner catalogActivities=new("application-index");
     readonly Func<CancellationToken,List<AppEntry>> scanCatalog;
-    readonly Action? observeOverride;readonly OwnedActivityTimer observationActivity;
+    readonly Action? observeOverride;readonly IPeriodicTask observationActivity;
     void CancelCatalog(){catalogGeneration++;catalogRestartRequested=false;catalogActivities.Reset();}
     bool loading;int catalogGeneration;bool catalogStarted,catalogWorkerRunning,catalogRestartRequested;
     FootballForm? football;
@@ -116,7 +116,7 @@ sealed partial class LauncherForm : Form
     public LauncherForm(Preferences p, Action openSettings, bool previewMode, bool demoMode,TodoStore? planner=null,Action<AppEntry>? appLauncher=null,Func<CancellationToken,List<AppEntry>>? scanner=null,Action? observationOverride=null)
     {
         scanCatalog=scanner??Catalog.Scan;observeOverride=observationOverride;
-        observationActivity=new(observer,"application-context","应用上下文","context-check",t=>{t.ThrowIfCancellationRequested();ObserveCore();return Task.CompletedTask;});
+        observationActivity=new OwnedActivityTimer(observer,"application-context","应用上下文","context-check",t=>{t.ThrowIfCancellationRequested();ObserveCore();return Task.CompletedTask;});
         launchApplication=appLauncher??Catalog.Launch;tasks=planner??new(previewMode?null:Path.Combine(Store.Root,"leo-todos.json"));prefs = p; resizePet = openSettings; preview = previewMode; demo = demoMode;
         memory = new Memory(demo ? null : Path.Combine(Store.Root, "leo-history.json"));
         Text = "Leo · 应用搜索"; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;

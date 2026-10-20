@@ -7,9 +7,9 @@ sealed class UpdateNotifications:IDisposable
     readonly System.Windows.Forms.Timer timer=new(){Interval=60_000};
     readonly Func<CancellationToken,Task<LeoRelease?>> check;readonly Action<LeoRelease> notify;
     readonly Func<DateTimeOffset> now;
-    readonly OwnedActivityTimer activity;DateTimeOffset next;bool enabled,disposed;
+    readonly IPeriodicTask activity;DateTimeOffset next;bool enabled,disposed;
     public UpdateNotifications(Func<CancellationToken,Task<LeoRelease?>> check,Action<LeoRelease> notify,Func<DateTimeOffset>? clock=null)
-    {this.check=check;this.notify=notify;now=clock??(()=>DateTimeOffset.Now);activity=new(timer,"update-check","自动检查更新","update-request",CheckCore);}
+    {this.check=check;this.notify=notify;now=clock??(()=>DateTimeOffset.Now);activity=new OwnedActivityTimer(timer,"update-check","自动检查更新","update-request",CheckCore);}
     public void Configure(bool value){if(disposed||enabled==value)return;enabled=value;if(value){next=now().AddSeconds(30);timer.Interval=30_000;}activity.Configure(value);}
     internal static bool ShouldNotify(LeoRelease? release,Version current,string last)=>release!=null&&release.Version>current&&LeoUpdates.TagVersion(last)!=release.Version;
     internal Task Tick()=>activity.RunNowAsync();

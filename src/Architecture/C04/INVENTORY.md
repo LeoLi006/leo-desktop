@@ -83,3 +83,8 @@
 ## 第十二批增量：宿主周期任务接口
 
 [宿主调度契约](HOST-SCHEDULING.md)：提醒、比赛校时、剪贴板监听通过IPeriodicTask使用原OwnedActivityTimer；IWindowPeriodicTask继承该契约。两类所有者和原启停策略保持分离，Enabled与Running分别描述是否接受工作和是否仍有未结束工作。
+
+
+## 第十三批增量：周期任务接口收尾
+
+[调度清册](SCHEDULING-INVENTORY.md)统一列出当前9类周期任务和剩余非周期/绘制边界。应用上下文、更新、专注宿主与窗口均使用IPeriodicTask字段，只有WindowPeriodicTask内部保留具体实现字段。原构造与行为保持，未清理仍有调用的活动服务。

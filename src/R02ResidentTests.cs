@@ -18,6 +18,7 @@ static class R02ResidentTests
         using(var launcher=new LauncherForm(prefs,()=>{},true,true,scanner:t=>{int call=Interlocked.Increment(ref scans);if(call==1){oldToken=t;held.Wait();}return [new(call==1?"old fixture app":"new fixture app",@"C:\fixture\app.exe","fixture")];},observationOverride:()=>{observations++;if(observationFails)throw new IOException("fixture context failure");})){
             await Until(()=>Volatile.Read(ref scans)==1);launcher.ConfigureActivity();launcher.ConfigureActivity();c["index_scan_is_registered_once"]=Count("application-index","scan")==1&&scans==1;
             c["context_observer_has_one_polling_lease"]=Count("application-context","polling")==1;
+            c["context_uses_contract_and_original_interval"]=typeof(LauncherForm).GetField("observationActivity",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask)&&((IPeriodicTask)Field(launcher,"observationActivity")).Enabled&&((System.Windows.Forms.Timer)Field(launcher,"observer")).Interval==1500;
             prefs.ApplicationIndexing=false;launcher.ConfigureActivity();c["index_disable_cancels_worker"]=oldToken.IsCancellationRequested;
             c["index_disable_stops_context_observation"]=Count("application-context")==0&&!((System.Windows.Forms.Timer)Field(launcher,"observer")).Enabled;
             c["cancelled_sta_work_remains_counted_until_return"]=Count("application-index","scan")==1;
@@ -30,9 +31,9 @@ static class R02ResidentTests
             prefs.ContextAware=true;launcher.ConfigureActivity();before=observations;Tick(observer);c["context_reenable_has_no_duplicate_handler"]=observations==before+1&&Count("application-context","polling")==1;
             observationFails=true;Tick(observer);c["context_failure_stops_its_own_observer"]=!observer.Enabled;
             launcher.ConfigureActivity();c["reapplying_preferences_does_not_restart_failed_observer"]=!observer.Enabled;
-            prefs.ContextAware=false;launcher.ConfigureActivity();((OwnedActivityTimer)Field(launcher,"observationActivity")).Retry();c["stale_context_retry_respects_disabled_option"]=!observer.Enabled;
+            prefs.ContextAware=false;launcher.ConfigureActivity();((IPeriodicTask)Field(launcher,"observationActivity")).Retry();c["stale_context_retry_respects_disabled_option"]=!observer.Enabled;
             observationFails=false;prefs.ContextAware=true;launcher.ConfigureActivity();before=observations;Tick(observer);c["context_explicit_reenable_recovers_once"]=observer.Enabled&&observations==before+1;
-            launcher.Dispose();((OwnedActivityTimer)Field(launcher,"observationActivity")).Retry();launcher.ConfigureActivity();Tick(observer);c["disposed_launcher_cannot_restore_observation"]=Count("application-context")==0;
+            launcher.Dispose();((IPeriodicTask)Field(launcher,"observationActivity")).Retry();launcher.ConfigureActivity();Tick(observer);c["disposed_launcher_cannot_restore_observation"]=Count("application-context")==0;
         }
         int staleErrors=0;var previousObserver=FeatureFaults.Observer;FeatureFaults.Observer=f=>{if(f.Feature=="应用索引")staleErrors++;};
         try{
@@ -62,9 +63,11 @@ static class R02ResidentTests
         }
         var clock=DateTimeOffset.Now;int calls=0,notifications=0;var release=new LeoRelease(new(9,0,0),"v9.0.0","","","",true);
         using(var watcher=new UpdateNotifications(_=>{calls++;return Task.FromResult<LeoRelease?>(release);},_=>notifications++,()=>clock)){
+            c["updates_declare_common_contract"]=typeof(UpdateNotifications).GetField("activity",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask)&&!((IPeriodicTask)Field(watcher,"activity")).Enabled;
             await watcher.Tick();c["disabled_update_check_has_no_activity"]=calls==0&&Count("update-check")==0;
             watcher.Configure(true);watcher.Configure(true);await watcher.Tick();c["update_startup_delay_and_single_schedule_preserved"]=calls==0&&Count("update-check","polling")==1;
             clock=clock.AddSeconds(31);await watcher.Tick();c["due_update_check_notifies_once"]=calls==1&&notifications==1;
+            c["updates_preserve_timer_and_idle_state"]=((System.Windows.Forms.Timer)Field(watcher,"timer")).Interval==60000&&((IPeriodicTask)Field(watcher,"activity")).Enabled&&!((IPeriodicTask)Field(watcher,"activity")).Running;
             watcher.Configure(true);clock=clock.AddHours(1);await watcher.Tick();c["reapplying_update_setting_preserves_daily_deadline"]=calls==1;
             clock=clock.AddDays(1);await watcher.Tick();c["daily_update_schedule_is_preserved"]=calls==2&&notifications==2;
             watcher.Dispose();watcher.Configure(true);await watcher.Tick();c["disposed_update_watcher_cannot_restart"]=calls==2&&Count("update-check")==0;
@@ -84,8 +87,10 @@ static class R02ResidentTests
         }
         var focus=new FocusSession(null);focus.Start(25,true,DateTimeOffset.Now);
         using(var form=new FocusForm(focus,()=>{})){
+            c["focus_window_declares_common_contract"]=typeof(FocusForm).GetField("displayActivity",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask)&&!((IPeriodicTask)Field(form,"displayActivity")).Enabled&&((System.Windows.Forms.Timer)Field(form,"timer")).Interval==1000;
             c["unshown_focus_window_has_no_refresh_timer"]=Count("focus-window")==0;form.StartPosition=FormStartPosition.Manual;form.Location=new(-19000,-19000);form.Show();
-            c["visible_focus_window_registers_refresh"]=Count("focus-window","polling")==1;form.Hide();c["hidden_focus_window_stops_refresh_only"]=Count("focus-window")==0&&focus.Active(DateTimeOffset.Now);
+            c["visible_focus_window_registers_refresh"]=Count("focus-window","polling")==1;
+            c["visible_focus_contract_state"]=((IPeriodicTask)Field(form,"displayActivity")).Enabled&&!((IPeriodicTask)Field(form,"displayActivity")).Running;form.Hide();c["hidden_focus_window_stops_refresh_only"]=Count("focus-window")==0&&focus.Active(DateTimeOffset.Now);
             form.Show();form.Hide();form.Show();c["focus_window_reopen_has_one_refresh_handler"]=Count("focus-window","polling")==1;form.Close();c["focus_window_close_preserves_session"]=form.IsDisposed&&focus.Active(DateTimeOffset.Now)&&Count("focus-window")==0;
         }
         using(var pet=new PetForm(new Preferences{ApplicationIndexing=false,AutoUpdateNotifications=false},true,true))foreach(var row in await pet.VerifyFocusActivities())c[row.Key]=row.Value;
@@ -102,6 +107,7 @@ sealed partial class PetForm
     {
         var c=new Dictionary<string,bool>();int checks=0,completions=0;FocusTickOverride=()=>{checks++;if(focus.Complete(DateTimeOffset.Now))completions++;};companionActivity.Configure(true);
         focus.Start(25,true,DateTimeOffset.Now);focusWindow=new FocusForm(focus,()=>{});focusWindow.StartPosition=FormStartPosition.Manual;focusWindow.Location=new(-19000,-19000);focusWindow.Show();focusWindow.Close();
+        c["focus_host_declares_common_contract"]=typeof(PetForm).GetField("companionActivity",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask)&&companionActivity.Enabled&&!companionActivity.Running&&companionTimer.Interval==1000;
         c["host_focus_timer_survives_focus_window_close"]=companionTimer.Enabled&&focus.Active(DateTimeOffset.Now)&&ModuleActivities.Snapshot().Any(x=>x.Module=="focus-host"&&x.Kind=="polling");
         focus.Start(1,true,DateTimeOffset.Now.AddMinutes(-2));await companionActivity.RunNowAsync();await companionActivity.RunNowAsync();c["closed_window_session_completion_occurs_once"]=checks==2&&completions==1&&!focus.Active(DateTimeOffset.Now);
         c["health_summary_has_focus_type_but_no_session_content"]=ModuleActivities.Summary().Contains("专注计时")&&!ModuleActivities.Summary().Contains("25 分钟");
