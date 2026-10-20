@@ -36,11 +36,11 @@ sealed partial class ChatForm
                     if(intent.Value is "应用" or "软件"||string.IsNullOrWhiteSpace(intent.Value)){ResultText("输入或说：打开微信、打开浏览器。");break;}
                     if(appTools==null)throw new InvalidOperationException("本机应用索引尚未就绪");var apps=appTools.FindLocal(intent.Value);var exact=apps.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(intent.Value)).ToArray();
                     if(intent.Kind==QuickKind.OpenApp&&(apps.Length==1||exact.Length==1)){var app=exact.Length==1?exact[0]:apps[0];string message=await appTools.OpenLocalAsync(app,request.Token);ResultText(message);LocalDone(message);}
-                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,async()=>{try{LocalDone(await appTools.OpenLocalAsync(app,chatLife.Token));}catch(Exception e){if(!IsDisposed)state.Text=e.Message;}});}break;
+                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,async()=>{try{LocalDone(await appTools.OpenLocalAsync(app,chatLife.Token));}catch(Exception e){if(!chatReleased&&!IsDisposed)state.Text=e.Message;}});}break;
                 case QuickKind.Football:Modules.RequireFootball();await ShowFootball(intent,request.Token);break;
             }
-        }catch(OperationCanceledException){if(!IsDisposed)state.Text="已停止";}catch(Exception e){if(!IsDisposed)state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
-        finally{pending=null;request.Dispose();if(!IsDisposed){send.Enabled=true;UpdateVoice();input.Focus();}}
+        }catch(OperationCanceledException){if(!chatReleased&&!IsDisposed)state.Text="已停止";}catch(Exception e){if(!chatReleased&&!IsDisposed)state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
+        finally{pending=null;request.Dispose();if(!chatReleased&&!IsDisposed){send.Enabled=true;UpdateVoice();input.Focus();}}
     }
     FootballClient? fallbackFootball;
     Task<string> FootballFacts(string value,CancellationToken token)=>appTools?.HasLeo==true?appTools.ExecuteLeoAsync("football_facts",value,token):(fallbackFootball??=FootballClient.Standalone(preview)).Facts(value,token);

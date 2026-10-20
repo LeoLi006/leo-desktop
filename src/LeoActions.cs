@@ -38,7 +38,7 @@ sealed partial class PetForm
             case "module_list":return JsonSerializer.Serialize(new{modules=commands.Modules.Select(m=>new{m.Id,m.Name,m.Version,m.Enabled,m.Actions}),applications=(prefs.ApplicationModules??[]).Select(a=>new{a.Id,a.Name,a.Enabled,action="local_app_open"}),extensions=commands.Extensions.Load().Select(m=>new{m.Id,m.Name,m.Version,m.Runtime,commands=m.Commands.Select(c=>new{c.Id,c.Title,c.Phrases,action="ext:"+m.Id+":"+c.Id})})});
             case "module_run":{string id=value,arg="";if(value.StartsWith('{')){using var doc=JsonDocument.Parse(value);id=doc.RootElement.GetProperty("id").GetString()??"";arg=doc.RootElement.TryGetProperty("value",out var v)?v.GetString()??"":"";}if(!id.StartsWith("ext:"))throw new ArgumentException("请使用module_list返回的扩展动作ID");return await commands.ExecuteAsync(new(id,arg,"chat-module"),token);}
             case "command_text":return await commands.ExecuteTextAsync(value,commands.CurrentSource,token);
-            case "chat_open":ShowChat();return "已打开聊天。";
+            case "chat_open":throw new InvalidOperationException("聊天窗口必须经过已注册会话能力");
 
             case "app_search":return JsonSerializer.Serialize(new{apps=new AppTools(()=>launcher.FileApplications,launcher.LaunchFromAssistant,()=>prefs.Aliases).FindLocal(value).Select(a=>new{app_id=AppTools.Id(a),name=a.Name})});
             case "app_open":{var app=launcher.FileApplications.Where(AppTools.Launchable).SingleOrDefault(a=>AppTools.Id(a)==value)??throw new ArgumentException("应用不在当前索引，请重新搜索");return await launcher.LaunchFromAssistantAsync(app,commands.CurrentSource,token);}

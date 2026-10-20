@@ -1,4 +1,4 @@
-namespace LeoLauncher;
+﻿namespace LeoLauncher;
 sealed partial class ChatForm
 {
     public int PreviewMatchCards=>results.Controls.OfType<MatchCard>().Count();
@@ -6,6 +6,7 @@ sealed partial class ChatForm
     public int PreviewTableRows=>results.Controls.OfType<StandingsLine>().Count();
     public string PreviewState=>state.Text;
     public void PreviewHome()=>ShowHome();
+    internal bool PreviewResizeAvailable(){if(!CanResize)return false;var point=PointToScreen(new Point(1,1));var message=Message.Create(Handle,0x84,IntPtr.Zero,(IntPtr)((point.Y<<16)|(point.X&0xffff)));WndProc(ref message);return message.Result.ToInt64() is >=10 and <=17;}
 
 }
 static class QuickTests
@@ -20,7 +21,7 @@ static class QuickTests
         store.Toggle(current.Id);var reopened=new TodoStore(path);checks["tasks_and_completion_survive_reload"]=reopened.Items.Count==3&&reopened.Items.Single(t=>t.Id==current.Id).Completed!=null;
         var deleted=reopened.Delete(old.Id)!;reopened.Restore(deleted);checks["delete_and_undo_persist"]=new TodoStore(path).Items.Count==3;
         string blocked=Path.Combine(directory,"todo-blocked-fixture");Directory.CreateDirectory(blocked);var failed=new TodoStore(blocked);try{failed.Add("保存失败事项",day);checks["failed_save_does_not_report_success"]=false;}catch(Exception e)when(e is IOException or UnauthorizedAccessException){checks["failed_save_does_not_report_success"]=failed.Items.Count==0&&Directory.Exists(blocked);}if(File.Exists(blocked+".tmp"))File.Delete(blocked+".tmp");Directory.Delete(blocked);
-        string bad=Path.Combine(directory,"todo-corrupt-fixture.json");File.WriteAllText(bad,"broken fixture");try{new TodoStore(bad).Add("不能覆盖",day);checks["corrupt_file_preserved"]=false;}catch(IOException){checks["corrupt_file_preserved"]=File.ReadAllText(bad)=="broken fixture";}
+        string corruptDir=Path.Combine(directory,"corrupt-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(corruptDir);string bad=Path.Combine(corruptDir,"leo-todos.json");File.WriteAllText(bad,"broken fixture");try{new TodoStore(bad).Add("不能覆盖",day);checks["corrupt_file_preserved"]=false;}catch(IOException){checks["corrupt_file_preserved"]=File.ReadAllText(bad)=="broken fixture";}
         checks["local_intent_routes"]=QuickRouter.Route("打开微信").Kind==QuickKind.OpenApp&&QuickRouter.Route("巴萨下一场什么时候").Kind==QuickKind.Football&&QuickRouter.Route("曼城排第几").Kind==QuickKind.Football&&QuickRouter.Route("今晚有什么值得看").Kind==QuickKind.Football&&QuickRouter.Route("明天添加待办，买牛奶").DayOffset==1;
         checks["analysis_and_casual_chat_need_model"]=QuickRouter.Route("分析巴萨为什么输了").Kind==QuickKind.FootballAnalysis&&QuickRouter.Route("今天有点烦，聊聊").Kind==QuickKind.Ai;
         checks["club_mentions_do_not_hijack_conversation"]=new[]{"我喜欢巴萨和曼城","你觉得巴萨和曼城谁更强","巴萨球衣真好看","我今天看了曼城比赛很开心","巴萨下一场什么时候，然后帮我安排任务"}.All(t=>QuickRouter.Route(t).Kind==QuickKind.Ai);
@@ -32,7 +33,7 @@ static class QuickTests
         using var window=new ChatForm(true,ChatTests.Settings(),()=>{calls++;return ChatTests.FixtureApi();},new AppTools(()=>apps,_=>opened++),onTodo:intent=>{daily.Show();daily.Apply(intent);});window.Show();Application.DoEvents();
         void Send(string text){var task=window.PreviewSendAsync(text);var watch=System.Diagnostics.Stopwatch.StartNew();while(!task.IsCompleted&&watch.ElapsedMilliseconds<15000){Application.DoEvents();Thread.Sleep(5);}task.GetAwaiter().GetResult();Application.DoEvents();}
         checks["settings_hidden_initially"]=window.PreviewOptionsHidden;
-        checks["chat_default_is_roomier_and_resizable"]=window.ClientSize.Width>=720&&window.ClientSize.Height>=600&&window.FormBorderStyle==FormBorderStyle.Sizable;
+        checks["chat_default_is_roomier_and_resizable"]=window.ClientSize.Width>=720&&window.ClientSize.Height>=600&&window.PreviewResizeAvailable();
         Send("添加待办，买牛奶");checks["task_command_opens_local_list"]=daily.Visible&&daily.Owner==null&&!daily.TopMost&&daily.Count==1;
         Send("完成待办，买牛奶");checks["task_completed_without_model"]=daily.CompletedCount==1;
         Send("打开微信");checks["single_local_app_opens"]=opened==1;

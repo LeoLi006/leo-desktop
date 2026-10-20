@@ -1,4 +1,4 @@
-using NAudio.Wave;
+﻿using NAudio.Wave;
 using SherpaOnnx;
 using System.Speech.Synthesis;
 using System.Text.RegularExpressions;
@@ -20,20 +20,24 @@ sealed class LocalAsr:IDisposable
     }
     public void Dispose(){lock(gate){if(disposed)return;disposed=true;engine?.Dispose();engine=null;}}
 }
-sealed class SpeechIO:IDisposable
+sealed class SpeechIO:ISpeechIO
 {
     readonly LocalAsr asr=new();readonly object audioGate=new();readonly List<float> audio=new();
     WaveInEvent? capture;CancellationTokenSource? decoding;
     SpeechSynthesizer? speaker;Prompt? activePrompt;
-    bool disposed;long session;long lastMeter;int silenceSamples,voiceSamples;bool heardVoice;double peakRms;
-    public int InputDevice=-1;
+    volatile bool disposed;long session;long lastMeter;int silenceSamples,voiceSamples;bool heardVoice;double peakRms;
+    public int InputDevice{get;set;}=-1;
+    public long Generation=>Interlocked.Read(ref session);
+    public bool IsCurrent(long generation)=>!disposed&&generation==Generation;
     public static (int Id,string Name)[] InputDevices()=>Enumerable.Range(0,WaveInEvent.DeviceCount).Select(i=>(i,WaveInEvent.GetCapabilities(i).ProductName)).ToArray();
     public bool Listening{get;private set;}
     public bool Finishing{get;private set;}
     public bool Speaking{get;private set;}
-    public event Action<string,bool>? Recognized;
-    public event Action<string>? Status;
-    public event Action? Changed;
+    public event Action<string,bool,long>? Recognized;
+    public event Action<string,long>? Status;
+    public event Action<long>? Changed;
+    void NotifyStatus(string message,long? generation=null){long id=generation??Generation;if(IsCurrent(id))Status?.Invoke(message,id);}
+    void NotifyChanged()=>Changed?.Invoke(Generation);
     public void Start()
     {
         if(disposed||Listening||Finishing)return;
@@ -44,45 +48,51 @@ sealed class SpeechIO:IDisposable
         device.DataAvailable+=(_,e)=>{
             if(disposed||id!=session||!Listening||Finishing)return;
             double energy=0;bool finish=false;
-            lock(audioGate){for(int i=0;i+1<e.BytesRecorded;i+=2){float sample=BitConverter.ToInt16(e.Buffer,i)/32768f;audio.Add(sample);energy+=sample*sample;}
+            lock(audioGate){if(disposed||id!=session||!Listening||Finishing)return;for(int i=0;i+1<e.BytesRecorded;i+=2){float sample=BitConverter.ToInt16(e.Buffer,i)/32768f;audio.Add(sample);energy+=sample*sample;}
                 int count=e.BytesRecorded/2;double rms=Math.Sqrt(energy/Math.Max(1,count));
                 peakRms=Math.Max(peakRms,rms);
                 if(rms>.006){heardVoice=true;voiceSamples+=count;silenceSamples=0;}else silenceSamples+=count;
                 finish=audio.Count>=16000*60||(heardVoice&&voiceSamples>=3200&&silenceSamples>=16000);
-                if(Environment.TickCount64-lastMeter>1500){lastMeter=Environment.TickCount64;Status?.Invoke(rms>.003?"正在录音 · 停顿后自动转写":"正在听 · 请确认默认麦克风有声音");}
+                if(Environment.TickCount64-lastMeter>1500){lastMeter=Environment.TickCount64;NotifyStatus(rms>.003?"正在录音 · 停顿后自动转写":"正在听 · 请确认默认麦克风有声音",id);}
             }
-            if(finish)_=Task.Run(()=>{if(id==session)FinishListening();});
+            if(finish)_=Task.Run(()=>FinishListening(id));
         };
         device.RecordingStopped+=(_,e)=>{
-            device.Dispose();if(ReferenceEquals(capture,device))capture=null;
-            if(disposed||id!=session||token.IsCancellationRequested)return;
-            Listening=false;Finishing=true;Changed?.Invoke();
-            if(e.Exception!=null){Finishing=false;Changed?.Invoke();Status?.Invoke("录音失败："+e.Exception.Message);return;}
-            float[] samples;lock(audioGate){samples=audio.ToArray();audio.Clear();}
-            if(samples.Length<1600||peakRms<.001){Finishing=false;Changed?.Invoke();Status?.Invoke("没有录到有效语音，请检查默认麦克风");return;}
-            Status?.Invoke("SenseVoice 本地转写中…");
+            try{device.Dispose();}catch{}
+            float[] samples;string? failure=null;
+            lock(audioGate){
+                if(ReferenceEquals(capture,device))capture=null;
+                if(disposed||id!=session||token.IsCancellationRequested)return;
+                Listening=false;Finishing=true;samples=audio.ToArray();audio.Clear();
+                if(e.Exception!=null)failure="录音失败，请检查输入设备";
+                else if(samples.Length<1600||peakRms<.001)failure="没有录到有效语音，请检查默认麦克风";
+                if(failure!=null)Finishing=false;
+            }
+            NotifyChanged();if(failure!=null){if(IsCurrent(id))NotifyStatus(failure,id);return;}
+            if(IsCurrent(id))NotifyStatus("SenseVoice 本地转写中…",id);
             _=Task.Run(()=>{
-                try{string text=asr.Decode(samples,token);if(!disposed&&id==session&&!token.IsCancellationRequested){if(text.Length>0)Recognized?.Invoke(text,true);else Status?.Invoke("没有识别到文字，请再试一次");}}
+                try{string text=asr.Decode(samples,token);if(IsCurrent(id)&&!token.IsCancellationRequested){if(text.Length>0)Recognized?.Invoke(text,true,id);else NotifyStatus("没有识别到文字，请再试一次",id);}}
                 catch(OperationCanceledException){}
-                catch(Exception error){if(!disposed&&id==session)Status?.Invoke("本地转写失败："+error.Message);}
-                finally{if(!disposed&&id==session){Finishing=false;Changed?.Invoke();}}
+                catch(Exception error)when(FeatureFaults.Recoverable(error)){if(IsCurrent(id))NotifyStatus("本地转写失败，请检查模型与录音设备",id);}
+                finally{bool publish;lock(audioGate){publish=!disposed&&id==session;if(publish)Finishing=false;}if(publish)NotifyChanged();}
             });
         };
         Listening=true;try{device.StartRecording();}catch{Listening=false;capture=null;device.Dispose();throw;}
-        Changed?.Invoke();Status?.Invoke("SenseVoice 正在录音 · 停顿1秒或再次点击后转写");
+        NotifyChanged();NotifyStatus("SenseVoice 正在录音 · 停顿1秒或再次点击后转写",id);
     }
-    public void FinishListening(){if(!Listening||Finishing)return;Finishing=true;Changed?.Invoke();Status?.Invoke("结束录音，准备本地转写…");try{capture?.StopRecording();}catch{StopListening();}}
-    public void StopListening(){Interlocked.Increment(ref session);decoding?.Cancel();Listening=false;Finishing=false;var current=capture;capture=null;try{current?.StopRecording();}catch{current?.Dispose();}lock(audioGate)audio.Clear();Changed?.Invoke();}
+    public void FinishListening()=>FinishListening(Generation);
+    void FinishListening(long expected){WaveInEvent? current;lock(audioGate){if(disposed||expected!=session||!Listening||Finishing)return;Finishing=true;current=capture;}NotifyChanged();NotifyStatus("结束录音，准备本地转写…",expected);try{current?.StopRecording();}catch{if(IsCurrent(expected))StopListening();}}
+    public void StopListening(){WaveInEvent? current;CancellationTokenSource? cancellation;lock(audioGate){Interlocked.Increment(ref session);cancellation=decoding;Listening=false;Finishing=false;current=capture;capture=null;audio.Clear();}try{cancellation?.Cancel();}catch(ObjectDisposedException){}try{current?.StopRecording();}catch{try{current?.Dispose();}catch{}}NotifyChanged();}
     public static string PlainSpeech(string text){string plain=Regex.Replace(text,@"```[\s\S]*?```"," 代码片段略。 ");plain=Regex.Replace(plain,@"\[([^\]]+)\]\([^)]+\)","$1");plain=Regex.Replace(plain,@"[*#`_]+","");return plain.Length>12000?plain[..12000]:plain;}
     public void Speak(string text)
     {
         if(disposed||string.IsNullOrWhiteSpace(text))return;StopListening();StopSpeaking();
-        if(speaker==null){speaker=new SpeechSynthesizer();var voice=speaker.GetInstalledVoices().FirstOrDefault(x=>x.Enabled&&x.VoiceInfo.Culture.Name=="zh-CN");if(voice!=null)speaker.SelectVoice(voice.VoiceInfo.Name);speaker.SpeakCompleted+=(_,e)=>{if(!disposed&&ReferenceEquals(e.Prompt,activePrompt)){activePrompt=null;Speaking=false;Changed?.Invoke();}};}
-        speaker.SetOutputToDefaultAudioDevice();Speaking=true;try{activePrompt=speaker.SpeakAsync(PlainSpeech(text));}catch{Speaking=false;throw;}Changed?.Invoke();
+        if(speaker==null){speaker=new SpeechSynthesizer();var voice=speaker.GetInstalledVoices().FirstOrDefault(x=>x.Enabled&&x.VoiceInfo.Culture.Name=="zh-CN");if(voice!=null)speaker.SelectVoice(voice.VoiceInfo.Name);speaker.SpeakCompleted+=(_,e)=>{if(!disposed&&ReferenceEquals(e.Prompt,activePrompt)){activePrompt=null;Speaking=false;NotifyChanged();}};}
+        speaker.SetOutputToDefaultAudioDevice();Speaking=true;try{activePrompt=speaker.SpeakAsync(PlainSpeech(text));}catch{Speaking=false;throw;}NotifyChanged();
     }
-    public void StopSpeaking(){activePrompt=null;try{speaker?.SpeakAsyncCancelAll();}catch{}Speaking=false;Changed?.Invoke();}
+    public void StopSpeaking(){activePrompt=null;try{speaker?.SpeakAsyncCancelAll();}catch{}Speaking=false;NotifyChanged();}
     public void Stop(){StopListening();StopSpeaking();}
-    public void Dispose(){if(disposed)return;disposed=true;Stop();decoding?.Dispose();speaker?.Dispose();_=Task.Run(asr.Dispose);}
+    public void Dispose(){if(disposed)return;disposed=true;Stop();decoding?.Dispose();speaker?.Dispose();_=Task.Run(()=>FeatureFaults.Run("本地识别释放",asr.Dispose));}
     public static object VerifyToFile(string file)
     {
         using var synth=new SpeechSynthesizer();var voice=synth.GetInstalledVoices().FirstOrDefault(x=>x.Enabled&&x.VoiceInfo.Culture.Name=="zh-CN");if(voice==null)return new{ok=false,reason="缺少测试合成声音"};

@@ -89,7 +89,8 @@ sealed partial class ChatForm : BarcaWindow
     readonly CheckBox remember = new(), useTools = new(), autoSpeak = new(), autoSend = new();
     readonly Button microphone = new(), readAloud = new();
     readonly Button inputDevice=new BarcaButton{Text="输入设备",Size=new Size(86,31)};
-    readonly SpeechIO voice = new();
+    readonly ContextMenuStrip deviceMenu=new();
+    readonly ISpeechIO voice;readonly ConversationHost sessionHost;readonly ConversationClient conversation;readonly bool ownsSessionHost;
     readonly AppTools? appTools;
     readonly System.Windows.Forms.Timer renderTimer = new() { Interval = 80 };
     readonly bool preview;
@@ -104,8 +105,9 @@ sealed partial class ChatForm : BarcaWindow
     readonly Func<ChatApi>? testApi;
     public bool IsThinking => pending != null || Visible && input.Focused && input.TextLength > 0;
     static string HistoryPath => Path.Combine(Store.Root, "leo-chat-history.json");
-    public ChatForm(bool previewMode = false, ChatSettings? testSettings = null, Func<ChatApi>? testFactory = null, AppTools? applicationTools = null, Action? clipboardAction = null, Action<QuickIntent>? onTodo = null,TodoStore? planner=null)
+    public ChatForm(bool previewMode = false, ChatSettings? testSettings = null, Func<ChatApi>? testFactory = null, AppTools? applicationTools = null, Action? clipboardAction = null, Action<QuickIntent>? onTodo = null,TodoStore? planner=null,ISpeechIO? speech=null,ConversationHost? sessionHost=null)
     {
+        voice=speech??new SpeechIO();this.sessionHost=sessionHost??ConversationHost.Standalone(this);ownsSessionHost=sessionHost==null;conversation=this.sessionHost.Attach(voice);
         preview = previewMode; settings = testSettings ?? (preview ? new ChatSettings() : ChatSettings.Load()); testApi = testFactory; appTools = applicationTools;
         todoAction=onTodo;openClipboard=clipboardAction;planStore=planner;
         TopMost = false; ShowInTaskbar = true; Text = "Leo · AI 对话"; StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 610); MinimumSize = new Size(500, 430);
@@ -131,7 +133,7 @@ sealed partial class ChatForm : BarcaWindow
         state.Dock=DockStyle.Fill;state.ForeColor=BarcaUi.Muted;state.Font=BarcaUi.Font(8.5f);state.AutoEllipsis=true;state.Padding=new Padding(0,8,7,0);actions.Controls.Add(state);actions.Controls.Add(retryReply);retryReply.Click+=async(_,_)=>{if(pending!=null||retryPrompt.Length==0)return;input.Text=retryPrompt;if(retryHasTools){retryReply.Visible=false;state.Text="部分操作可能已完成，请核对清单或软件状态后再发送。";input.Focus();return;}plainNextReply=retryTextOnly;retryTextOnly=false;retryReply.Text="重试";retryReply.Width=55;await SendAsync();};actions.Controls.Add(stop);actions.Controls.Add(microphone);actions.Controls.Add(send);composer.Controls.Add(input);composer.Controls.Add(actions);bottom.Controls.Add(composer);
         transcript.Dock=DockStyle.Fill;bodyHost.Controls.Add(transcript);bodyHost.Controls.Add(results);Controls.Add(bodyHost);Controls.Add(bottom);Controls.Add(topPanel);
         foreach(var button in new[]{send,stop,configure,reset,microphone,readAloud}){button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderSize=0;button.BackColor=BarcaUi.Raised;button.ForeColor=BarcaUi.Text;button.Font=BarcaUi.Font(9);Appearance.Round(button,9);}send.BackColor=BarcaUi.Raised;microphone.BackColor=Appearance.Blue;microphone.ForeColor=BarcaUi.Gold;
-        var deviceMenu=new ContextMenuStrip();inputDevice.Click+=(_,_)=>{foreach(ToolStripItem item in deviceMenu.Items.Cast<ToolStripItem>().ToArray())item.Dispose();deviceMenu.Items.Clear();void Add(int id,string name){var item=new ToolStripMenuItem(name){Checked=voice.InputDevice==id};item.Click+=(_,_)=>{voice.InputDevice=id;state.Text="录音设备："+name;};deviceMenu.Items.Add(item);}Add(-1,"Windows 默认输入设备");try{foreach(var device in SpeechIO.InputDevices())Add(device.Id,device.Name);}catch{state.Text="无法读取录音设备";}deviceMenu.Show(inputDevice,new Point(0,inputDevice.Height));};FormClosed+=(_,_)=>deviceMenu.Dispose();
+        inputDevice.Click+=(_,_)=>{foreach(ToolStripItem item in deviceMenu.Items.Cast<ToolStripItem>().ToArray())item.Dispose();deviceMenu.Items.Clear();void Add(int id,string name){var item=new ToolStripMenuItem(name){Checked=voice.InputDevice==id};item.Click+=(_,_)=>{voice.InputDevice=id;state.Text="录音设备："+name;};deviceMenu.Items.Add(item);}Add(-1,"Windows 默认输入设备");try{foreach(var device in SpeechIO.InputDevices())Add(device.Id,device.Name);}catch{state.Text="无法读取录音设备";}deviceMenu.Show(inputDevice,new Point(0,inputDevice.Height));};FormClosed+=(_,_)=>deviceMenu.Dispose();
         if (!preview && settings.RememberConversation)
         {
             try { turns.AddRange((JsonSerializer.Deserialize<List<ChatTurn>>(File.ReadAllText(HistoryPath)) ?? new()).Where(x => x != null).TakeLast(40)); } catch { }
@@ -146,30 +148,33 @@ sealed partial class ChatForm : BarcaWindow
             if (!preview) { try { settings.Save(); SaveHistory(); } catch { state.Text = "本地配置保存失败"; } }
         };
         send.Click += async (_, _) => await SendAsync();
-        stop.Click += (_, _) => { pending?.Cancel(); voice.Stop(); UpdateVoice(); };
+        stop.Click += (_, _) => {directVoice=false;try{conversation.Cancel();}catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!chatReleased)state.Text="语音停止未完成，请检查音频设备";}finally{pending?.Cancel();if(!chatReleased)UpdateVoice();}};
         useTools.CheckedChanged += (_, _) => { settings.EnableAppTools = useTools.Checked; SaveOptions(); };
         autoSpeak.CheckedChanged += (_, _) => { settings.VoiceAutoSpeak = autoSpeak.Checked; SaveOptions(); };
         autoSend.CheckedChanged += (_, _) => { settings.VoiceAutoSend = autoSend.Checked; SaveOptions(); };
         microphone.Click += (_, _) => {
             if (preview) { state.Text = "示例模式，不启用麦克风"; return; }
-            try { if (voice.Listening) voice.FinishListening(); else { directVoice=true; voice.Start(); } UpdateVoice(); }
-            catch (Exception error) { voice.Stop(); state.Text = "语音输入失败："+error.Message; }
+            try { if (voice.Listening) conversation.Voice("voice_finish"); else { directVoice=true; conversation.Voice("voice_start"); } UpdateVoice(); }
+            catch (Exception error) { directVoice=false;try{conversation.Voice("voice_stop");}catch(Exception e)when(FeatureFaults.Recoverable(e)){}state.Text = "语音输入失败："+error.Message; }
         };
         readAloud.Click += (_, _) => {
             if (preview) return;
-            try { if (voice.Speaking) voice.StopSpeaking(); else voice.Speak(lastAnswer.Length>0?lastAnswer:turns.LastOrDefault(x => x.Assistant.Length > 0)?.Assistant ?? UiTheme.Rename("你好，我是 Leo。")); }
+            try { if (voice.Speaking) conversation.Voice("voice_stop_speaking"); else conversation.Speak(lastAnswer.Length>0?lastAnswer:turns.LastOrDefault(x => x.Assistant.Length > 0)?.Assistant ?? UiTheme.Rename("你好，我是 Leo。")); }
             catch { state.Text = "无法朗读，请检查 Windows 语音和音频输出"; }
         };
-        voice.Changed += () => OnUi(UpdateVoice);
-        voice.Status += message => OnUi(() => state.Text = message);
-        voice.Recognized += (text,confident) => OnUi(async()=>await ReceiveVoiceAsync(text,confident));
+        voice.Changed += VoiceChanged;
+        voice.Status += VoiceStatus;
+        voice.Recognized += VoiceRecognized;
         input.KeyDown += async (_, e) => { if (!e.Shift && e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await SendAsync(); } };
         renderTimer.Tick += (_, _) => { if (dirty) { dirty = false; Render(); } };
         renderTimer.Start(); Render(); ShowHome(); UpdateState();
         bodyHost.SizeChanged+=(_,_)=>{foreach(Control c in results.Controls)c.Width=ResultWidth;};
         Shown += (_, _) => input.Focus();
     }
-    async Task ReceiveVoiceAsync(string text,bool confident){if(pending!=null)return;input.AppendText((input.TextLength>0?" ":"")+text);if((directVoice||autoSend.Checked||QuickRouter.IsLocalMusic(text)&&string.Equals(input.Text.Trim(),text.Trim(),StringComparison.Ordinal))&&confident){directVoice=false;voice.StopListening();if(appTools!=null)appTools.Source="voice";try{await SendAsync();}finally{if(appTools!=null)appTools.Source="chat";}}else state.Text=confident?"已识别，可编辑后发送":"识别不确定，已填入草稿，请校对后发送";}
+    void VoiceChanged(long generation){OnUi(()=>{if(voice.IsCurrent(generation))UpdateVoice();});}
+    void VoiceStatus(string message,long generation){OnUi(()=>{if(voice.IsCurrent(generation))state.Text=message;});}
+    void VoiceRecognized(string text,bool confident,long generation){OnUi(async()=>{if(!chatReleased&&voice.IsCurrent(generation)&&conversation.AcceptVoice(generation))await ReceiveVoiceAsync(text,confident);});}
+    async Task ReceiveVoiceAsync(string text,bool confident){if(chatReleased||IsDisposed||pending!=null)return;input.AppendText((input.TextLength>0?" ":"")+text);if((directVoice||autoSend.Checked||QuickRouter.IsLocalMusic(text)&&string.Equals(input.Text.Trim(),text.Trim(),StringComparison.Ordinal))&&confident){directVoice=false;conversation.Voice("voice_stop_listening");if(appTools!=null)appTools.Source="voice";try{await SendAsync();}finally{if(appTools!=null)appTools.Source="chat";}}else state.Text=confident?"已识别，可编辑后发送":"识别不确定，已填入草稿，请校对后发送";}
     public Task PreviewRecognizedAsync(string text,bool confident)=>ReceiveVoiceAsync(text,confident);
     public void ReloadConfiguration(){if(preview)return;settings=ChatSettings.Load();remember.Checked=settings.RememberConversation;useTools.Checked=settings.EnableAppTools;autoSpeak.Checked=settings.VoiceAutoSpeak;autoSend.Checked=settings.VoiceAutoSend;}
     void UpdateState() => state.Text = "按“说话”输入，快捷键可在 Leo 设置中调整";
@@ -186,7 +191,7 @@ sealed partial class ChatForm : BarcaWindow
         if(InvokeRequired){await (Task)Invoke(new Func<Task>(SendAsync));return;}
         if(SynchronizationContext.Current is not WindowsFormsSynchronizationContext)SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
         if (chatReleased || IsDisposed || pending != null || string.IsNullOrWhiteSpace(input.Text)) return;
-        voice.Stop();
+        try{conversation.Voice("voice_stop");}catch(Exception e)when(FeatureFaults.Recoverable(e)){state.Text="语音停止未完成，请检查音频设备后重试";return;}
         string prompt = input.Text.Trim();bool textOnly=plainNextReply;plainNextReply=false;retryReply.Visible=false;retryReply.Text="重试";retryReply.Width=55;retryTextOnly=false;appTools?.Brain?.Clear();
         if (prompt.Length > 100_000) { state.Text = "本条消息过长，请缩短后发送"; return; }
         var intent=QuickRouter.Route(prompt);
@@ -208,24 +213,26 @@ sealed partial class ChatForm : BarcaWindow
         {
             UpdateVoice();
             if(intent.Kind==QuickKind.FootballAnalysis){state.Text="正在查询比赛数据…";context.Insert(1,new ApiMessage("system",await AnalysisFacts(intent,request.Token)));}
-            using var api = testApi?.Invoke() ?? new ChatApi();
-            var reply = await ChatAgent.RunAsync(api, settings, key, context, delta => OnUi(() => {
-                if (IsDisposed || request.IsCancellationRequested) return;
+            long generation=conversation.Generation+1;
+            var settingsSnapshot=JsonSerializer.Deserialize<ChatSettings>(JsonSerializer.Serialize(settings))!;
+            var reply = await conversation.Reply(async(onText,onDetail,token)=>{using var api=testApi?.Invoke()??new ChatApi();return await ChatAgent.RunAsync(api,settingsSnapshot,key,context,onText,tools,onDetail,token);},delta => OnUi(() => {
+                if (IsDisposed || chatReleased || request.IsCancellationRequested || !conversation.Current(generation)) return;
                 turn.Assistant += delta; dirty = true; state.Text = "AI 回复中…";
-            }), tools, detail => OnUi(() => {
-                if (IsDisposed) return;
+            }), detail => OnUi(() => {
+                if (IsDisposed || chatReleased || request.IsCancellationRequested || !conversation.Current(generation)) return;
                 state.Text = detail; turn.ToolLog.Add(detail); dirty = true;
-            }), request.Token);
+            }),appTools?.Source??"chat",key,request.Token);
+            request.Token.ThrowIfCancellationRequested();if(chatReleased)return;
             turn.Assistant = reply.Text; turn.Status = reply.Truncated ? "回复受限" : "完成";
             lastAnswer=reply.Text;
             if(tools?.Brain?.Pending!=null)ShowBrainPlan(tools.Brain);
-            if (!preview && !reply.Truncated && autoSpeak.Checked && !IsDisposed) { try { voice.Speak(reply.Text); } catch { state.Text = "回复完成，但朗读不可用"; } }
+            if (!preview && !reply.Truncated && autoSpeak.Checked && !IsDisposed) { try { conversation.Speak(reply.Text); } catch { state.Text = "回复完成，但朗读不可用"; } }
             if (!IsDisposed) state.Text = tools?.Brain?.Pending!=null?"计划待确认 · 尚未执行":reply.Truncated ? "回复达到长度或内容限制" : "AI · 回复完成";
         }
         catch (OperationCanceledException) { turn.Status = "已停止"; if (!IsDisposed) state.Text = "已停止生成"; }
         catch (Exception error)
         {
-            turn.Status = "未完成";retryPrompt=prompt;retryHasTools=turn.ToolLog.Count>0;retryTextOnly=tools?.Brain!=null&&!retryHasTools&&(error.Message.StartsWith("HTTP 400")||error.Message.StartsWith("HTTP 422"));if(retryTextOnly){retryReply.Text="仅文字重试";retryReply.Width=104;}if(!IsDisposed)retryReply.Visible=true;
+            turn.Status = "未完成";retryPrompt=prompt;retryHasTools=conversation.HadTools||turn.ToolLog.Count>0;retryTextOnly=tools?.Brain!=null&&!retryHasTools&&(error.Message.StartsWith("HTTP 400")||error.Message.StartsWith("HTTP 422"));if(retryTextOnly){retryReply.Text="仅文字重试";retryReply.Width=104;}if(!IsDisposed)retryReply.Visible=true;
             string message = error is System.Net.Http.HttpRequestException ? "连接失败，请检查中转站地址、网络与系统代理" : error.Message;
             if(retryTextOnly)message="接口未接受工具请求，可点击“仅文字重试”。本地功能仍可使用。";
             message = message.Replace(key, "[Key 已隐藏]", StringComparison.Ordinal);
@@ -241,8 +248,8 @@ sealed partial class ChatForm : BarcaWindow
     void SaveOptions() { if (!preview) try { settings.Save(); } catch { state.Text = "选项保存失败"; } }
     void OnUi(Action action)
     {
-        if (IsDisposed || !IsHandleCreated) return;
-        try { if (InvokeRequired) BeginInvoke((Action)(() => { if (!IsDisposed) action(); })); else action(); } catch (InvalidOperationException) { }
+        if (chatReleased || IsDisposed || !IsHandleCreated) return;
+        try { if (InvokeRequired) BeginInvoke((Action)(() => { if (!chatReleased && !IsDisposed) action(); })); else action(); } catch (InvalidOperationException) { }
     }
     void UpdateVoice()
     {
@@ -258,7 +265,7 @@ sealed partial class ChatForm : BarcaWindow
     void SaveHistory()
     {
         if (preview || !settings.RememberConversation) return;
-        try { File.WriteAllText(HistoryPath, JsonSerializer.Serialize(turns.TakeLast(40))); }
+        try { AtomicJson.Write(HistoryPath, JsonSerializer.Serialize(turns.TakeLast(40))); }
         catch { state.Text = "本地对话保存失败，本次对话仍可继续"; }
     }
     void Render() { if (!IsDisposed) transcript.Display(turns); }
@@ -273,7 +280,7 @@ sealed partial class ChatForm : BarcaWindow
     internal void PreviewRetryReply()=>retryReply.PerformClick();
     public void PreviewStop() => stop.PerformClick();
     public bool PreviewWasStopped => turns.LastOrDefault()?.Status == "已停止" && send.Enabled && !stop.Enabled;
-    void ReleaseChat(){if(chatReleased)return;chatReleased=true;appTools?.Brain?.Dispose();fallbackFootball?.Dispose();chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();voice.Dispose();chatLife.Dispose();}
+    void ReleaseChat(){if(chatReleased)return;chatReleased=true;appTools?.Brain?.Dispose();fallbackFootball?.Dispose();conversation.Dispose();if(ownsSessionHost)sessionHost.Dispose();voice.Changed-=VoiceChanged;voice.Status-=VoiceStatus;voice.Recognized-=VoiceRecognized;deviceMenu.Dispose();chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();chatLife.Dispose();}
     protected override void OnFormClosed(FormClosedEventArgs e) { ReleaseChat(); base.OnFormClosed(e); }
     protected override void Dispose(bool disposing){if(disposing)ReleaseChat();base.Dispose(disposing);}
 }
