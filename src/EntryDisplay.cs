@@ -9,7 +9,10 @@ static class EntryDisplay
     public static bool ShowShortcut(Preferences p,string id)=>Mode(p,id)==Shortcut;
     public static bool ShowMenu(Preferences p,string id)=>Mode(p,id)!=Search;
     public static void Validate(Dictionary<string,string>? modes){if(modes==null||modes.Count>512||modes.Any(p=>p.Key.Length is <1 or >100||!Regex.IsMatch(p.Key,@"^[A-Za-z0-9:_-]+$")||!Modes.Any(m=>m.Value==p.Value)))throw new ArgumentException("入口显示配置无效，请重新选择显示方式。");}
-    public static OptionalEntry[] Entries(Preferences p)=>new[]{new OptionalEntry("terminal","管理员终端",p.TerminalModule,"打开终端"),new("clash","Clash Verge",p.ClashModule,"开启系统代理 / 关闭系统代理"),new("music","QQ 音乐",p.MusicModule,"点歌"),new("edge","Edge 搜索",p.EdgeModule,"网页搜索 关键词"),new("football","足球",p.FootballModule,"打开足球"),new("media","PotPlayer · 媒体控制",p.MediaModule,"打开媒体控制")}.Concat(EntryContributions.Read(p).Select(a=>new OptionalEntry(a.Id,a.Name,a.Enabled,"搜索应用名："+a.Name))).ToArray();
+    public static OptionalEntry[] Entries(Preferences p)=>new[]{new OptionalEntry("terminal","管理员终端",p.TerminalModule,"打开终端"),new("clash","Clash Verge",p.ClashModule,"开启系统代理 / 关闭系统代理"),new("edge","Edge 搜索",p.EdgeModule,"网页搜索 关键词")}
+        .Concat(EntryContributions.ReadBuiltins(p).Select(e=>new OptionalEntry(e.Id,e.SettingsName,e.Enabled,e.Hint)))
+        .OrderBy(e=>Array.IndexOf(new[]{"terminal","clash","music","edge","football","media"},e.Id))
+        .Concat(EntryContributions.Read(p).Select(a=>new OptionalEntry(a.Id,a.Name,a.Enabled,"搜索应用名："+a.Name))).ToArray();
 }
 sealed class EntryDisplayForm:BarcaWindow
 {
@@ -38,7 +41,7 @@ sealed partial class PetForm
             foreach(var old in parent.DropDownItems.OfType<ToolStripMenuItem>().Where(i=>i.Tag as string=="optional-entry").ToArray()){parent.DropDownItems.Remove(old);old.Dispose();}
             ToolStripMenuItem Item(string title,string action,string value=""){var item=new ToolStripMenuItem(title){Tag="optional-entry"};item.Click+=async(_,_)=>{try{var result=await commands.ExecuteAsync(new(action.StartsWith("local:",StringComparison.Ordinal)?EntryContributions.CurrentAction(prefs,action[6..]):action,value,"menu"));if(!IsDisposed)OperationFeedback.Show(result);}catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed)OperationFeedback.Error(e.Message);}};return item;}
             bool Visible(string id)=>Modules.Enabled(prefs,id)&&EntryDisplay.ShowMenu(prefs,id);
-            if(Visible("football"))parent.DropDownItems.Add(Item("足球赛程…","football_open"));
+            var football=EntryContributions.Builtin(prefs,"football");if(football.Menu)parent.DropDownItems.Add(Item(football.MenuName,football.ActionId));
             if(Visible("terminal"))parent.DropDownItems.Add(Item("管理员终端","terminal_open"));
             if(Visible("clash")){var clash=new ToolStripMenuItem("Clash 系统代理"){Tag="optional-entry"};clash.DropDownItems.Add(Item("开启系统代理","proxy_on"));clash.DropDownItems.Add(Item("关闭系统代理","proxy_off"));clash.DropDownItems.Add(Item("查看状态","proxy_status"));BarcaMenus.StyleSubmenu(clash,menu.Font);parent.DropDownItems.Add(clash);}
             if(Visible("edge"))parent.DropDownItems.Add(Item("Edge 搜索…","launcher_open","web"));

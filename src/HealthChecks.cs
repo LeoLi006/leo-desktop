@@ -55,7 +55,7 @@ sealed class ModulesView:Panel
         var statusButton=new BarcaButton{Text="模块状态与处理…",Bounds=new Rectangle(10,542,535,32)};statusButton.Click+=(_,_)=>ShowModuleStatus?.Invoke();Controls.Add(statusButton);
         int y=50;
         foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口"),("football","足球","赛程、球队关注、积分榜和赛程后台更新"),("media","统一媒体控制","PotPlayer与Windows媒体会话的播放、暂停和切换")}){
-            var field=new CheckBox{Text=title,Checked=Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=58;
+            var contribution=EntryContributions.ReadBuiltins(p).SingleOrDefault(e=>e.Id==id);var field=new CheckBox{Text=title,Checked=contribution?.Enabled??Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=58;
         }
         Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,410,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
         var extensions=new BarcaButton{Text="管理扩展模块…",Bounds=new Rectangle(10,455,230,32)};extensions.Click+=(_,_)=>{using var manager=new ExtensionManager(p,preview);manager.ShowDialog(FindForm());};Controls.Add(extensions);
