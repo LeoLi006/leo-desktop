@@ -14,6 +14,7 @@ sealed partial class MusicForm:BarcaWindow
     readonly ActivityOwner searchActivities=new("music-window"),controlActivities=new("music-window");
     CancellationTokenSource? pending;
     MusicSong[] latest=[];long presentationGeneration;
+    readonly ModuleThemeBinding theme;
     public MusicForm(bool previewMode=false,Func<string,CancellationToken,Task<MusicSong[]>>? searcher=null,MusicClient? shared=null)
     {
         preview=previewMode;client=shared??MusicClient.Standalone(preview,searcher);ownsClient=shared==null;client.Published+=Published;
@@ -34,7 +35,7 @@ sealed partial class MusicForm:BarcaWindow
         Button("打开QQ音乐",112,async()=>{string message=await RunControl("music_client");if(!IsDisposed)state.Text=message;});
         var searchStatus=new Panel{Dock=DockStyle.Bottom,Height=36};state.Dock=DockStyle.Fill;searchStatus.Controls.Add(state);searchStatus.Controls.Add(retrySearch);retrySearch.Click+=async(_,_)=>await SearchAsync(input.Text);
         top.Controls.Add(controls);Controls.Add(songs);Controls.Add(searchStatus);Controls.Add(top);Controls.Add(chrome);
-        MaximizeBox=false;MinimumSize=MaximumSize=Size;Home();state.Text="快速点一首 · QQ音乐未运行时会自动启动";Shown+=(_,_)=>input.Focus();VisibleChanged+=(_,_)=>{Interlocked.Increment(ref presentationGeneration);if(!Visible&&!released)searchActivities.Reset();};
+        MaximizeBox=false;MinimumSize=MaximumSize=Size;Home();state.Text="快速点一首 · QQ音乐未运行时会自动启动";Shown+=(_,_)=>input.Focus();theme=new(this);VisibleChanged+=(_,_)=>{Interlocked.Increment(ref presentationGeneration);if(!Visible&&!released)searchActivities.Reset();};
     }
     public async Task SearchAsync(string query)
     {
@@ -85,6 +86,6 @@ sealed partial class MusicForm:BarcaWindow
 
     public void OpenQuery(string query){input.Text=query;WindowInteraction.Show(this);if(query.Length>0)_=SearchAsync(query);}
     bool released;
-    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;client.Published-=Published;searchActivities.Dispose();controlActivities.Dispose();if(ownsClient)client.Dispose();}base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;theme.Dispose();client.Published-=Published;searchActivities.Dispose();controlActivities.Dispose();if(ownsClient)client.Dispose();}base.Dispose(disposing);}
     protected override void OnFormClosing(FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;searchActivities.Reset();Hide();return;}base.OnFormClosing(e);}
 }

@@ -17,6 +17,8 @@ static class UiTheme
     static Palette active=Palettes[0];
     public static ThemeOptions Options{get;private set;}=new();
     static int revision;
+    internal static event Action<ModuleThemeSnapshot>? Changed;
+    internal static ModuleThemeSnapshot Snapshot()=>new(revision,Skin,Name,TeamName,Motto,Map(R(11,18,33)),Map(R(19,30,49)),Map(R(25,40,63)),Map(R(237,242,250)),Map(R(139,158,184)),Map(R(231,194,119)),Options.CornerRadius,WindowOpacity,new("Microsoft YaHei UI",10,FontStyle.Regular),1);
     internal static object ExportTokens(){var palette=active;var options=Options;string Hex(System.Drawing.Color c)=>"#"+c.R.ToString("X2")+c.G.ToString("X2")+c.B.ToString("X2");return new{skin=palette.Id,name=Name,accent=options.Accent??Hex(palette.Accent),background=Hex(MapCore(R(11,18,33),palette,options)),text=Hex(MapCore(R(237,242,250),palette,options)),radius=options.CornerRadius,opacity=options.Opacity};}
     public static double WindowOpacity=>Options.Opacity/100d;
     public static Palette PaletteFor(string id){var skin=SkinLibrary.Find(id);if(skin?.Palette is {} colors)return new Palette(id,skin.Name,colors.Motto,ColorTranslator.FromHtml(colors.Primary),ColorTranslator.FromHtml(colors.Secondary),ColorTranslator.FromHtml(colors.Accent));return Palettes.FirstOrDefault(p=>p.Id==(skin?.BaseTheme??id))??Palettes[0];}
@@ -68,8 +70,9 @@ static class UiTheme
         if(next==active&&valid==Name&&options==Options)return;
         // Capture controls under the old palette before changing tokens.
         RefreshAll();active=next;Name=valid;Options=options;revision++;RefreshAll();
+        if(Changed!=null)foreach(Action<ModuleThemeSnapshot> subscriber in Changed.GetInvocationList())FeatureFaults.Run("主题通知",()=>subscriber(Snapshot()));
     }
-    internal static void RefreshAll(){foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())Attach(form);}
+    internal static void RefreshAll(){foreach(Form form in Application.OpenForms.Cast<Form>().ToArray())if(!ModuleThemeBinding.Managed(form))Attach(form);}
     internal static void Attach(Control control)
     {
         if(control.IsDisposed)return;
