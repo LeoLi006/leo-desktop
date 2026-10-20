@@ -1,4 +1,8 @@
-# C04：自定义应用宿主服务最小试点
+# C04：宿主服务交付索引
+
+当前阶段结论见[验收矩阵](ACCEPTANCE.md)与[证据索引](ACCEPTANCE-EVIDENCE.md)；[服务清册](INVENTORY.md)、[主题清册](THEME-INVENTORY.md)、[调度清册](SCHEDULING-INVENTORY.md)记录最新范围。原试点、后续批次和数量保留为历史交付依据。
+
+## 首批：自定义应用宿主服务最小试点
 
 ## 目标与边界
 
