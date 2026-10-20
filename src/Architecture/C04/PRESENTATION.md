@@ -2,7 +2,7 @@
 
 ## 固定窗口请求
 
-`leo-host-presentation/1` 是宿主内部格式。ModuleWindowTarget 固定为 Applications、Football、Music、Media；IModuleWindowPort 只暴露带取消的 ShowAsync，不暴露控件或任意显示回调。模块原 show 委托保留兼容，正式宿主绑定固定端口。
+`leo-host-presentation/1` 是宿主内部格式。ModuleWindowTarget 当前为 Applications、Football、Music、Media、Todos、Notes、QuickNote（后三者见[第四批说明](PLANNER-PRESENTATION.md)）；IModuleWindowPort 只暴露带取消的 ShowAsync，不暴露控件或任意显示回调。模块原 show 委托保留兼容，正式宿主绑定固定端口。
 
 | 目标 | 接入路径 | 宿主保留的原显示方式 |
 | --- | --- | --- |
@@ -11,7 +11,7 @@
 | Music | music_open | Launcher.OpenMusicCore；原点歌窗口。 |
 | Media | media_open | ShowMediaCore；原媒体窗口。 |
 
-应用搜索请求可带有限长度文字和 Web 模式；其他目标拒绝这些参数。不存在任意窗口编号、控件实例或执行回调的请求字段。
+应用搜索请求可带有限长度文字和 Web 模式；第四批为便签草稿及清单视图增加明确的数据字段，其他目标拒绝不适用参数。不存在任意窗口编号、控件实例或执行回调的请求字段。
 
 ## 取消、关闭与停用
 
@@ -19,7 +19,7 @@
 
 - 应用搜索隐藏时失效；足球及媒体窗口关闭时失效。
 - 音乐原“关闭”实际隐藏窗口，因此同时接入隐藏事件，保持原复用窗口行为。
-- 四类目标独立，单个显示回调异常只使该请求失败，不污染其他目标或后续请求。
+- 各类目标独立，单个显示回调异常只使该请求失败，不污染其他目标或后续请求。
 - 只丢弃未执行的旧请求，不回滚已经显示的窗口或已提交的客户端动作。
 - 原 ModuleWindowService 两参数方法保留；增加带有效性检查的重载，不要求其他模块同步迁移。
 

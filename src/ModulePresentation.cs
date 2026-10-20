@@ -1,13 +1,13 @@
 namespace LeoLauncher;
 
-enum ModuleWindowTarget { Applications,Football,Music,Media }
-sealed record ModuleWindowRequest(ModuleWindowTarget Target,string Query="",bool Web=false);
+enum ModuleWindowTarget { Applications,Football,Music,Media,Todos,Notes,QuickNote }
+sealed record ModuleWindowRequest(ModuleWindowTarget Target,string Query="",bool Web=false,string View="",QuickIntent? PlannerIntent=null);
 interface IModuleWindowPort { Task ShowAsync(CancellationToken token); }
 sealed class ModulePresentationService(ModuleWindowService ui,Func<ModuleWindowTarget,bool> enabled,
     Action<ModuleWindowRequest> open,Action<LeoNotice> publish,Action<string> dismiss)
 {
     public const string Protocol="leo-host-presentation/1";
-    readonly object gate=new();readonly long[] generations=new long[4];readonly bool[] states=[true,true,true,true];
+    readonly object gate=new();readonly long[] generations=new long[Enum.GetValues<ModuleWindowTarget>().Length];readonly bool[] states=Enumerable.Repeat(true,Enum.GetValues<ModuleWindowTarget>().Length).ToArray();
     static int Index(ModuleWindowTarget target)=>Enum.IsDefined(target)?(int)target:throw new ArgumentException("未知窗口目标");
     public void Configure(){foreach(var target in Enum.GetValues<ModuleWindowTarget>()){bool state=enabled(target);lock(gate){int i=Index(target);if(states[i]!=state){states[i]=state;generations[i]++;}}}}
     public void Invalidate(ModuleWindowTarget target){lock(gate)generations[Index(target)]++;}
@@ -18,7 +18,11 @@ sealed class ModulePresentationService(ModuleWindowService ui,Func<ModuleWindowT
     {public Task ShowAsync(CancellationToken token)=>owner.ShowAsync(new(target),token);}
     public Task ShowAsync(ModuleWindowRequest request,CancellationToken token)
     {
-        Index(request.Target);if(request.Query.Length>2000||request.Target!=ModuleWindowTarget.Applications&&(request.Web||request.Query.Length>0))throw new ArgumentException("窗口请求参数无效");
+        Index(request.Target);
+        bool notes=request.Target==ModuleWindowTarget.Notes,applications=request.Target==ModuleWindowTarget.Applications,todos=request.Target==ModuleWindowTarget.Todos;
+        if(request.Query.Length>(notes?20000:2000)||!applications&&request.Web||!applications&&!notes&&request.Query.Length>0||
+            !todos&&(request.View.Length>0||request.PlannerIntent!=null)||todos&&request.View is not("" or "day" or "week")||
+            request.PlannerIntent is {} intent&&(intent.Kind is not(QuickKind.Todos or QuickKind.AddTodo or QuickKind.CompleteTodo)||intent.Value.Length>20000))throw new ArgumentException("窗口请求参数无效");
         long generation=Capture(request.Target);
         return ui.ShowAsync(()=>open(request),token,()=>Current(request.Target,generation));
     }
@@ -37,7 +41,7 @@ sealed class ModulePresentationFeedback(ModulePresentationService host,ModuleWin
 {
     public Task ReportAsync(ActionResult result,bool acknowledge=false)
     {
-        string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Football=>"football-data",ModuleWindowTarget.Music=>"music",_=>"media"};
+        string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Football=>"football-data",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",ModuleWindowTarget.Todos=>"todos",_=>"notes"};
         if(result.ModuleId!=module&&!(target==ModuleWindowTarget.Applications&&result.ModuleId.StartsWith("local:",StringComparison.Ordinal)))throw new ArgumentException("反馈归属不一致");
         if(result.Status=="failed")return host.Emit(target,generation,new(result.Message,true,Module:module,OperationId:result.ExecutionId),token);
         if(acknowledge&&result.Status=="succeeded")return host.Emit(target,generation,new(result.Message,Module:module,OperationId:result.ExecutionId),token);
@@ -63,6 +67,9 @@ sealed partial class PetForm
             case ModuleWindowTarget.Football:launcher.OpenFootballFromAssistant();break;
             case ModuleWindowTarget.Music:launcher.OpenMusicCore();break;
             case ModuleWindowTarget.Media:ShowMediaCore();break;
+            case ModuleWindowTarget.Todos:ShowTodosCore(request.PlannerIntent);if(request.View.Length>0)todoWindow!.View.SetWeek(request.View=="week");break;
+            case ModuleWindowTarget.Notes:ShowNotesCore(request.Query);break;
+            case ModuleWindowTarget.QuickNote:ShowQuickNoteCore();break;
         }
     }
     void DismissPresentationFeedback(string operation){if(feedback?.Matches(new("",OperationId:operation))==true&&feedback.IsBusy)feedback.Hide();}

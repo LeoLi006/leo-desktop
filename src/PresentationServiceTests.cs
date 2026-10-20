@@ -31,6 +31,11 @@ static class PresentationServiceTests
         }
         await host.ShowAsync(new(ModuleWindowTarget.Applications,"fixture query",true),CancellationToken.None);
         c["application_query_web_options_preserved"]=shown.Last() is {Query:"fixture query",Web:true};
+        await host.ShowAsync(new(ModuleWindowTarget.Notes,"note draft"),CancellationToken.None);
+        c["notes_draft_request_preserved"]=shown.Last().Query=="note draft";
+        c["quick_note_draft_rejected"]=Rejected(()=>host.ShowAsync(new(ModuleWindowTarget.QuickNote,"invalid"),CancellationToken.None));
+        c["todo_bad_view_rejected"]=Rejected(()=>host.ShowAsync(new(ModuleWindowTarget.Todos,View:"invalid"),CancellationToken.None));
+        c["non_todo_intent_rejected"]=Rejected(()=>host.ShowAsync(new(ModuleWindowTarget.Todos,PlannerIntent:new(QuickKind.OpenApp,"invalid")),CancellationToken.None));
         c["other_window_query_rejected"]=Rejected(()=>host.ShowAsync(new(ModuleWindowTarget.Football,"invalid"),CancellationToken.None));
         c["unknown_window_rejected"]=Rejected(()=>host.For((ModuleWindowTarget)99).ShowAsync(CancellationToken.None));
         failWindow=true;bool failed=false;try{await host.For(ModuleWindowTarget.Football).ShowAsync(CancellationToken.None);}catch(IOException){failed=true;}failWindow=false;await host.For(ModuleWindowTarget.Media).ShowAsync(CancellationToken.None);c["one_window_failure_isolated"]=failed&&shown.Last().Target==ModuleWindowTarget.Media;
@@ -53,14 +58,44 @@ static class PresentationServiceTests
             var launcher=(LauncherForm)typeof(PetForm).GetField("launcher",flags)!.GetValue(pet)!;
             foreach(var target in Enum.GetValues<ModuleWindowTarget>()){
                 await live.For(target).ShowAsync(CancellationToken.None);
-                Form window=target==ModuleWindowTarget.Applications?launcher:target==ModuleWindowTarget.Media?(Form)typeof(PetForm).GetField("mediaWindow",flags)!.GetValue(pet)!:(Form)typeof(LauncherForm).GetField(target==ModuleWindowTarget.Music?"music":"football",flags)!.GetValue(launcher)!;
+                Form window=target switch{
+                    ModuleWindowTarget.Applications=>launcher,
+                    ModuleWindowTarget.Music or ModuleWindowTarget.Football=>(Form)typeof(LauncherForm).GetField(target==ModuleWindowTarget.Music?"music":"football",flags)!.GetValue(launcher)!,
+                    _=>(Form)typeof(PetForm).GetField(target switch{ModuleWindowTarget.Media=>"mediaWindow",ModuleWindowTarget.Todos=>"todoWindow",ModuleWindowTarget.Notes=>"notesWindow",_=>"quickNoteWindow"},flags)!.GetValue(pet)!};
                 c[target+"_real_host_opens_existing_window"]=window.Visible;
                 var oldFeedback=live.Feedback(target,CancellationToken.None);int before=liveNotices.Count;
                 EscapeWindows.Dismiss(window);
-                string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",_=>"football-data"};
+                string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",ModuleWindowTarget.Todos=>"todos",ModuleWindowTarget.Notes or ModuleWindowTarget.QuickNote=>"notes",_=>"football-data"};
                 await oldFeedback.ReportAsync(Result(module),true);
                 c[target+"_real_close_invalidates_feedback"]=!window.Visible&&liveNotices.Count==before;
             }
+            await live.ShowAsync(new(ModuleWindowTarget.Todos,View:"week",PlannerIntent:new(QuickKind.Todos,DayOffset:2)),CancellationToken.None);
+            var todo=(TodoForm)typeof(PetForm).GetField("todoWindow",flags)!.GetValue(pet)!;
+            c["todo_week_and_date_preserved"]=todo.View.IsWeekly&&todo.View.SelectedDate==DateOnly.FromDateTime(DateTime.Today).AddDays(2);
+            var store=(TodoStore)typeof(PetForm).GetField("todoStore",flags)!.GetValue(pet)!;
+            var reminder=store.Add("fixture reminder",DateOnly.FromDateTime(DateTime.Today),DateTime.Now.AddMinutes(-1));
+            var capability=(IStructuredLeoModule)pet.ContractRegistry.Resolve("todos_open");
+            var weekReceipt=await capability.ExecuteStructuredAsync(new("todos_open","week"),CancellationToken.None);
+            c["registered_todo_week_receipt_preserved"]=todo.View.IsWeekly&&weekReceipt.Evidence=="window-shown";
+            await capability.ExecuteStructuredAsync(new("todos_open"),CancellationToken.None);
+            c["registered_todo_daily_view_preserved"]=!todo.View.IsWeekly;
+            var oldTodoOpen=Queued(async()=>{await capability.ExecuteStructuredAsync(new("todos_open","week"),CancellationToken.None);});
+            EscapeWindows.Dismiss(todo);
+            c["registered_todo_old_open_dropped_after_close"]=await Cancelled(oldTodoOpen)&&!todo.Visible;
+            int savedTasks=store.Items.Count;
+            var oldIntent=Queued(()=>live.ShowAsync(new(ModuleWindowTarget.Todos,PlannerIntent:new(QuickKind.AddTodo,"must not save")),CancellationToken.None));
+            live.Invalidate(ModuleWindowTarget.Todos);
+            c["cancelled_legacy_intent_does_not_save"]=await Cancelled(oldIntent)&&store.Items.Count==savedTasks;
+            c["closing_todo_keeps_due_reminder"]=store.Items.Any(t=>t.Id==reminder.Id)&&store.Due(DateTimeOffset.Now).Any(t=>t.Id==reminder.Id);
+            await live.For(ModuleWindowTarget.QuickNote).ShowAsync(CancellationToken.None);
+            var quick=(QuickNoteForm)typeof(PetForm).GetField("quickNoteWindow",flags)!.GetValue(pet)!;
+            var oldQuickFeedback=live.Feedback(ModuleWindowTarget.QuickNote,CancellationToken.None);
+            quick.Controls.OfType<TextBox>().Single().Text="saved fixture";((Button)quick.AcceptButton!).PerformClick();
+            var notes=(NoteStore)typeof(PetForm).GetProperty("Notes",flags)!.GetValue(pet)!;
+            c["quick_note_saved_once_before_close"]=quick.IsDisposed&&notes.Query("saved fixture").Count==1&&quick.SavedResult is {Status:"succeeded",Evidence:"committed"};
+            c["committed_quick_note_confirmation_preserved"]=liveNotices.Count(n=>n.Text=="已记下")==1;
+            int afterSave=liveNotices.Count;await oldQuickFeedback.ReportAsync(Result("notes","failed"));
+            c["old_quick_note_feedback_does_not_replay_save"]=liveNotices.Count==afterSave&&notes.Query("saved fixture").Count==1;
             c["production_progress_uses_host"]=new[]{"musicCapabilityQueue","mediaCapabilityQueue"}.All(name=>((NativeCapabilityQueue)typeof(PetForm).GetField(name,flags)!.GetValue(pet)!).Feedback!=null);
         }finally{OperationFeedback.Sink=originalSink;}
         using(var owner=new Form{Opacity=0,ShowInTaskbar=false}){

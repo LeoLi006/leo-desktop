@@ -619,7 +619,8 @@ sealed partial class PetForm : Form
         chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; WindowInteraction.Show(chat);
     }
     void ShowVoice(){ShowChat();chat!.ToggleVoiceInput();}
-    void ShowTodos(QuickIntent? intent=null){RevealDock(true);launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed)todoWindow=new TodoForm(previewMode,todoStore);if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);WindowInteraction.Show(todoWindow);if(intent!=null)todoWindow.Apply(intent);}
+    async void ShowTodos(QuickIntent? intent=null){try{await presentation.ShowAsync(new(ModuleWindowTarget.Todos,PlannerIntent:intent),CancellationToken.None);}catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("清单窗口",e);}}
+    void ShowTodosCore(QuickIntent? intent=null){RevealDock(true);launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed){todoWindow=new TodoForm(previewMode,todoStore);todoWindow.FormClosed+=(_,_)=>presentation.Invalidate(ModuleWindowTarget.Todos);}if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);WindowInteraction.Show(todoWindow);if(intent!=null)todoWindow.Apply(intent);}
     void PollFullscreen()
     {
         if(resourcesDisposed||IsDisposed||Disposing||!IsHandleCreated)return;

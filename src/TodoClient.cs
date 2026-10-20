@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 namespace LeoLauncher;
 
 // Synchronous editors execute on the owning UI thread. Rendering reads immutable task records;
@@ -66,7 +66,7 @@ sealed partial class PetForm
     void RegisterTodoCapability()
     {
         var ui=new ModuleWindowService(this);
-        commands.Registry.Register(new TodoCapability(todoStore,ui.ShowAsync,value=>{ShowTodos();todoWindow!.View.SetWeek(value=="week");},draft=>{using var dialog=new NaturalTodoForm(draft);return dialog.ShowDialog(this)==DialogResult.OK?dialog.Draft:null;}));
+        commands.Registry.Register(new TodoCapability(todoStore,ui.ShowAsync,value=>{ShowTodosCore();todoWindow!.View.SetWeek(value=="week");},draft=>{using var dialog=new NaturalTodoForm(draft);return dialog.ShowDialog(this)==DialogResult.OK?dialog.Draft:null;},(view,token)=>presentation.ShowAsync(new(ModuleWindowTarget.Todos,View:view=="week"?"week":"day"),token)));
         todoClient=new(todoStore,commands);todoStore.SharedClient=todoClient;
     }
 }

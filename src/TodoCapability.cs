@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 namespace LeoLauncher;
 
-sealed class TodoCapability(TodoStore store,Func<Action,CancellationToken,Task> ui,Action<string> show,Func<NaturalTodoDraft,NaturalTodoDraft?> confirm):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,ICommittedActionModule,IModuleContractSource
+sealed class TodoCapability(TodoStore store,Func<Action,CancellationToken,Task> ui,Action<string> show,Func<NaturalTodoDraft,NaturalTodoDraft?> confirm,Func<string,CancellationToken,Task>? openWindow=null):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,ICommittedActionModule,IModuleContractSource
 {
     public ModuleContract DescribeModule()=>ModuleContracts.Todos(this);
     public DependencyState[] ReadDependencies()=>[new("todo-store",store.Error==null?"ready":"degraded")];
@@ -64,6 +64,12 @@ sealed class TodoCapability(TodoStore store,Func<Action,CancellationToken,Task> 
     public async Task<string> ExecuteAsync(ActionRequest r,CancellationToken t)=>(await ExecuteStructuredAsync(r,t)).Message;
     public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest r,CancellationToken token)
     {
+        if(r.Action=="todos_open"&&openWindow!=null){
+            token.ThrowIfCancellationRequested();
+            lock(gate){if(r.RequestId is {} id&&receipts.TryGetValue(id,out var saved)){if(saved.Action!=r.Action||saved.Value!=r.Value)throw new ArgumentException("同一请求编号不能用于不同操作");return saved.Payload;}}
+            if(r.Value is not("" or "week"))throw new ArgumentException("清单视图无效");
+            await openWindow(r.Value,token);return new("已打开清单。",Evidence:"window-shown");
+        }
         ActionPayload? result=null;
         await ui(()=>{
             token.ThrowIfCancellationRequested();

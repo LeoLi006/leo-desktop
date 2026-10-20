@@ -68,12 +68,13 @@ sealed class NotesCapability(Func<NoteStore> store,Func<string,string,Cancellati
 // Window actions must use the asynchronous dispatcher entry instead of this facade.
 sealed class NotesClient(NoteStore store,ActionDispatcher dispatcher,string source="notes-ui",bool ownsDispatcher=false):IDisposable
 {
+    internal ActionResult? LastResult{get;private set;}
     string? pendingCreateText,pendingCreateRequest;
     public void Dispose(){if(ownsDispatcher)dispatcher.Dispose();}
     public event Action? Changed{add=>store.Changed+=value;remove=>store.Changed-=value;}
     public List<StickyNote> Items=>Query(scope:"all");
     ActionResult Run(string action,object value,string? requestId=null)
-    {var result=dispatcher.ExecuteDetailedAsync(new(action,JsonSerializer.Serialize(value),source,requestId)).GetAwaiter().GetResult();result.ToLegacy(default);return result;}
+    {var result=dispatcher.ExecuteDetailedAsync(new(action,JsonSerializer.Serialize(value),source,requestId)).GetAwaiter().GetResult();LastResult=result;result.ToLegacy(default);return result;}
     public StickyNote Save(string? id,string text)
     {
         string? request=null;if(id==null){if(pendingCreateText!=text){pendingCreateText=text;pendingCreateRequest=Guid.NewGuid().ToString("N");}request=pendingCreateRequest;}
@@ -91,12 +92,12 @@ sealed partial class PetForm
 {
     void RegisterNotesCapability()
     {
-        var windows=new ModuleWindowService(this);
-        commands.Registry.Register(new NotesCapability(()=>Notes,(action,value,token)=>windows.ShowAsync(()=>{if(action=="note_quick_open")ShowQuickNoteCore();else ShowNotesCore(value);},token)));
+        commands.Registry.Register(new NotesCapability(()=>Notes,(action,value,token)=>presentation.ShowAsync(
+            action=="note_quick_open"?new(ModuleWindowTarget.QuickNote):new(ModuleWindowTarget.Notes,value),token)));
     }
     async void RunNotesEntry(string action,string value,string source)
     {
-        try{var result=await commands.ExecuteDetailedAsync(new(action,value,source));if(!IsDisposed&&!Disposing)new ModuleFeedbackService(OperationFeedback.Show,text=>OperationFeedback.Error(text)).Report(result);}
-        catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("便签入口",e);}
+        try{var delivery=presentation.Feedback(action=="note_quick_open"?ModuleWindowTarget.QuickNote:ModuleWindowTarget.Notes,CancellationToken.None);var result=await commands.ExecuteDetailedAsync(new(action,value,source));if(!IsDisposed&&!Disposing)await delivery.ReportAsync(result);}
+        catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("便签入口",e);}
     }
 }
