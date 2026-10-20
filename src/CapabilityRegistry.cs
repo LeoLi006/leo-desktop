@@ -6,6 +6,7 @@ sealed class CapabilityRegistry
 {
     readonly object gate=new();
     internal ApplicationHostFaults ApplicationFaults{get;}=new();
+    internal ApplicationHostFaults ClientFaults{get;}=new();
     readonly Preferences prefs;readonly Func<string,string,CancellationToken,Task<string>> legacy;
     readonly Func<ILeoModule[]> extensions;readonly ApplicationCapabilityHost? applicationHost;
     sealed record BuiltinSnapshot(ILeoModule[] Modules,Dictionary<string,ILeoModule> Actions);

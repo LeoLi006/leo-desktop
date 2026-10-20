@@ -19,14 +19,14 @@ sealed class MusicSession(MusicHistory history)
         lock(gate){if(!step)queue=latest.Any(s=>s.Id==song.Id)?latest:history.Items.ToArray();if(queue.Length==0)queue=[song];index=Array.FindIndex(queue,s=>s.Id==song.Id);try{history.Add(song);return true;}catch(Exception e)when(FeatureFaults.Recoverable(e)){return false;}}
     }
 }
-sealed class MusicCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,MusicSession session,Func<string,CancellationToken,Task<MusicSong[]>> search,Func<MusicSong,CancellationToken,Action<string>,Task> play,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> pause,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> lyrics,Func<CancellationToken,Action<string>,Task> client,Func<MusicClientStatus> status,Func<CancellationToken,Task> show,NativeCapabilityQueue queue):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
+sealed class MusicCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,MusicSession session,Func<string,CancellationToken,Task<MusicSong[]>> search,Func<MusicSong,CancellationToken,Action<string>,Task> play,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> pause,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> lyrics,Func<CancellationToken,Action<string>,Task> client,Func<MusicClientStatus> status,Func<CancellationToken,Task> show,NativeCapabilityQueue queue,IClientHostServices? services=null):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
     public ModuleContract DescribeModule()=>ModuleContracts.Music(this);
-    public DependencyState[] ReadDependencies()=>[new("music-source","unknown"),new("music-client","unknown"),new("song-selection",session.Candidates.Length>0||session.History.Length>0?"ready":"unknown")];
+    public DependencyState[] ReadDependencies()=>hostServices.ReadDependencies();
 
-    readonly string generation=configuration();
-    public string Id=>"music";public string Name=>"QQ音乐点歌";public string Version=>"1";public bool Enabled=>enabled();public bool ConfigurationIsCurrent=>generation==configuration();public string BrainStamp=>configuration();public bool BrainAvailable=>ConfigurationIsCurrent;
-    bool Available{get{try{return available();}catch(Exception e)when(FeatureFaults.Recoverable(e)){return false;}}}
+    readonly ClientHostContext hostServices=new("music",services??new ClientHostServices("music",enabled,configuration,()=>[new("music-source","unknown"),new("music-client","unknown"),new("song-selection",session.Candidates.Length>0||session.History.Length>0?"ready":"unknown")],available));
+    public string Id=>"music";public string Name=>"QQ音乐点歌";public string Version=>"1";public bool Enabled=>hostServices.Enabled;public bool ConfigurationIsCurrent=>hostServices.ConfigurationIsCurrent;public string BrainStamp=>hostServices.Stamp;public bool BrainAvailable=>ConfigurationIsCurrent;
+    bool Available{get{try{return hostServices.ClientAvailable();}catch(Exception e)when(FeatureFaults.Recoverable(e)){return false;}}}
     public IReadOnlyList<string> Actions=>["music_open","music_search","music_play","music_step","music_pause","music_client","music_lyrics","music_status"];
     public IReadOnlyList<BrainAction> BrainActions=>new[]{new BrainAction("music_search","搜索QQ音乐歌曲","music-query",true,Check:Query),new BrainAction("music_open","打开快速点歌","text",Check:OptionalQuery),new BrainAction("music_status","查询QQ音乐状态","none",true,Check:Empty)}.Concat(!Available?[]:new[]{new BrainAction("music_play","点播歌曲","music-song",Hint:"先查询歌曲，使用实际返回的Id；同名或多首候选先澄清",Check:SongId,Preview:id=>{var s=session.Resolve(id);return "点播："+s.Name+" · "+s.Artist+"（仅发送客户端）";},TimeoutMs:45000),new BrainAction("music_client","打开QQ音乐客户端","none",Check:Empty,TimeoutMs:45000),new BrainAction("music_pause","QQ音乐播放/暂停","none",Check:Empty,TimeoutMs:45000),new BrainAction("music_lyrics","QQ音乐歌词开关","none",Check:Empty,TimeoutMs:45000)}).ToArray();
     static void Empty(string v){if(v.Length!=0)throw new ArgumentException("此音乐动作不接受参数");}
@@ -43,7 +43,8 @@ sealed class MusicCapability(Func<bool> enabled,Func<string> configuration,Func<
     public CapabilityDefinition Describe(string a)=>new(a,Id,"in-process","music-text",a is "music_search" or "music_status"?"read":a=="music_open"?"window":"external","coalesce-inflight",a=="music_status"?5000:45000);
     public string FailureCode(Exception e)=>e is ArgumentException?"invalid_request":"music_unconfirmed";
     void Current(CancellationToken t){t.ThrowIfCancellationRequested();if(!Enabled||!ConfigurationIsCurrent)throw new ApplicationConfigurationChangedException();}
-    public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest r,CancellationToken token)
+    public Task<ActionPayload> ExecuteStructuredAsync(ActionRequest r,CancellationToken token)=>hostServices.Execute(()=>ExecuteCoreAsync(r,token));
+    async Task<ActionPayload> ExecuteCoreAsync(ActionRequest r,CancellationToken token)
     {
         Current(token);
         if(r.Action is "music_search" or "music_open")OptionalQuery(r.Value);else if(r.Action=="music_play")SongId(r.Value);else if(r.Action=="music_step"){if(r.Value is not("1" or "-1"))throw new ArgumentException("请选择上一首或下一首");}else Empty(r.Value);
