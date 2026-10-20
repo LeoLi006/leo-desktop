@@ -1,6 +1,6 @@
 using System.Text.Json;
 namespace LeoLauncher;
-sealed class ClipboardCapability(ClipboardHistoryService service,Preferences prefs,Func<Action,CancellationToken,Task> ui,Action show):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
+sealed class ClipboardCapability(ClipboardHistoryService service,Preferences prefs,Func<Action,CancellationToken,Task> ui,Action show,IModuleWindowPort? window=null):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
     public ModuleContract DescribeModule()=>ModuleContracts.Clipboard(this);
     public DependencyState[] ReadDependencies()=>[new("history-store",service.IsClosed?"missing":service.History.Error==null?"ready":"degraded"),new("system-clipboard","unknown")];
@@ -21,6 +21,11 @@ sealed class ClipboardCapability(ClipboardHistoryService service,Preferences pre
     public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest r,CancellationToken t)
     {
         if(r.Source.StartsWith("brain-",StringComparison.Ordinal)&&r.Action!="clipboard_open")throw new ArgumentException("剪贴板正文仅在本地窗口管理，不向模型提供");
+        if(r.Action=="clipboard_open"&&window!=null){
+            t.ThrowIfCancellationRequested();if(r.Value.Length!=0)throw new ArgumentException("此窗口不接受正文参数");
+            if(service.IsClosed)throw new ObjectDisposedException("clipboard host");
+            await window.ShowAsync(t);return new("已打开剪贴板历史与收藏。",Evidence:"window-shown");
+        }
         ActionPayload? result=null;await ui(()=>{t.ThrowIfCancellationRequested();var history=service.History;
             ClipItem Item()=>history.Items.SingleOrDefault(x=>x.Key==r.Value)??throw new ArgumentException("记录已失效，请刷新后选择");
             switch(r.Action){
@@ -41,9 +46,9 @@ sealed class ClipboardCapability(ClipboardHistoryService service,Preferences pre
     }
     public async Task<string> ExecuteAsync(ActionRequest r,CancellationToken t)=>(await ExecuteStructuredAsync(r,t)).Message;
 }
-sealed class ClipboardClient(ClipboardHistoryService service,ActionDispatcher bus,string source="clipboard-ui",bool ownsDispatcher=false):IDisposable
+sealed class ClipboardClient(ClipboardHistoryService service,ActionDispatcher bus,string source="clipboard-ui",bool ownsDispatcher=false,Func<CancellationToken,ModulePresentationFeedback>? feedback=null):IDisposable
 {
-    ActionResult Run(string action,string value=""){var result=bus.ExecuteDetailedAsync(new(action,value,source)).GetAwaiter().GetResult();result.ToLegacy(default);return result;}
+    ActionResult Run(string action,string value=""){var delivery=action=="clipboard_open"?feedback?.Invoke(CancellationToken.None):null;var result=bus.ExecuteDetailedAsync(new(action,value,source)).GetAwaiter().GetResult();delivery?.ReportAsync(result).GetAwaiter().GetResult();result.ToLegacy(default);return result;}
     public List<ClipItem> Search(string query){var keys=Run("clipboard_query",query).Data!.Value.Deserialize<string[]>()!.ToHashSet();return service.History.Items.Where(x=>keys.Contains(x.Key)).ToList();}
     public void Execute(string action,string value="")=>Run(action,value);
     public void Dispose(){if(ownsDispatcher)bus.Dispose();}

@@ -60,12 +60,13 @@ static class PresentationServiceTests
                 await live.For(target).ShowAsync(CancellationToken.None);
                 Form window=target switch{
                     ModuleWindowTarget.Applications=>launcher,
+                    ModuleWindowTarget.Clipboard=>(Form)typeof(LauncherForm).GetField("clipboardWindow",flags)!.GetValue(launcher)!,
                     ModuleWindowTarget.Music or ModuleWindowTarget.Football=>(Form)typeof(LauncherForm).GetField(target==ModuleWindowTarget.Music?"music":"football",flags)!.GetValue(launcher)!,
-                    _=>(Form)typeof(PetForm).GetField(target switch{ModuleWindowTarget.Media=>"mediaWindow",ModuleWindowTarget.Todos=>"todoWindow",ModuleWindowTarget.Notes=>"notesWindow",_=>"quickNoteWindow"},flags)!.GetValue(pet)!};
+                    _=>(Form)typeof(PetForm).GetField(target switch{ModuleWindowTarget.Media=>"mediaWindow",ModuleWindowTarget.Todos=>"todoWindow",ModuleWindowTarget.Notes=>"notesWindow",ModuleWindowTarget.Chat=>"chat",_=>"quickNoteWindow"},flags)!.GetValue(pet)!};
                 c[target+"_real_host_opens_existing_window"]=window.Visible;
                 var oldFeedback=live.Feedback(target,CancellationToken.None);int before=liveNotices.Count;
                 EscapeWindows.Dismiss(window);
-                string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",ModuleWindowTarget.Todos=>"todos",ModuleWindowTarget.Notes or ModuleWindowTarget.QuickNote=>"notes",_=>"football-data"};
+                string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",ModuleWindowTarget.Todos=>"todos",ModuleWindowTarget.Chat=>"conversation",ModuleWindowTarget.Clipboard=>"clipboard",ModuleWindowTarget.Notes or ModuleWindowTarget.QuickNote=>"notes",_=>"football-data"};
                 await oldFeedback.ReportAsync(Result(module),true);
                 c[target+"_real_close_invalidates_feedback"]=!window.Visible&&liveNotices.Count==before;
             }
@@ -96,8 +97,41 @@ static class PresentationServiceTests
             c["committed_quick_note_confirmation_preserved"]=liveNotices.Count(n=>n.Text=="已记下")==1;
             int afterSave=liveNotices.Count;await oldQuickFeedback.ReportAsync(Result("notes","failed"));
             c["old_quick_note_feedback_does_not_replay_save"]=liveNotices.Count==afterSave&&notes.Query("saved fixture").Count==1;
+            var clipModule=(IStructuredLeoModule)pet.ContractRegistry.Resolve("clipboard_open");
+            var clipReceipt=await clipModule.ExecuteStructuredAsync(new("clipboard_open"),CancellationToken.None);
+            c["registered_clipboard_window_receipt"]=clipReceipt.Evidence=="window-shown";
+            var clips=launcher.ClipboardService;
+            var clipboardWindow=(Form)typeof(LauncherForm).GetField("clipboardWindow",flags)!.GetValue(launcher)!;
+            var pendingClip=Queued(async()=>{await clipModule.ExecuteStructuredAsync(new("clipboard_open"),CancellationToken.None);});
+            clips.Enabled=false;
+            c["recording_off_drops_old_clipboard_open"]=await Cancelled(pendingClip)&&!clips.Enabled;
+            await clipModule.ExecuteStructuredAsync(new("clipboard_open"),CancellationToken.None);
+            c["recording_off_keeps_history_window_available"]=clipboardWindow.Visible&&!clips.IsClosed;
+            EscapeWindows.Dismiss(clipboardWindow);clips.Enabled=true;
+            c["clipboard_window_close_keeps_service"]=!clips.IsClosed&&clips.Enabled;
+            var chatModule=(IStructuredLeoModule)pet.ContractRegistry.Resolve("chat_open");
+            var chatReceipt=await chatModule.ExecuteStructuredAsync(new("chat_open"),CancellationToken.None);
+            c["registered_chat_window_receipt"]=chatReceipt.Evidence=="window-shown";
+            var chatWindow=(Form)typeof(PetForm).GetField("chat",flags)!.GetValue(pet)!;
+            var pendingChat=Queued(async()=>{await chatModule.ExecuteStructuredAsync(new("chat_open"),CancellationToken.None);});
+            EscapeWindows.Dismiss(chatWindow);
+            c["chat_close_drops_old_registered_open"]=await Cancelled(pendingChat)&&chatWindow.IsDisposed;
+            var conversationHost=(ConversationHost)typeof(PetForm).GetField("conversations",flags)!.GetValue(pet)!;
+            pendingChat=Queued(async()=>{await chatModule.ExecuteStructuredAsync(new("chat_open"),CancellationToken.None);});conversationHost.Dispose();
+            c["conversation_shutdown_drops_queued_open"]=await Cancelled(pendingChat);
+            var staleClip=live.Feedback(ModuleWindowTarget.Clipboard,CancellationToken.None);int beforeDispose=liveNotices.Count;clips.Dispose();
+            await staleClip.ReportAsync(Result("clipboard","failed"));
+            c["clipboard_disposal_drops_old_feedback"]=liveNotices.Count==beforeDispose;
             c["production_progress_uses_host"]=new[]{"musicCapabilityQueue","mediaCapabilityQueue"}.All(name=>((NativeCapabilityQueue)typeof(PetForm).GetField(name,flags)!.GetValue(pet)!).Feedback!=null);
         }finally{OperationFeedback.Sink=originalSink;}
+        int captures=0,transitions=0;
+        using(var clips=new ClipboardHistoryService(new Preferences(),true,captureOverride:()=>captures++)){
+            clips.StateChanged+=()=>transitions++;
+            var window=ClipboardTool.Open(clips)!;window.Close();int beforeCapture=captures;clips.Capture();
+            c["closed_window_keeps_simulated_capture"]=captures==beforeCapture+1&&!clips.IsClosed;
+            clips.Enabled=false;beforeCapture=captures;clips.Capture();c["recording_disabled_stops_simulated_capture"]=captures==beforeCapture;
+            clips.Enabled=true;clips.Capture();c["reenable_does_not_duplicate_capture"]=captures==beforeCapture+1&&transitions==2;
+        }
         using(var owner=new Form{Opacity=0,ShowInTaskbar=false}){
             owner.Show();var dying=new ModuleWindowService(owner);int shows=0;var pending=Queued(()=>dying.ShowAsync(()=>shows++,CancellationToken.None));owner.Dispose();bool disposed=false;try{await pending;}catch(ObjectDisposedException){disposed=true;}c["disposed_owner_drops_pending_show"]=disposed&&shows==0;
         }

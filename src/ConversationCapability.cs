@@ -32,8 +32,8 @@ sealed class ConversationHost:IDisposable
 {
     readonly object gate=new();readonly Dictionary<string,ConversationSession> sessions=new();readonly Dictionary<string,ConversationJob> jobs=new();
     internal bool IsClosed{get{lock(gate)return disposed;}}
-    readonly ActionDispatcher bus;readonly ModuleWindowService ui;readonly Action show;readonly bool owns;bool disposed;
-    public ConversationHost(ActionDispatcher bus,ModuleWindowService ui,Action show,bool owns=false){this.bus=bus;this.ui=ui;this.show=show;this.owns=owns;bus.Registry.Register(new ConversationCapability(this));}
+    readonly ActionDispatcher bus;readonly ModuleWindowService ui;readonly Action show;readonly IModuleWindowPort? window;readonly bool owns;bool disposed;
+    public ConversationHost(ActionDispatcher bus,ModuleWindowService ui,Action show,bool owns=false,IModuleWindowPort? window=null){this.window=window;this.bus=bus;this.ui=ui;this.show=show;this.owns=owns;bus.Registry.Register(new ConversationCapability(this));}
     public static ConversationHost Standalone(Control owner){var bus=new ActionDispatcher(new(),(_,_,_)=>throw new InvalidOperationException("会话不可绕回旧入口"),new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-chat-noextensions")));return new(bus,new(owner),()=>{},true);}
     public ConversationClient Attach(ISpeechIO speech){lock(gate){if(disposed)throw new ObjectDisposedException(nameof(ConversationHost));if(sessions.Count>=8)throw new InvalidOperationException("会话数量已达上限");string id=Guid.NewGuid().ToString("N");var session=new ConversationSession(speech);sessions[id]=session;return new(this,bus,id,session);}}
     internal string Add(ConversationJob job){lock(gate){if(disposed||!sessions.ContainsKey(job.Session))throw new ObjectDisposedException("chat session");if(jobs.Count>=16)throw new InvalidOperationException("正在等待前一项会话操作结束");string id=Guid.NewGuid().ToString("N");jobs[id]=job;return id;}}
@@ -46,7 +46,7 @@ sealed class ConversationHost:IDisposable
     public void Dispose(){string[] ids;lock(gate){if(disposed)return;disposed=true;ids=sessions.Keys.ToArray();}foreach(var id in ids)Detach(id);if(owns)bus.Dispose();}
     internal async Task<ActionPayload> Execute(ActionRequest r,CancellationToken token)
     {
-        if(r.Action=="chat_open"){if(r.Value.Length!=0)throw new ArgumentException("聊天窗口不接受参数");await ui.ShowAsync(show,token);return new("已打开聊天。",Evidence:"window-shown");}
+        if(r.Action=="chat_open"){if(r.Value.Length!=0)throw new ArgumentException("聊天窗口不接受参数");if(IsClosed)throw new ObjectDisposedException("conversation host");await (window?.ShowAsync(token)??ui.ShowAsync(show,token));return new("已打开聊天。",Evidence:"window-shown");}
         if(r.Source.StartsWith("brain-",StringComparison.Ordinal))throw new ArgumentException("会话内部动作不提供给模型");
         if(r.Action is "chat_reply" or "voice_speak"){
             ConversationJob job;lock(gate){job=jobs.GetValueOrDefault(r.Value)??throw new ArgumentException("会话请求已失效");job.Started=true;}
@@ -123,5 +123,5 @@ sealed class ConversationClient(ConversationHost host,ActionDispatcher bus,strin
 sealed partial class PetForm
 {
     ConversationHost conversations=null!;
-    void RegisterConversationCapability()=>conversations=new(commands,new ModuleWindowService(this),ShowChat);
+    void RegisterConversationCapability()=>conversations=new(commands,new ModuleWindowService(this),ShowChatCore,window:presentation.For(ModuleWindowTarget.Chat));
 }

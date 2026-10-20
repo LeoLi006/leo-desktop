@@ -2,7 +2,7 @@
 
 ## 固定窗口请求
 
-`leo-host-presentation/1` 是宿主内部格式。ModuleWindowTarget 当前为 Applications、Football、Music、Media、Todos、Notes、QuickNote（后三者见[第四批说明](PLANNER-PRESENTATION.md)）；IModuleWindowPort 只暴露带取消的 ShowAsync，不暴露控件或任意显示回调。模块原 show 委托保留兼容，正式宿主绑定固定端口。
+`leo-host-presentation/1` 是宿主内部格式。ModuleWindowTarget 当前为 Applications、Football、Music、Media、Todos、Notes、QuickNote、Chat、Clipboard（清单便签见[第四批](PLANNER-PRESENTATION.md)，聊天剪贴板见[第五批](CONVERSATION-CLIPBOARD.md)）；IModuleWindowPort 只暴露带取消的 ShowAsync，不暴露控件或任意显示回调。模块原 show 委托保留兼容，正式宿主绑定固定端口。
 
 | 目标 | 接入路径 | 宿主保留的原显示方式 |
 | --- | --- | --- |

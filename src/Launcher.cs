@@ -164,7 +164,7 @@ sealed partial class LauncherForm : Form
         };
         // Error messages only; no instructional footer.
         status.SetBounds(22, 248, 556, 24); status.ForeColor = Color.LightSalmon; status.Visible = false; Controls.Add(status);
-        clipboard = new ClipboardHistoryService(prefs,preview);
+        clipboard = new ClipboardHistoryService(prefs,preview);clipboard.StateChanged+=()=>WindowClosed?.Invoke(ModuleWindowTarget.Clipboard);
         FeatureFaults.Timer(debounce,"应用搜索",()=>{debounce.Stop();Filter();});
         query.TextChanged += (_, _) => { keyboardNavigation=false;pathLookup?.Cancel();pathChoices.Items.Clear();debounce.Stop(); debounce.Start(); };
         InitializePathCompletion();
@@ -426,7 +426,7 @@ sealed partial class LauncherForm : Form
     public string PinClipboardText(string text){if(SharedClipboardClient==null)throw new InvalidOperationException("剪贴板能力尚未就绪");SharedClipboardClient.Execute("clipboard_pin_text",text);return "已收藏这段文字到剪贴板。";}
 
     public void OpenClipboardFromAssistant(){if(SharedClipboardClient!=null){SharedClipboardClient.Execute("clipboard_open");return;}OpenClipboardCore();}
-    internal void OpenClipboardCore(){Hide();if(clipboardWindow is {IsDisposed:false}){WindowInteraction.Show(clipboardWindow);return;}clipboardWindow=ClipboardTool.Open(clipboard,SharedClipboardClient);if(prefs.RememberHistory)memory.Record(ClipboardTool.Entry,activationContext,DateTimeOffset.UtcNow);}
+    internal void OpenClipboardCore(){Hide();if(clipboardWindow is {IsDisposed:false}){WindowInteraction.Show(clipboardWindow);return;}clipboardWindow=ClipboardTool.Open(clipboard,SharedClipboardClient);if(clipboardWindow!=null)clipboardWindow.FormClosed+=(_,_)=>WindowClosed?.Invoke(ModuleWindowTarget.Clipboard);if(prefs.RememberHistory)memory.Record(ClipboardTool.Entry,activationContext,DateTimeOffset.UtcNow);}
     async void Launch(AppEntry app)
     {
         Hide();

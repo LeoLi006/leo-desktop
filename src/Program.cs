@@ -538,7 +538,7 @@ sealed partial class PetForm : Form
         constructionProbe?.Invoke("assets_and_window_ready");
         var applicationHost=applicationOverride??new ApplicationCapabilityHost((app,token)=>{token.ThrowIfCancellationRequested();return Task.FromResult(!preview&&!File.Exists(app.Path)?RepairLocalApplication(app):app);},ApplicationCapabilityHost.StartProcess,app=>launcher?.RememberConfiguredLaunch(app),preview);
         commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null,applicationHost);
-        presentation=new(new ModuleWindowService(this),target=>target switch{ModuleWindowTarget.Football=>prefs.FootballModule,ModuleWindowTarget.Music=>prefs.MusicModule,ModuleWindowTarget.Media=>prefs.MediaModule,_=>true},OpenPresentation,notice=>OperationFeedback.Sink?.Invoke(notice),DismissPresentationFeedback);
+        presentation=new(new ModuleWindowService(this),target=>target switch{ModuleWindowTarget.Football=>prefs.FootballModule,ModuleWindowTarget.Music=>prefs.MusicModule,ModuleWindowTarget.Media=>prefs.MediaModule,ModuleWindowTarget.Chat=>conversations==null||!conversations.IsClosed,ModuleWindowTarget.Clipboard=>launcher==null||!launcher.ClipboardService.IsClosed,_=>true},OpenPresentation,notice=>OperationFeedback.Sink?.Invoke(notice),DismissPresentationFeedback);
         presentation.Configure();musicCapabilityQueue.Feedback=t=>new(presentation.Feedback(ModuleWindowTarget.Music,t),"music");mediaCapabilityQueue.Feedback=t=>new(presentation.Feedback(ModuleWindowTarget.Media,t),"media");
         RegisterNotesCapability();RegisterConversationCapability();RegisterTodoCapability();RegisterFootballCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();
         constructionProbe?.Invoke("dispatcher_ready");
@@ -610,15 +610,16 @@ sealed partial class PetForm : Form
         InitializeBackgroundActivities();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};Shown+=async(_,_)=>{await SyncMatchesAsync();await reminderActivity.RunNowAsync();};}
     }
     protected override bool ShowWithoutActivation => true;
-    void ShowChat()
+    async void ShowChat(){try{var delivery=presentation.Feedback(ModuleWindowTarget.Chat,CancellationToken.None);var result=await commands.ExecuteDetailedAsync(new("chat_open","","chat-entry"));await delivery.ReportAsync(result);}catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("聊天窗口",e);}}
+    void ShowChatCore()
     {
         RevealDock(true);
         launcher.Hide(); foot.CollapseSearch();
-        if (chat == null || chat.IsDisposed) chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction){Brain=CreateBrainSession(),RecognizesExtension=commands.RecognizesExtension,OriginDispatcher=(a,v,s,t)=>commands.ExecuteAsync(new(a,v,s),t)}, clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore,sessionHost:conversations);
+        if (chat == null || chat.IsDisposed){chat = new ChatForm(previewMode, applicationTools: new AppTools(() => launcher.FileApplications, launcher.LaunchFromAssistant, () => prefs.Aliases,ExecuteLeoAction){Brain=CreateBrainSession(),RecognizesExtension=commands.RecognizesExtension,OriginDispatcher=(a,v,s,t)=>commands.ExecuteAsync(new(a,v,s),t)}, clipboardAction: launcher.OpenClipboardFromAssistant,onTodo:intent=>ShowTodos(intent),planner:todoStore,sessionHost:conversations);chat.FormClosed+=(_,_)=>presentation.Invalidate(ModuleWindowTarget.Chat);chat.Disposed+=(_,_)=>presentation.Invalidate(ModuleWindowTarget.Chat);}
         if (!chat.Visible) WindowPositions.Prepare(chat,"chat",Bounds,previewMode);
         chat.TopMost = false; if (chat.WindowState == FormWindowState.Minimized) chat.WindowState = FormWindowState.Normal; WindowInteraction.Show(chat);
     }
-    void ShowVoice(){ShowChat();chat!.ToggleVoiceInput();}
+    async void ShowVoice(){try{long generation=presentation.Capture(ModuleWindowTarget.Chat);var delivery=presentation.Feedback(ModuleWindowTarget.Chat,CancellationToken.None);var result=await commands.ExecuteDetailedAsync(new("chat_open","","voice-entry"));await delivery.ReportAsync(result);if(result.Status=="succeeded"&&presentation.Current(ModuleWindowTarget.Chat,generation)&&chat is {IsDisposed:false})chat.ToggleVoiceInput();}catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("语音窗口",e);}}
     async void ShowTodos(QuickIntent? intent=null){try{await presentation.ShowAsync(new(ModuleWindowTarget.Todos,PlannerIntent:intent),CancellationToken.None);}catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("清单窗口",e);}}
     void ShowTodosCore(QuickIntent? intent=null){RevealDock(true);launcher.Hide();foot.CollapseSearch();if(todoWindow==null||todoWindow.IsDisposed){todoWindow=new TodoForm(previewMode,todoStore);todoWindow.FormClosed+=(_,_)=>presentation.Invalidate(ModuleWindowTarget.Todos);}if(!todoWindow.Visible)WindowPositions.Prepare(todoWindow,"todos",Bounds,previewMode);WindowInteraction.Show(todoWindow);if(intent!=null)todoWindow.Apply(intent);}
     void PollFullscreen()

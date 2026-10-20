@@ -50,7 +50,8 @@ sealed class ClipboardHistoryService : IDisposable
         ConfigureActivity();
     }
     readonly bool simulatedCapture;
-    public void ConfigureActivity(){if(disposed)return;lastSequence=GetClipboardSequenceNumber();monitor.Configure((!preview||simulatedCapture)&&prefs.ClipboardHistory);}
+    internal event Action? StateChanged;bool? lastEnabled;
+    public void ConfigureActivity(){if(disposed)return;lastSequence=GetClipboardSequenceNumber();monitor.Configure((!preview||simulatedCapture)&&prefs.ClipboardHistory);bool changed=lastEnabled!=prefs.ClipboardHistory;lastEnabled=prefs.ClipboardHistory;if(changed)StateChanged?.Invoke();}
     public bool Enabled { get => prefs.ClipboardHistory; set { ObjectDisposedException.ThrowIf(disposed,this);var next=LocalApplications.Clone(prefs);next.ClipboardHistory=value;if(!preview)ConfigMigration.Write(Store.FilePath,JsonSerializer.Serialize(next));prefs.ClipboardHistory=value;ConfigureActivity(); } }
     internal Preferences Preferences=>prefs;
     internal bool IsClosed=>disposed;
@@ -111,7 +112,7 @@ sealed class ClipboardHistoryService : IDisposable
         }
         lastSequence = GetClipboardSequenceNumber(); if(Enabled&&!ClipboardPrivacy.Paused(prefs,DateTimeOffset.Now)&&!(prefs.ClipboardBlockSecrets&&item.Kind=="text"&&ClipboardPrivacy.Sensitive(item.Content)))History.Add(item with { Time = DateTimeOffset.Now });
     }
-    public void Dispose(){if(disposed)return;disposed=true;ClipboardPrivacy.Changed-=RefreshPrivacy;monitor.Dispose();}
+    public void Dispose(){if(disposed)return;disposed=true;ClipboardPrivacy.Changed-=RefreshPrivacy;monitor.Dispose();StateChanged?.Invoke();StateChanged=null;}
 }
 
 static class ClipboardTool

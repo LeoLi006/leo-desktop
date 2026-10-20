@@ -1,6 +1,6 @@
 namespace LeoLauncher;
 
-enum ModuleWindowTarget { Applications,Football,Music,Media,Todos,Notes,QuickNote }
+enum ModuleWindowTarget { Applications,Football,Music,Media,Todos,Notes,QuickNote,Chat,Clipboard }
 sealed record ModuleWindowRequest(ModuleWindowTarget Target,string Query="",bool Web=false,string View="",QuickIntent? PlannerIntent=null);
 interface IModuleWindowPort { Task ShowAsync(CancellationToken token); }
 sealed class ModulePresentationService(ModuleWindowService ui,Func<ModuleWindowTarget,bool> enabled,
@@ -41,7 +41,7 @@ sealed class ModulePresentationFeedback(ModulePresentationService host,ModuleWin
 {
     public Task ReportAsync(ActionResult result,bool acknowledge=false)
     {
-        string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Football=>"football-data",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",ModuleWindowTarget.Todos=>"todos",_=>"notes"};
+        string module=target switch{ModuleWindowTarget.Applications=>"core",ModuleWindowTarget.Football=>"football-data",ModuleWindowTarget.Music=>"music",ModuleWindowTarget.Media=>"media",ModuleWindowTarget.Todos=>"todos",ModuleWindowTarget.Chat=>"conversation",ModuleWindowTarget.Clipboard=>"clipboard",_=>"notes"};
         if(result.ModuleId!=module&&!(target==ModuleWindowTarget.Applications&&result.ModuleId.StartsWith("local:",StringComparison.Ordinal)))throw new ArgumentException("反馈归属不一致");
         if(result.Status=="failed")return host.Emit(target,generation,new(result.Message,true,Module:module,OperationId:result.ExecutionId),token);
         if(acknowledge&&result.Status=="succeeded")return host.Emit(target,generation,new(result.Message,Module:module,OperationId:result.ExecutionId),token);
@@ -70,6 +70,8 @@ sealed partial class PetForm
             case ModuleWindowTarget.Todos:ShowTodosCore(request.PlannerIntent);if(request.View.Length>0)todoWindow!.View.SetWeek(request.View=="week");break;
             case ModuleWindowTarget.Notes:ShowNotesCore(request.Query);break;
             case ModuleWindowTarget.QuickNote:ShowQuickNoteCore();break;
+            case ModuleWindowTarget.Chat:ShowChatCore();break;
+            case ModuleWindowTarget.Clipboard:launcher.OpenClipboardCore();break;
         }
     }
     void DismissPresentationFeedback(string operation){if(feedback?.Matches(new("",OperationId:operation))==true&&feedback.IsBusy)feedback.Hide();}

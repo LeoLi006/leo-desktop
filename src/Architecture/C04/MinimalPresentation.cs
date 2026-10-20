@@ -7,5 +7,7 @@ static class MinimalPresentationExample
     // The host binds a fixed target before handing the port to a module.
     public static IModuleWindowPort PlannerPort(ModulePresentationService host)=>host.For(ModuleWindowTarget.Todos);
     public static IModuleWindowPort QuickNotePort(ModulePresentationService host)=>host.For(ModuleWindowTarget.QuickNote);
+    public static IModuleWindowPort ChatPort(ModulePresentationService host)=>host.For(ModuleWindowTarget.Chat);
+    public static IModuleWindowPort ClipboardPort(ModulePresentationService host)=>host.For(ModuleWindowTarget.Clipboard);
     public static Task Report(ModulePresentationFeedback feedback,ActionResult result)=>feedback.ReportAsync(result);
 }
