@@ -9,6 +9,9 @@ sealed class ApplicationConfigurationChangedException():OperationCanceledExcepti
 sealed record ActionPayload(string Message,JsonElement? Data=null,string Evidence="unknown",bool PrivateData=false,string? DiagnosticMessage=null);
 // Host evidence for already committed local writes; never supplied by a caller.
 interface ICommittedActionModule { bool TryCommitted(ActionRequest request,out ActionPayload payload); }
+// Opt-in for read-only providers that discard cancelled generations before publishing.
+// Native commands keep their reserved execution until the original operation finishes.
+interface IRestartableQueryModule { }
 interface IActionRequestAdapter{ActionRequest Adapt(StructuredActionRequest request);}
 interface IStructuredLeoModule:ILeoModule
 {

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 namespace LeoLauncher;
 
 sealed partial class LauncherForm : Form
@@ -20,6 +20,7 @@ sealed partial class LauncherForm : Form
     readonly Label status = new();
     readonly Preferences prefs;
     readonly TodoStore tasks;
+    internal FootballClient? SharedFootballClient;
     readonly Action resizePet;
     readonly Action<AppEntry> launchApplication;
     readonly ClipboardHistoryService clipboard;
@@ -120,7 +121,7 @@ sealed partial class LauncherForm : Form
         footballButton.FlatAppearance.BorderSize = 0;
         openFootball = () => {
             if(!prefs.FootballModule)return;
-            if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks);
+            if (football == null || football.IsDisposed) football = new FootballForm(preview,tasks,sharedQueries:SharedFootballClient);
             SetWatchVisibility(football);
             var area = Screen.FromControl(this).WorkingArea;
             football.StartPosition = FormStartPosition.Manual;

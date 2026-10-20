@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
 sealed record Club(string Name,string Id,string League,string LeagueName,string English="",string[]? Aliases=null,string Kind="club")
@@ -16,7 +16,7 @@ sealed class TeamData
     public List<FootballMatch> Matches {get;set;}=new();
     public List<LeagueRow> Rows {get;set;}=new();
     public static string CachePath(Club club)=>Path.Combine(Store.Root,"leo-team-"+club.Id+(club.IsNational?"-"+club.League:"")+".json");
-    public static TeamData Load(Club club){try{return JsonSerializer.Deserialize<TeamData>(File.ReadAllText(CachePath(club)))??new();}catch{return new();}}
+    public static TeamData Load(Club club){try{return AtomicJson.Read(CachePath(club),json=>{var data=JsonSerializer.Deserialize<TeamData>(json)??throw new FormatException("球队缓存为空");FootballQueries.Validate(data);return data;});}catch{return new();}}
     public static (string Season,List<LeagueRow> Rows) ParseTable(string json)
     {
         using var doc=JsonDocument.Parse(json);var rows=new List<LeagueRow>();
@@ -52,14 +52,14 @@ sealed class TeamData
             data.MatchesUpdated=DateTimeOffset.UtcNow;mf=false;
         }catch{}
         if(responses[2]!=null)try{NationalCompetitions.ValidateTable(club,responses[2]!);var table=ParseTable(responses[2]!);if(club.IsNational&&table.Rows.Any(row=>ClubCatalog.Find(row.Id) is {IsNational:false}))throw new FormatException("国家队积分榜返回了俱乐部数据");data.Rows=table.Rows;data.Season=table.Season;data.TableUpdated=DateTimeOffset.UtcNow;tf=false;}catch{}
-        if(!mf||!tf)try{File.WriteAllText(CachePath(club)+".tmp",JsonSerializer.Serialize(data));File.Move(CachePath(club)+".tmp",CachePath(club),true);}catch{}
+        token.ThrowIfCancellationRequested();
         return(data,mf,tf);
     }
 }
 sealed class TeamView:UserControl
 {
     Club club;ComboBox? competitionSelector;
-    readonly TodoStore? tasks;
+    readonly TodoStore? tasks;readonly FootballClient queries;readonly bool ownsQueries;
     readonly bool preview;
     TeamData data;
     int tab;
@@ -68,24 +68,24 @@ sealed class TeamView:UserControl
     readonly BarcaButton matches=new(){Text="近期比赛",Bounds=new Rectangle(24,9,112,34),Selected=true},table=new(){Text="联赛积分榜",Bounds=new Rectangle(146,9,125,34)},refresh=new(){Text="刷新 ↻",Bounds=new Rectangle(285,9,90,34)};
     readonly CancellationTokenSource lifetime=new();
     bool busy,disposed,matchesFailed,tableFailed;
-    public TeamView(string name,bool previewMode,Action goBack,TodoStore? planner=null)
+    public TeamView(string name,bool previewMode,Action goBack,TodoStore? planner=null,FootballClient? sharedQueries=null)
     {
-        tasks=planner;club=Club.For(name);preview=previewMode;data=TeamData.Load(club);Dock=DockStyle.Fill;BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;Font=BarcaUi.Font();
+        tasks=planner;club=Club.For(name);preview=previewMode;queries=sharedQueries??FootballClient.Standalone(preview);ownsQueries=sharedQueries==null;data=queries.CachedTeam(club);Dock=DockStyle.Fill;BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;Font=BarcaUi.Font();
         var chrome=new Panel{Dock=DockStyle.Top,Height=66};
         var back=new BarcaButton{Text="‹ 返回",Bounds=new Rectangle(24,15,86,33),AccessibleName="返回赛程"};back.Click+=(_,_)=>goBack();chrome.Controls.Add(back);
         var competitionTitle=new Label{Text=club.Name+"  /  "+club.CompetitionName,Bounds=new Rectangle(130,12,600,29),Font=BarcaUi.Font(14,true),ForeColor=BarcaUi.Text};chrome.Controls.Add(competitionTitle);
         chrome.Controls.Add(new Label{Text="最近10场赛果 · 未来10场赛程",Bounds=new Rectangle(132,42,600,20),Font=BarcaUi.Font(8.5f),ForeColor=BarcaUi.Muted});
         var toolbar=new Panel{Dock=DockStyle.Top,Height=54};toolbar.Controls.AddRange([matches,table,refresh]);matches.Click+=(_,_)=>{tab=0;Render();};table.Click+=(_,_)=>{tab=1;Render();};refresh.Click+=async(_,_)=>await LoadAsync(true);
-        if(club.IsNational){table.Text="赛事积分榜";var competitions=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Bounds=new Rectangle(390,12,228,29),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text};CompanionUi.ThemeCombo(competitions);competitionSelector=competitions;var choices=NationalCompetitions.For(club);competitions.Items.AddRange(choices.Select(c=>c.Name).Cast<object>().ToArray());competitions.SelectedIndex=0;competitions.SelectedIndexChanged+=async(_,_)=>{if(busy)return;var choice=choices[competitions.SelectedIndex];club=club with{League=choice.Id};competitionTitle.Text=club.Name+"  /  "+club.CompetitionName;data=TeamData.Load(club);tab=1;Render();competitions.Enabled=false;try{await LoadAsync(true);}finally{if(!IsDisposed)competitions.Enabled=true;}};toolbar.Controls.Add(competitions);}
+        if(club.IsNational){table.Text="赛事积分榜";var competitions=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Bounds=new Rectangle(390,12,228,29),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text};CompanionUi.ThemeCombo(competitions);competitionSelector=competitions;var choices=NationalCompetitions.For(club);competitions.Items.AddRange(choices.Select(c=>c.Name).Cast<object>().ToArray());competitions.SelectedIndex=0;competitions.SelectedIndexChanged+=async(_,_)=>{if(busy)return;var choice=choices[competitions.SelectedIndex];club=club with{League=choice.Id};competitionTitle.Text=club.Name+"  /  "+club.CompetitionName;data=queries.CachedTeam(club);matchesFailed=tableFailed=false;tab=1;Render();competitions.Enabled=false;try{await LoadAsync(true);}finally{if(!IsDisposed)competitions.Enabled=true;}};toolbar.Controls.Add(competitions);}
         Controls.Add(list);Controls.Add(status);Controls.Add(toolbar);Controls.Add(chrome);Resize+=(_,_)=>Render();Load+=async(_,_)=>{Render();if(!preview)await LoadAsync(false);};Render();
     }
     async Task LoadAsync(bool force)
     {
         if(busy||preview)return;
-        if(!force&&data.MatchesUpdated>DateTimeOffset.UtcNow.AddMinutes(-10)&&data.TableUpdated>DateTimeOffset.UtcNow.AddMinutes(-10)){Render();return;}
         busy=true;if(competitionSelector!=null)competitionSelector.Enabled=false;refresh.Enabled=false;status.Text="正在更新球队赛程与积分榜…";
-        try{var result=await TeamData.Fetch(club,data,lifetime.Token);data=result.Data;if(!result.MatchesFailed)tasks?.SyncMatches(data.Matches,data.MatchesUpdated);matchesFailed=result.MatchesFailed;tableFailed=result.TableFailed;if(!IsDisposed)Render();}
+        try{var result=await queries.Team(club,force,lifetime.Token);if(IsDisposed||lifetime.IsCancellationRequested)return;data=result.Data;if(!result.MatchesFailed)tasks?.Client.From("football-sync").SyncMatches(data.Matches,data.MatchesUpdated);matchesFailed=result.MatchesFailed;tableFailed=result.TableFailed;Render();if(result.Error!=null)status.Text+=" · "+result.Error;}
         catch(OperationCanceledException){}
+        catch(Exception e)when(FootballQueries.QueryFailure(e)){if(!IsDisposed){matchesFailed=tableFailed=true;Render();}}
         finally{busy=false;if(!IsDisposed){refresh.Enabled=true;if(competitionSelector!=null)competitionSelector.Enabled=true;}}
     }
     void Heading(string text){list.Controls.Add(new Label{Text=text,Width=Math.Max(700,list.ClientSize.Width-55),Height=35,Padding=new Padding(5,8,0,0),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});}
@@ -119,7 +119,7 @@ sealed class TeamView:UserControl
     public void PreviewTable(){tab=1;Render();}
     public void PreviewBack()=>Controls.OfType<Panel>().SelectMany(p=>p.Controls.OfType<BarcaButton>()).Single(b=>b.AccessibleName=="返回赛程").PerformClick();
     public bool VerifySwitching(){for(int i=0;i<4;i++){table.PerformClick();matches.PerformClick();}return tab==0&&matches.Selected&&!table.Selected;}
-    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;lifetime.Cancel();lifetime.Dispose();if(ownsQueries)queries.Dispose();}base.Dispose(disposing);}
 }
 sealed class StandingsLine:Control
 {

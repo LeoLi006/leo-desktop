@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
@@ -42,11 +42,11 @@ sealed partial class ChatForm
         }catch(OperationCanceledException){if(!IsDisposed)state.Text="已停止";}catch(Exception e){if(!IsDisposed)state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}
         finally{pending=null;request.Dispose();if(!IsDisposed){send.Enabled=true;UpdateVoice();input.Focus();}}
     }
+    FootballClient? fallbackFootball;
+    Task<string> FootballFacts(string value,CancellationToken token)=>appTools?.HasLeo==true?appTools.ExecuteLeoAsync("football_facts",value,token):(fallbackFootball??=FootballClient.Standalone(preview)).Facts(value,token);
     async Task<(TeamData Data,Club Club,bool Stale)> TeamFacts(string name,CancellationToken token)
     {
-        Modules.RequireFootball();var club=Club.For(name);if(appTools?.HasLeo==true){using var reply=JsonDocument.Parse(await appTools.ExecuteLeoAsync("football_facts","view:"+name,token));return(reply.RootElement.GetProperty("data").Deserialize<TeamData>()??new(),club,reply.RootElement.GetProperty("stale").GetBoolean());}var data=TeamData.Load(club);bool stale=false;
-        if(!preview&&(data.MatchesUpdated<DateTimeOffset.UtcNow.AddMinutes(-10)||data.TableUpdated<DateTimeOffset.UtcNow.AddMinutes(-10))){var result=await TeamData.Fetch(club,data,token);data=result.Data;stale=result.MatchesFailed||result.TableFailed;}
-        return(data,club,stale);
+        Modules.RequireFootball();var club=Club.For(name);using var reply=JsonDocument.Parse(await FootballFacts("view:"+name,token));return(reply.RootElement.GetProperty("data").Deserialize<TeamData>()??new(),club,reply.RootElement.GetProperty("stale").GetBoolean());
     }
     async Task ShowFootball(QuickIntent intent,CancellationToken token)
     {
@@ -60,7 +60,7 @@ sealed partial class ChatForm
             else{bool recent=System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"近况|最近|上一场|昨天|前天|赛果|比分");IEnumerable<FootballMatch> matches=recent?fact.Data.Matches.Where(m=>m.State=="post").OrderByDescending(m=>m.Kickoff):fact.Data.Matches.Where(m=>m.State!="post"&&m.Kickoff>DateTimeOffset.UtcNow.AddHours(-3)).OrderBy(m=>m.Kickoff);if(System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"昨天|前天|明天|今天")){int offset=intent.Value.Contains("昨天")?-1:intent.Value.Contains("前天")?-2:intent.DayOffset;var date=DateTime.Today.AddDays(offset);matches=fact.Data.Matches.Where(m=>m.Kickoff.LocalDateTime.Date==date).OrderBy(m=>m.Kickoff);}ShowMatches(matches.Take(System.Text.RegularExpressions.Regex.IsMatch(intent.Value,"下一场|上一场")?1:3));lastAnswer="已显示"+fact.Club.Name+"近期比赛。";}
             var time=ranking?fact.Data.TableUpdated:fact.Data.MatchesUpdated;ResultText("ESPN · "+(time==default?"暂无缓存":time.ToLocalTime().ToString("MM-dd HH:mm")+" 更新")+(fact.Stale?" · 更新失败，含旧数据":""));
         }else{
-            FootballCache cache;bool stale=false;if(appTools?.HasLeo==true){using var reply=JsonDocument.Parse(await appTools.ExecuteLeoAsync("football_facts","view:"+intent.Value,token));cache=reply.RootElement.GetProperty("cache").Deserialize<FootballCache>()??new();stale=reply.RootElement.GetProperty("stale").GetBoolean();}else{cache=FootballFeed.LoadCache();if(!preview&&(cache.SchemaVersion<2||cache.Updated<DateTimeOffset.UtcNow.AddMinutes(-10)))try{cache=await FootballFeed.FetchAsync(cache,token);}catch(HttpRequestException){stale=true;}}
+            FootballCache cache;bool stale;using(var reply=JsonDocument.Parse(await FootballFacts("view:"+intent.Value,token))){cache=reply.RootElement.GetProperty("cache").Deserialize<FootballCache>()??new();stale=reply.RootElement.GetProperty("stale").GetBoolean();}
             if(IsDisposed)return;bool overnight=intent.Value.Contains("今晚");var start=DateTimeOffset.Now.Date.AddDays(intent.DayOffset).AddHours(overnight?16:0);var end=start.AddHours(overnight?16:24);
             bool timed=intent.Value.Contains("今晚")||intent.Value.Contains("明天")||intent.Value.Contains("今天");
             var matches=cache.Matches.Where(m=>(FootballFeed.FollowTags(m,FootballForm.FollowingNames).Length>0||FootballFeed.IsFocus(m))&&(timed?m.Kickoff.LocalDateTime>=start&&m.Kickoff.LocalDateTime<end:m.Kickoff>=DateTimeOffset.UtcNow&&m.Kickoff<=DateTimeOffset.UtcNow.AddHours(48))).OrderBy(m=>m.Kickoff).Take(8).ToArray();
@@ -71,7 +71,7 @@ sealed partial class ChatForm
     void ShowMatches(IEnumerable<FootballMatch> matches){var rows=matches.ToArray();if(rows.Length==0)ResultText("暂无已公布的匹配比赛。");foreach(var m in rows){var card=new MatchCard(m,"",planStore){Width=ResultWidth};card.Click+=(_,_)=>{if(!preview&&m.Id.Length>0&&m.Id.All(char.IsAsciiDigit))try{Process.Start(new ProcessStartInfo("https://www.espn.com/soccer/match/_/gameId/"+m.Id){UseShellExecute=true});}catch{state.Text="无法打开比赛来源";}};results.Controls.Add(card);}}
     async Task<string> AnalysisFacts(QuickIntent intent,CancellationToken token)
     {
-        if(intent.Team.Length==0){var cache=FootballFeed.LoadCache();if(!preview&&cache.Updated<DateTimeOffset.UtcNow.AddMinutes(-10))cache=await FootballFeed.FetchAsync(cache,token);return "当前时间："+DateTimeOffset.Now.ToString("O")+"。以下是ESPN公开比赛数据，来源https://www.espn.com/soccer/scoreboard 。只依据数据简短分析，不得编造伤停、新闻和比赛过程。\n"+JsonSerializer.Serialize(new{cache.Updated,cache.FailedSources,matches=cache.Matches.Where(m=>FootballFeed.IsRecent(m,DateTimeOffset.UtcNow)&&(FootballFeed.FollowTags(m,FootballForm.FollowingNames).Length>0||FootballFeed.IsFocus(m))).Take(20)});}
+        if(intent.Team.Length==0)return "当前时间："+DateTimeOffset.Now.ToString("O")+"。以下为ESPN公开比赛实际查询结果，注意缓存时间与stale标记。只依据数据分析，不得编造伤停、新闻、比赛过程和比赛编号。来源https://www.espn.com/soccer/scoreboard 。\n"+await FootballFacts(intent.Value,token);
         string team=intent.Team;var fact=await TeamFacts(team,token);
         return "当前时间："+DateTimeOffset.Now.ToString("O")+"。以下为 ESPN 结构化查询结果。只依据这些事实分析，明确区分推测；没有查询伤停、首发、新闻和比赛过程，不得编造。若现有数据不足，直接说明。来源比赛页：https://www.espn.com/soccer/match/_/gameId/{Id}；积分榜：https://www.espn.com/soccer/standings/_/league/"+fact.Club.League+"。\n"+JsonSerializer.Serialize(new{team, fact.Data.MatchesUpdated,fact.Data.TableUpdated,stale=fact.Stale,matches=fact.Data.Matches.Take(12),table=fact.Data.Rows.Where(r=>r.Id==fact.Club.Id)});
     }

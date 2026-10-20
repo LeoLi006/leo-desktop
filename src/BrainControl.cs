@@ -17,7 +17,7 @@ sealed class BrainCatalog(CapabilityRegistry registry)
     public BrainEntry[] Read()
     {
         var result=registry.Read().Where(m=>m.Enabled&&m is IBrainContributor{BrainAvailable:true}).SelectMany(m=>((IBrainContributor)m).BrainActions.Select(a=>new BrainEntry(a,m.Id,((IBrainContributor)m).BrainStamp))).Take(64).ToList();
-        var facts=registry.Resolve("football_facts");if(facts.Enabled)result.Add(new(new("football_facts","查询足球赛程","text",true,"球队名、今晚比赛；只返回实际数据"),facts.Id,""));return result.ToArray();
+        var facts=registry.Resolve("football_facts");if(facts.Enabled&&!result.Any(e=>e.Action.Id=="football_facts"))result.Add(new(new("football_facts","查询足球赛程","text",true,"球队名、今晚比赛；只返回实际数据"),facts.Id,""));return result.ToArray();
     }
     public BrainEntry Require(string action)=>Read().SingleOrDefault(x=>x.Action.Id==action)??throw new ArgumentException("能力已停用、依赖不可用或尚未接入模型，请改用本地入口");
     public static string Hash(string value)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));

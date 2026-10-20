@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 namespace LeoLauncher;
 
 sealed class ApiSettingsForm : Form
@@ -273,7 +273,7 @@ sealed partial class ChatForm : BarcaWindow
     internal void PreviewRetryReply()=>retryReply.PerformClick();
     public void PreviewStop() => stop.PerformClick();
     public bool PreviewWasStopped => turns.LastOrDefault()?.Status == "已停止" && send.Enabled && !stop.Enabled;
-    void ReleaseChat(){if(chatReleased)return;chatReleased=true;appTools?.Brain?.Dispose();chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();voice.Dispose();chatLife.Dispose();}
+    void ReleaseChat(){if(chatReleased)return;chatReleased=true;appTools?.Brain?.Dispose();fallbackFootball?.Dispose();chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();voice.Dispose();chatLife.Dispose();}
     protected override void OnFormClosed(FormClosedEventArgs e) { ReleaseChat(); base.OnFormClosed(e); }
     protected override void Dispose(bool disposing){if(disposing)ReleaseChat();base.Dispose(disposing);}
 }

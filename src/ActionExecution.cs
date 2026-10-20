@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 namespace LeoLauncher;
 
 sealed partial class ActionDispatcher
@@ -67,7 +67,7 @@ sealed partial class ActionDispatcher
             Execution work;bool start=false;
             lock(pending){
                 if(disposed)throw new ObjectDisposedException(nameof(ActionDispatcher));
-                if(pending.TryGetValue(key,out work!))coalesced++;
+                if(pending.TryGetValue(key,out work!)&&(!work.Token.IsCancellationRequested||module is not IRestartableQueryModule||policy?.Effect!="read"))coalesced++;
                 else{
                     var definition=policy;
                     if(definition!=null&&(definition.Id!=request.Action||definition.ModuleId!=module.Id||definition.Concurrency is not("coalesce-inflight" or "serialized-store")||definition.TimeoutMs is not(>=1 and <=120000)||definition.Retry))throw new CapabilityException("invalid_definition","当前宿主不支持此动作的执行策略");

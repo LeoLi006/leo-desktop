@@ -63,10 +63,7 @@ sealed partial class PetForm
     MatchPlanningHost? matchPlanning;
     void RegisterMatchPlanning()
     {
-        matchPlanning=new(()=>{
-            var cache=previewMode?new FootballCache():FootballFeed.LoadCache();var rows=cache.Matches.Select(m=>(m,cache.Updated)).ToList();
-            if(!previewMode)foreach(string name in FootballForm.FollowingNames){var data=TeamData.Load(Club.For(name));rows.AddRange(data.Matches.Select(m=>(m,data.MatchesUpdated)));}return rows;
-        });
+        matchPlanning=new(()=>footballQueries.CachedMatches(previewMode?[]:FootballFollowing.Current.Clubs));
         commands.Registry.Register(new MatchPlanningCapability(()=>prefs.FootballModule,matchPlanning,todoStore,new ModuleWindowService(this)));
         todoStore.MatchImporter=async(match,observed)=>{
             var envelope=matchPlanning.Remember(match,observed);var lookup=await commands.ExecuteDetailedAsync(new("match_lookup",JsonSerializer.Serialize(envelope.Reference),"football-ui"));lookup.ToLegacy(default);

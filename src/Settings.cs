@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Text.Json;
 namespace LeoLauncher;
 
@@ -184,7 +184,7 @@ sealed partial class PetForm
         if(!prefs.MediaModule)mediaWindow?.Close();
         if(!previewMode){if(prefs.FootballModule)matchSyncTimer.Start();else matchSyncTimer.Stop();}
         if(!previewMode)ConfigureClientActivity();
-        Modules.SetFootball(prefs.FootballModule);RegisterClientCapabilities();RegisterMusicCapability();commands.CancelDisabled();foot.ConfigureModules(prefs);launcher.RefreshModules();
+        Modules.SetFootball(prefs.FootballModule);if(!prefs.FootballModule)footballQueries.Suspend();RegisterClientCapabilities();RegisterMusicCapability();commands.CancelDisabled();foot.ConfigureModules(prefs);launcher.RefreshModules();
         prefs.PetSize = next.PetSize; prefs.RememberHistory = next.RememberHistory; prefs.ContextAware = next.ContextAware; prefs.HideInFullscreen = next.HideInFullscreen; prefs.ClipboardHistory = next.ClipboardHistory;
         prefs.QuickNoteHotkey=next.QuickNoteHotkey;prefs.SearchHotkey = next.SearchHotkey; prefs.VoiceHotkey = next.VoiceHotkey; prefs.LyricsHotkey = next.LyricsHotkey; lyricsHotkeyRegistered = next.MusicModule&&next.LyricsHotkey != Keys.None;
         if(!previewMode)RegisterConfiguredHotkeys();

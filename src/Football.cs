@@ -42,7 +42,7 @@ static class FootballFeed
         if (events.GetArrayLength() > 0 && result.Count == 0) throw new FormatException("赛程字段已变更");
         return result;
     }
-    public static FootballCache LoadCache() { try { return JsonSerializer.Deserialize<FootballCache>(File.ReadAllText(CachePath)) ?? new(); } catch { return new(); } }
+    public static FootballCache LoadCache() { try { return AtomicJson.Read(CachePath,json=>{var data=JsonSerializer.Deserialize<FootballCache>(json)??throw new FormatException("赛程缓存为空");FootballQueries.Validate(data);return data;}); } catch { return new(); } }
     public static bool IsRecent(FootballMatch m, DateTimeOffset now) => m.Kickoff >= new DateTimeOffset(now.ToLocalTime().Date.AddDays(-3), TimeZoneInfo.Local.GetUtcOffset(now.ToLocalTime().Date.AddDays(-3))) && m.Kickoff <= now.AddDays(14);
     public static string[] FollowTags(FootballMatch m, IEnumerable<string> following)
     {
@@ -90,7 +90,6 @@ static class FootballFeed
         if (failed > 0) matches.AddRange(old.Matches.Where(m => IsRecent(m, now) && matches.All(n => n.Id != m.Id)));
         var cache = new FootballCache { Updated = now, Matches = matches, FailedSources = failed, SchemaVersion = 2 };
         token.ThrowIfCancellationRequested();
-        try { File.WriteAllText(CachePath + ".tmp", JsonSerializer.Serialize(cache)); File.Move(CachePath + ".tmp", CachePath, true); } catch { }
         return cache;
     }
 }
@@ -98,6 +97,7 @@ static class FootballFeed
 sealed class FootballForm : BarcaWindow,IWindowBack
 {
     readonly bool preview;
+    readonly FootballClient queries;readonly bool ownsQueries;
     readonly TodoStore tasks;
     public static string[] FollowingNames=>FootballFollowing.Current.Names;
     readonly FootballFollowing following;
@@ -114,9 +114,9 @@ sealed class FootballForm : BarcaWindow,IWindowBack
     readonly Dictionary<string,FollowButton> follows=new();
     readonly CancellationTokenSource lifetime=new();
     int filterIndex;bool busy,disposed;
-    public FootballForm(bool previewMode=false,TodoStore? planner=null,FootballFollowing? favorites=null)
+    public FootballForm(bool previewMode=false,TodoStore? planner=null,FootballFollowing? favorites=null,FootballClient? sharedQueries=null)
     {
-        following=favorites??(previewMode?new FootballFollowing(null):FootballFollowing.Current);preview=previewMode;tasks=planner??new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));cache=preview?new():FootballFeed.LoadCache();
+        following=favorites??(previewMode?new FootballFollowing(null):FootballFollowing.Current);preview=previewMode;queries=sharedQueries??FootballClient.Standalone(preview,following);ownsQueries=sharedQueries==null;tasks=planner??new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));cache=queries.CachedSchedule();
         Text="Leo · 足球";StartPosition=FormStartPosition.Manual;ClientSize=new Size(900,760);MinimumSize=new Size(780,580);TopMost=false;
         var chrome=BarcaUi.Chrome(this,"LEO  /  MATCHDAY","BLAUGRANA  ·  你的足球日程");
         CanResize=false;MaximizeBox=false;MinimumSize=Size;MaximumSize=Size;
@@ -135,12 +135,13 @@ sealed class FootballForm : BarcaWindow,IWindowBack
         KeyPreview=true;KeyDown+=(_,e)=>{if(detail!=null&&(e.KeyCode==Keys.BrowserBack||e.Alt&&e.KeyCode==Keys.Left)){BackToSchedule();e.Handled=true;e.SuppressKeyPress=true;}};Render();
     }
     void RenderFollowing(){foreach(Control c in followed.Controls.Cast<Control>().ToArray())c.Dispose();follows.Clear();foreach(var club in following.Clubs){var button=new FollowButton(club.Name,club.Id){Width=157};button.Click+=(_,_)=>OpenTeam(club.Name);follows[club.Name]=button;followed.Controls.Add(button);}followed.Height=Math.Clamp(following.Clubs.Length*76,42,250);if(follows.Count==0)followed.Controls.Add(new Label{Text="尚未关注球队",ForeColor=BarcaUi.Muted,Width=170,Height=35});}
+    internal int QueryCacheCount=>cache.Matches.Count;
     public bool VerifyNoResize(){var before=Size;foreach(var point in new[]{new Point(1,1),new Point(Width-2,1),new Point(1,Height-2),new Point(Width-2,Height-2)}){var screen=PointToScreen(point);var msg=Message.Create(Handle,0x84,IntPtr.Zero,(IntPtr)((screen.Y<<16)|(screen.X&0xffff)));WndProc(ref msg);if(msg.Result.ToInt64() is >=10 and <=17)return false;}var command=Message.Create(Handle,0x112,(IntPtr)0xF000,IntPtr.Zero);WndProc(ref command);return Size==before&&MinimumSize==MaximumSize&&!CanResize;}
     void OpenTeam(string name)
     {
         if(detail!=null)detail.Dispose();
         homeScroll=new Point(0,-list.AutoScrollPosition.Y);home.Hide();
-        detail=new TeamView(name,preview,BackToSchedule,tasks);pages.Controls.Add(detail);detail.BringToFront();
+        detail=new TeamView(name,preview,BackToSchedule,tasks,queries);pages.Controls.Add(detail);detail.BringToFront();
     }
     public bool TryGoBack(){if(detail==null)return false;BackToSchedule();return true;}
     void BackToSchedule()
@@ -154,9 +155,9 @@ sealed class FootballForm : BarcaWindow,IWindowBack
     }
     async Task LoadAsync(bool force)
     {
-        if(busy||preview)return;if(!force&&cache.SchemaVersion>=2&&cache.FailedSources==0&&cache.Updated>DateTimeOffset.UtcNow.AddMinutes(-10)){UpdateStatus();return;}
+        if(busy||preview)return;
         busy=true;refresh.Enabled=false;status.Text="正在更新公开赛程…";
-        try{cache=await FootballFeed.FetchAsync(cache,lifetime.Token);if(cache.FailedSources==0)tasks.Client.From("football-sync").SyncMatches(cache.Matches,cache.Updated);if(!IsDisposed){Render();UpdateStatus();}}
+        try{var result=await queries.Schedule(force,lifetime.Token);if(IsDisposed||lifetime.IsCancellationRequested)return;cache=result.Cache;if(!result.Stale)tasks.Client.From("football-sync").SyncMatches(cache.Matches,cache.Updated);Render();UpdateStatus();if(result.Stale)status.Text+=" · 显示已有缓存";if(result.Error!=null)status.Text+=" · "+result.Error;}
         catch(OperationCanceledException){}
         catch{if(!IsDisposed){Render();status.Text=cache.Updated==default?"暂时无法联网 · 暂无缓存，请稍后刷新":"联网失败 · 显示旧缓存 "+cache.Updated.ToLocalTime().ToString("MM-dd HH:mm");}}
         finally{busy=false;if(!IsDisposed)refresh.Enabled=true;}
@@ -187,5 +188,5 @@ sealed class FootballForm : BarcaWindow,IWindowBack
     public bool PreviewTeam(){OpenTeam("巴塞罗那");Application.DoEvents();return detail!.VerifySwitching();}
     public void PreviewTeamTable()=>detail?.PreviewTable();
     protected override void OnFormClosed(FormClosedEventArgs e){lifetime.Cancel();base.OnFormClosed(e);}
-    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!disposed){disposed=true;lifetime.Cancel();lifetime.Dispose();if(ownsQueries)queries.Dispose();}base.Dispose(disposing);}
 }
