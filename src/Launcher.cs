@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 namespace LeoLauncher;
 
 sealed partial class LauncherForm : Form
@@ -352,7 +352,18 @@ sealed partial class LauncherForm : Form
 
     bool CanRunCommand(string text)=>IsCommand(text)||RecognizesCommand?.Invoke(text.Trim())==true;
     internal static bool IsCommand(string text)=>LocalPath.LooksLike(text)||text.StartsWith(":")||text.StartsWith("：")||QuickRouter.Route(text).Kind is not(QuickKind.Ai or QuickKind.SearchApp)||NaturalTodo.Parse(text,DateTime.Now,DateOnly.FromDateTime(DateTime.Today))!=null;
-    async Task RunCommand(){debounce.Stop();pathLookup?.Cancel();var text=query.Text.Trim().TrimStart(':','：').Trim();try{query.Enabled=false;var result=await CommandRequested!(text,CancellationToken.None);if(!IsDisposed){query.Clear();Hide();OperationFeedback.Show(result);}}catch(Exception e){if(!IsDisposed){status.Visible=true;status.Text=e.Message;ClientSize=new Size(600,280);}}finally{if(!IsDisposed){query.Enabled=true;query.Focus();}}}
+    readonly CancellationTokenSource commandLife=new();bool commandRunning,launcherReleased;
+    async Task RunCommand()
+    {
+        if(commandRunning||launcherReleased)return;
+        commandRunning=true;var token=commandLife.Token;
+        debounce.Stop();pathLookup?.Cancel();var text=query.Text.Trim().TrimStart(':','：').Trim();
+        try{query.Enabled=false;var result=await CommandRequested!(text,token);if(!launcherReleased&&!IsDisposed&&!token.IsCancellationRequested){query.Clear();Hide();OperationFeedback.Show(result);}}
+        catch(OperationCanceledException)when(token.IsCancellationRequested){}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!launcherReleased&&!IsDisposed){status.Visible=true;status.Text=e.Message;ClientSize=new Size(600,280);}}
+        finally{commandRunning=false;if(!launcherReleased&&!IsDisposed){query.Enabled=true;query.Focus();}}
+    }
+
     void LaunchSelected()
     {
         var entries = VisibleEntries();
@@ -435,7 +446,13 @@ sealed partial class LauncherForm : Form
     }
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { CancelCatalog();clipboardWindow?.Dispose();music?.Dispose();football?.Dispose(); observer.Dispose(); debounce.Dispose(); icons.Dispose(); clipboard?.Dispose(); }
+        if(disposing&&!launcherReleased){
+            launcherReleased=true;
+            void Cleanup(Action action){try{action();}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Leo launcher cleanup: "+e.GetType().Name);}}
+            Cleanup(commandLife.Cancel);Cleanup(commandLife.Dispose);Cleanup(CancelCatalog);
+            Cleanup(()=>clipboardWindow?.Dispose());Cleanup(()=>music?.Dispose());Cleanup(()=>football?.Dispose());
+            Cleanup(observer.Dispose);Cleanup(debounce.Dispose);Cleanup(icons.Dispose);Cleanup(()=>clipboard?.Dispose());
+        }
         base.Dispose(disposing);
     }
 }

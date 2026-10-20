@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using System.Text.Json;
 namespace LeoLauncher;
 
@@ -88,6 +88,6 @@ sealed class FootballQueries:IDisposable
     internal static bool QueryFailure(Exception e)=>e is TimeoutException or OperationCanceledException or HttpRequestException or IOException or UnauthorizedAccessException or JsonException or FormatException or InvalidOperationException or ArgumentException;
     internal static void Validate(FootballCache data){if(data.Matches==null||data.Matches.Count>20000||data.FailedSources<0||data.Matches.Any(m=>m==null||string.IsNullOrWhiteSpace(m.Id)))throw new FormatException("赛程缓存无效");}
     internal static void Validate(TeamData data){if(data.Matches==null||data.Rows==null||data.Matches.Count>20000||data.Rows.Count>2000||data.Matches.Any(m=>m==null||string.IsNullOrWhiteSpace(m.Id))||data.Rows.Any(r=>r==null))throw new FormatException("球队缓存无效");}
-    public void Suspend(){lock(gate){if(disposed)return;epoch++;var old=life;life=new();old.Cancel();old.Dispose();}}
-    public void Dispose(){lock(gate){if(disposed)return;disposed=true;life.Cancel();life.Dispose();}}
+    public void Suspend(){CancellationTokenSource old;lock(gate){if(disposed)return;epoch++;old=life;life=new();}try{old.Cancel();}finally{old.Dispose();}}
+    public void Dispose(){CancellationTokenSource old;lock(gate){if(disposed)return;disposed=true;old=life;}try{old.Cancel();}finally{old.Dispose();}}
 }
