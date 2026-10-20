@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Text.Json;
 namespace LeoLauncher;
 
@@ -182,7 +182,7 @@ sealed partial class PetForm
         prefs.ModuleExecutables=next.ModuleExecutables.ToDictionary();ModulePaths.Configure(prefs.ModuleExecutables);prefs.Favorites=next.Favorites.ToList();prefs.Aliases=next.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());
         prefs.TerminalModule=next.TerminalModule;prefs.ClashModule=next.ClashModule;prefs.MusicModule=next.MusicModule;prefs.FootballModule=next.FootballModule;prefs.EdgeModule=next.EdgeModule;prefs.EdgeDocking=next.EdgeDocking;
         if(!prefs.MediaModule)mediaWindow?.Close();
-        if(!previewMode){if(prefs.FootballModule)matchSyncTimer.Start();else matchSyncTimer.Stop();}
+        ConfigureBackgroundActivities();
         if(!previewMode)ConfigureClientActivity();
         Modules.SetFootball(prefs.FootballModule);if(!prefs.FootballModule)footballQueries.Suspend();RegisterClientCapabilities();RegisterMusicCapability();commands.CancelDisabled();foot.ConfigureModules(prefs);launcher.RefreshModules();
         prefs.PetSize = next.PetSize; prefs.RememberHistory = next.RememberHistory; prefs.ContextAware = next.ContextAware; prefs.HideInFullscreen = next.HideInFullscreen; prefs.ClipboardHistory = next.ClipboardHistory;

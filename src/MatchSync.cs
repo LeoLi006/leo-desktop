@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 namespace LeoLauncher;
@@ -12,7 +12,32 @@ static class MatchSyncService
 }
 sealed partial class PetForm
 {
-    ReminderForm? reminders;readonly System.Windows.Forms.Timer matchSyncTimer=new(){Interval=600000};readonly CancellationTokenSource matchSyncLife=new();bool matchSyncBusy;
-    async Task SyncMatchesAsync(){if(previewMode||!prefs.FootballModule||matchSyncBusy||IsDisposed)return;matchSyncBusy=true;try{var cached=footballQueries.CachedSchedule();todoClient.From("football-sync").HydrateMatchMetadata(cached.Matches,cached.Updated);var snapshot=await footballClient.Events(MatchSyncService.TrackedIds(todoStore),matchSyncLife.Token);var matches=snapshot.Matches;if(!IsDisposed&&prefs.FootballModule&&!matchSyncLife.IsCancellationRequested)todoClient.From("football-sync").SyncMatches(matches,DateTimeOffset.Now);}catch(OperationCanceledException){}catch{/* Keep saved reminders when a source or local save is unavailable. */}finally{matchSyncBusy=false;}}
+    ReminderForm? reminders;readonly System.Windows.Forms.Timer matchSyncTimer=new(){Interval=600000};
+    OwnedActivityTimer reminderActivity=null!,matchSyncActivity=null!;
+    internal Action? ReminderTickOverride;
+    internal Func<string[],CancellationToken,Task<EventSnapshot>>? MatchSyncOverride;
+    bool matchSyncBusy=>matchSyncActivity?.Running==true;
+    void InitializeBackgroundActivities()
+    {
+        reminderActivity=new(reminderTimer,"reminder-scheduler","清单提醒","reminder-check",t=>{t.ThrowIfCancellationRequested();if(ReminderTickOverride!=null)ReminderTickOverride();else CheckRemindersCore();return Task.CompletedTask;});
+        matchSyncActivity=new(matchSyncTimer,"match-sync","比赛后台校时","sync-request",SyncMatchesCoreAsync);
+        ConfigureBackgroundActivities();
+    }
+    void ConfigureBackgroundActivities()
+    {
+        reminderActivity.Configure(!resourcesDisposed&&(!previewMode||ReminderTickOverride!=null));
+        matchSyncActivity.Configure(!resourcesDisposed&&prefs.FootballModule&&(!previewMode||MatchSyncOverride!=null));
+    }
+    Task SyncMatchesAsync()=>matchSyncActivity?.RunNowAsync()??Task.CompletedTask;
+    async Task SyncMatchesCoreAsync(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();if(resourcesDisposed||IsDisposed||!prefs.FootballModule)return;
+        var cached=footballQueries.CachedSchedule();todoClient.From("football-sync").HydrateMatchMetadata(cached.Matches,cached.Updated);
+        var ids=MatchSyncService.TrackedIds(todoStore);if(ids.Length==0)return;
+        var snapshot=await (MatchSyncOverride?.Invoke(ids,token)??footballClient.Events(ids,token));
+        token.ThrowIfCancellationRequested();if(resourcesDisposed||IsDisposed||!prefs.FootballModule)return;
+        todoClient.From("football-sync").SyncMatches(snapshot.Matches,DateTimeOffset.Now);
+    }
+
     void OpenReminderTask(DailyTask task){ShowTodos();todoWindow!.View.ShowDay(task.Day);}
 }

@@ -35,25 +35,28 @@ sealed class ClipboardHistoryService : IDisposable
     readonly System.Windows.Forms.Timer timer = new() { Interval = 450 };
     readonly Preferences prefs;
     readonly bool preview;
-    uint lastSequence;DateTimeOffset lastExpiry;
-    public void RefreshPrivacy(){History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastSequence=GetClipboardSequenceNumber();}
-    public void OpenPrivacy(IWin32Window? owner=null){using var form=new ClipboardPrivacyForm(prefs,RefreshPrivacy,preview);form.ShowDialog(owner);}
+    uint lastSequence;DateTimeOffset lastExpiry;bool disposed;readonly OwnedActivityTimer monitor;
+    public void RefreshPrivacy(){if(disposed)return;if(prefs.ClipboardHistory)History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastSequence=GetClipboardSequenceNumber();}
+    public void OpenPrivacy(IWin32Window? owner=null){ObjectDisposedException.ThrowIf(disposed,this);using var form=new ClipboardPrivacyForm(prefs,RefreshPrivacy,preview);form.ShowDialog(owner);}
     public ClipHistory History { get; }
-    public ClipboardHistoryService(Preferences p, bool previewMode = false,string? historyPath=null)
+    public ClipboardHistoryService(Preferences p, bool previewMode = false,string? historyPath=null,Action? captureOverride=null)
     {
         prefs = p; preview = previewMode;
         History = new(historyPath??(preview ? null : Path.Combine(Store.Root, "leo-clipboard.json")));
         History.Expire(p.ClipboardExpireDays,DateTimeOffset.Now);
-        timer.Tick += (_, _) => Capture();
+        monitor=new(timer,"clipboard-monitor","剪贴板监听","capture",t=>{t.ThrowIfCancellationRequested();if(captureOverride!=null)captureOverride();else CaptureCore();return Task.CompletedTask;});
+        simulatedCapture=captureOverride!=null;
         ClipboardPrivacy.Changed+=RefreshPrivacy;
         ConfigureActivity();
     }
-    public void ConfigureActivity(){lastSequence=GetClipboardSequenceNumber();if(!preview&&prefs.ClipboardHistory)timer.Start();else timer.Stop();}
-    public bool Enabled { get => prefs.ClipboardHistory; set { var next=LocalApplications.Clone(prefs);next.ClipboardHistory=value;if(!preview)ConfigMigration.Write(Store.FilePath,JsonSerializer.Serialize(next));prefs.ClipboardHistory=value;ConfigureActivity(); } }
+    readonly bool simulatedCapture;
+    public void ConfigureActivity(){if(disposed)return;lastSequence=GetClipboardSequenceNumber();monitor.Configure((!preview||simulatedCapture)&&prefs.ClipboardHistory);}
+    public bool Enabled { get => prefs.ClipboardHistory; set { ObjectDisposedException.ThrowIf(disposed,this);var next=LocalApplications.Clone(prefs);next.ClipboardHistory=value;if(!preview)ConfigMigration.Write(Store.FilePath,JsonSerializer.Serialize(next));prefs.ClipboardHistory=value;ConfigureActivity(); } }
     internal Preferences Preferences=>prefs;
-    public void Capture()
+    public void Capture(){if(!disposed)_=monitor.RunNowAsync();}
+    void CaptureCore()
     {
-        if (preview) return;
+        if(disposed||preview||!prefs.ClipboardHistory)return;
         if(DateTimeOffset.Now-lastExpiry>TimeSpan.FromSeconds(30)){History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastExpiry=DateTimeOffset.Now;}
         uint sequence = GetClipboardSequenceNumber();
         if(!Enabled||ClipboardPrivacy.Paused(prefs,DateTimeOffset.Now)){lastSequence=sequence;return;}
@@ -93,7 +96,7 @@ sealed class ClipboardHistoryService : IDisposable
     }
     public void Copy(ClipItem item)
     {
-        if(preview)return;
+        ObjectDisposedException.ThrowIf(disposed,this);if(preview)return;
         if (item.Kind == "text") Clipboard.SetText(item.Content);
         else if (item.Kind == "files")
         {
@@ -107,7 +110,7 @@ sealed class ClipboardHistoryService : IDisposable
         }
         lastSequence = GetClipboardSequenceNumber(); if(Enabled&&!ClipboardPrivacy.Paused(prefs,DateTimeOffset.Now)&&!(prefs.ClipboardBlockSecrets&&item.Kind=="text"&&ClipboardPrivacy.Sensitive(item.Content)))History.Add(item with { Time = DateTimeOffset.Now });
     }
-    public void Dispose(){ClipboardPrivacy.Changed-=RefreshPrivacy;timer.Dispose();}
+    public void Dispose(){if(disposed)return;disposed=true;ClipboardPrivacy.Changed-=RefreshPrivacy;monitor.Dispose();}
 }
 
 static class ClipboardTool

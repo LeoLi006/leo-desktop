@@ -212,6 +212,7 @@ static class Program
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--m05-conversation-test"){ConversationTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--r02-host-test"){R02HostTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--r02-activity-test"){R02ActivityTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m06-stability-test"){M06StabilityTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m05-football-test"){FootballCapabilityTests.Run(args[1]);return;}
@@ -593,7 +594,7 @@ sealed partial class PetForm : Form
         animation.Start();
         FeatureFaults.Timer(fullscreenTimer,"全屏检测",PollFullscreen);
         if (!preview) fullscreenTimer.Start();
-        FeatureFaults.Timer(reminderTimer,"清单提醒",CheckReminders);tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};reminderTimer.Start();Shown+=async(_,_)=>{await SyncMatchesAsync();CheckReminders();};matchSyncTimer.Tick+=async(_,_)=>await SyncMatchesAsync();if(prefs.FootballModule)matchSyncTimer.Start();}
+        InitializeBackgroundActivities();tray.BalloonTipClicked+=(_,_)=>{if(reminders!=null&&!reminders.IsDisposed)reminders.Show();else ShowTodos();};if(!preview){Shown+=(_,_)=>{if(prefs.MusicModule&&prefs.LyricsHotkey!=Keys.None&&!lyricsHotkeyRegistered){tray.BalloonTipTitle=UiTheme.Name+" · 歌词快捷键";tray.BalloonTipText="歌词快捷键未启用或被占用，可在设置中调整，也可从右键音乐菜单切换歌词。";tray.ShowBalloonTip(5000);}};Shown+=async(_,_)=>{await SyncMatchesAsync();await reminderActivity.RunNowAsync();};}
     }
     protected override bool ShowWithoutActivation => true;
     void ShowChat()
@@ -915,12 +916,13 @@ sealed partial class PetForm : Form
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
         void Cleanup(Action action){try{action();}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Leo cleanup: "+e.GetType().Name);}}
+        Cleanup(()=>reminderActivity?.Dispose());Cleanup(()=>matchSyncActivity?.Dispose());
         Cleanup(()=>layeredSurface.Dispose());Cleanup(()=>paintSurface?.Dispose());paintSurface=null;
         Cleanup(()=>updateNotifications?.Dispose());Cleanup(()=>quickNoteWindow?.Dispose());Cleanup(()=>companionTimer.Stop());Cleanup(()=>companionTimer.Dispose());Cleanup(()=>noticeWindow?.Dispose());Cleanup(()=>focusWindow?.Dispose());Cleanup(()=>dockBridge?.Dispose());foreach(var skin in animationSkins.Values)Cleanup(()=>skin.Dispose());Cleanup(()=>animationSkins.Clear());
         Cleanup(()=>dockTimer.Stop());Cleanup(()=>dockTimer.Dispose());Cleanup(()=>dockSprites?.Dispose());var pickup=dragPickup;dragPickup=null;Cleanup(()=>pickup?.Dispose());
         Cleanup(()=>fullscreenTimer.Stop());Cleanup(()=>fullscreenTimer.Dispose());Cleanup(()=>animation.Stop());Cleanup(()=>animation.Dispose());Cleanup(()=>hoverTimer.Stop());Cleanup(()=>reminderTimer.Stop());Cleanup(()=>matchSyncTimer.Stop());
         Cleanup(()=>notesWindow?.Dispose());Cleanup(()=>comboCancellation?.Cancel());Cleanup(()=>footballQueries?.Dispose());Cleanup(()=>conversations?.Dispose());Cleanup(()=>commands.Dispose());todoStore.MatchImporter=null;if(!previewMode){Cleanup(()=>ClientOperations.Hub.Dispose());Cleanup(()=>OwnedHelpers.Shutdown());}
-        Cleanup(()=>hoverTimer.Dispose());Cleanup(()=>hoverCard?.Dispose());Cleanup(()=>dropWindow?.Dispose());if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}Cleanup(()=>feedback?.Dispose());Cleanup(()=>settingsWindow?.Dispose());Cleanup(()=>mediaWindow?.Dispose());Cleanup(()=>matchSyncTimer.Dispose());Cleanup(()=>matchSyncLife.Cancel());Cleanup(()=>matchSyncLife.Dispose());Cleanup(()=>reminders?.Close());Cleanup(()=>reminders?.Dispose());Cleanup(()=>reminderTimer.Dispose());Cleanup(()=>todoWindow?.Close());Cleanup(()=>todoWindow?.Dispose());Cleanup(()=>chat?.Close()); Cleanup(()=>chat?.Dispose()); Cleanup(()=>foot.Dispose()); Cleanup(()=>hit.Dispose()); Cleanup(()=>launcher.Dispose()); Cleanup(()=>tray.Dispose()); Cleanup(()=>atlas.Dispose()); Cleanup(()=>verticalAtlas.Dispose());
+        Cleanup(()=>hoverTimer.Dispose());Cleanup(()=>hoverCard?.Dispose());Cleanup(()=>dropWindow?.Dispose());if(!previewMode){ModulePaths.RepairRequested=null;ModuleRepair.Applications=null;MediaControl.Applications=null;OperationFeedback.Sink=null;WindowPositions.MonitorsChanged=null;WindowPositions.PetBounds=null;}Cleanup(()=>feedback?.Dispose());Cleanup(()=>settingsWindow?.Dispose());Cleanup(()=>mediaWindow?.Dispose());Cleanup(()=>matchSyncTimer.Dispose());Cleanup(()=>reminders?.Close());Cleanup(()=>reminders?.Dispose());Cleanup(()=>reminderTimer.Dispose());Cleanup(()=>todoWindow?.Close());Cleanup(()=>todoWindow?.Dispose());Cleanup(()=>chat?.Close()); Cleanup(()=>chat?.Dispose()); Cleanup(()=>foot.Dispose()); Cleanup(()=>hit.Dispose()); Cleanup(()=>launcher.Dispose()); Cleanup(()=>tray.Dispose()); Cleanup(()=>atlas.Dispose()); Cleanup(()=>verticalAtlas.Dispose());
     }
     protected override void OnFormClosed(FormClosedEventArgs e){ReleaseResources();base.OnFormClosed(e);}
     protected override void Dispose(bool disposing){if(disposing)ReleaseResources();base.Dispose(disposing);}

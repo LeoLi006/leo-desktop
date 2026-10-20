@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 namespace LeoLauncher;
@@ -14,7 +14,8 @@ sealed partial class PetForm
     readonly TodoStore todoStore;
     readonly HashSet<string> presentedReminders=new();
     static string ReminderKey(DailyTask t)=>t.Id+":"+t.Reminder?.ToString("O")+":"+t.SnoozedUntil?.ToString("O");
-    void CheckReminders()
+    void CheckReminders(){if(!resourcesDisposed)_=reminderActivity?.RunNowAsync();}
+    void CheckRemindersCore()
     {
         bool concentrating=focus.Active(DateTimeOffset.Now);
         if(concentrating&&reminders!=null&&!reminders.IsDisposed)reminders.Retain(t=>focus.AllowImportant&&(t.Important||t.MatchId!=null));
