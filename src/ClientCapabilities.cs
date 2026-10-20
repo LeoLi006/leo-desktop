@@ -55,8 +55,11 @@ sealed class MediaCapabilityState
     public void Update(MediaSession[] rows){lock(gate){sessions=rows.ToArray();observed=DateTimeOffset.UtcNow;}}
     public MediaSession[] Read(){lock(gate)return DateTimeOffset.UtcNow-observed<TimeSpan.FromMinutes(5)?sessions.ToArray():[];}
 }
-sealed class MediaCapability(Func<bool> enabled,Func<string> configuration,Func<CancellationToken,Task<MediaSession[]>> read,Func<string,string,CancellationToken,Task<MediaCommandReceipt>> control,Func<string,CancellationToken,Task> open,Func<CancellationToken,Task> show,NativeCapabilityQueue queue,MediaCapabilityState state,bool preview=false):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class MediaCapability(Func<bool> enabled,Func<string> configuration,Func<CancellationToken,Task<MediaSession[]>> read,Func<string,string,CancellationToken,Task<MediaCommandReceipt>> control,Func<string,CancellationToken,Task> open,Func<CancellationToken,Task> show,NativeCapabilityQueue queue,MediaCapabilityState state,bool preview=false):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Media(this);
+    public DependencyState[] ReadDependencies()=>[new("media-provider",state.Read().Length>0?"ready":"unknown"),new("potplayer","unknown")];
+
     readonly string generation=configuration();
     public string Id=>"media";public string Name=>"媒体控制";public string Version=>"1";public bool Enabled=>enabled();public bool ConfigurationIsCurrent=>generation==configuration();public string BrainStamp=>configuration();
     public bool BrainAvailable=>ConfigurationIsCurrent;

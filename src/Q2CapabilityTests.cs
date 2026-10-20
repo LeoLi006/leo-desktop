@@ -4,12 +4,13 @@ namespace LeoLauncher;
 
 static class Q2CapabilityTests
 {
+    internal static object? EntryReceiptSummary;
     static TaskCompletionSource<bool> Gate()=>new(TaskCreationOptions.RunContinuationsAsynchronously);
     static async Task Until(Func<bool> test){var clock=Stopwatch.StartNew();while(!test()&&clock.ElapsedMilliseconds<2500)await Task.Delay(10);if(!test())throw new TimeoutException("Fixture deadline");}
     public static void Run(string report)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(report)!);using var window=new Form{Opacity=0,ShowInTaskbar=false};
-        window.Shown+=async(_,_)=>{try{var checks=await Check(Path.GetDirectoryName(report)!);File.WriteAllText(report,JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,external_process_starts=0},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}finally{window.Close();}};Application.Run(window);
+        window.Shown+=async(_,_)=>{try{var checks=await Check(Path.GetDirectoryName(report)!);File.WriteAllText(report,JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,entries=EntryReceiptSummary,external_process_starts=0},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}finally{window.Close();}};Application.Run(window);
     }
     static async Task<Dictionary<string,bool>> Check(string directory)
     {
@@ -150,7 +151,10 @@ sealed partial class PetForm
         checks["actual_chat_uses_same_application_capability"]=commands.RecentResults.Last() is {Source:"chat",Status:"succeeded"} h&&h.ActionId=="local:"+app.Id;
         await chat.Q2ReceiveDirectVoice("打开"+app.Name);
         checks["actual_voice_uses_same_application_capability"]=commands.RecentResults.Last() is {Source:"voice",Status:"succeeded"} v&&v.ActionId=="local:"+app.Id;
-        checks["four_entries_use_unique_request_ids"]=commands.RecentResults.Select(r=>r.RequestId).Distinct().Count()==4;
+        // Conversation lifecycle actions also have receipts; assert the four application requests only.
+        var appReceipts=commands.RecentResults.Where(r=>r.ActionId=="local:"+app.Id).ToArray();
+        Q2CapabilityTests.EntryReceiptSummary=new{all_request_ids=commands.RecentResults.Select(r=>r.RequestId).Distinct().Count(),application_receipts=appReceipts.Length,application_request_ids=appReceipts.Select(r=>r.RequestId).Distinct().Count()};
+        checks["four_entries_use_unique_request_ids"]=appReceipts.Length==4&&appReceipts.Select(r=>r.RequestId).Distinct().Count()==4&&appReceipts.Select(r=>r.Source).ToHashSet().SetEquals(["shortcut","search","chat","voice"]);
         chat.Close();
         static IEnumerable<Control> Walk(Control control){yield return control;foreach(Control child in control.Controls)foreach(var item in Walk(child))yield return item;}
     }

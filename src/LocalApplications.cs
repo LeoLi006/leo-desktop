@@ -3,8 +3,11 @@ using System.Text.Json;
 namespace LeoLauncher;
 
 sealed record LocalApplication(string Id,string Name,string Path,bool Enabled=true,string Icon="",string Arguments="",string WorkingDirectory="",bool Administrator=false);
-sealed class LocalApplicationModule:IStructuredLeoModule,IBrainContributor
+sealed class LocalApplicationModule:IStructuredLeoModule,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Application(this);
+    public DependencyState[] ReadDependencies()=>[new("application-file",File.Exists(configuration.Path)?"ready":"missing"),new("working-directory",configuration.WorkingDirectory.Length==0||Directory.Exists(configuration.WorkingDirectory)?"ready":"missing")];
+
     readonly LocalApplication app;readonly Func<string,string,CancellationToken,Task<string>> execute;readonly ApplicationCapabilityHost? host;readonly Func<LocalApplication?>? current;
     LocalApplication configuration;
     public LocalApplicationModule(LocalApplication app,Func<string,string,CancellationToken,Task<string>> execute,ApplicationCapabilityHost? host=null,Func<LocalApplication?>? current=null){this.app=app;this.execute=execute;this.host=host;this.current=current;configuration=app;}

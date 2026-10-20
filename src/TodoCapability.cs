@@ -1,9 +1,12 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 namespace LeoLauncher;
 
-sealed class TodoCapability(TodoStore store,Func<Action,CancellationToken,Task> ui,Action<string> show,Func<NaturalTodoDraft,NaturalTodoDraft?> confirm):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,ICommittedActionModule
+sealed class TodoCapability(TodoStore store,Func<Action,CancellationToken,Task> ui,Action<string> show,Func<NaturalTodoDraft,NaturalTodoDraft?> confirm):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,ICommittedActionModule,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Todos(this);
+    public DependencyState[] ReadDependencies()=>[new("todo-store",store.Error==null?"ready":"degraded")];
+
     readonly Dictionary<string,(string Action,string Value,ActionPayload Payload)> receipts=new();readonly object gate=new();
     public string Id=>"todos";public string Name=>"清单与提醒";public string Version=>"1";public bool Enabled=>true;public bool ConfigurationIsCurrent=>true;
     public IReadOnlyList<string> Actions=>["todos_open","todo_list","todo_add","todo_repeat","todo_complete","todo_complete_title","todo_edit","todo_move","todo_remind","todo_snooze","todo_postpone","todo_stop_repeat","todo_skip_repeat","todo_undo","todo_natural","todo_snapshot","todo_ensure","todo_completed","todo_important","todo_delete","todo_restore","todo_postpone_ids","todo_follow_match","todo_match_add","todo_match_sync","todo_match_hydrate","todo_due","todo_ack","todo_backup","todo_restore_backup","todo_quiet","todo_quiet_save"];
@@ -31,7 +34,7 @@ sealed class TodoCapability(TodoStore store,Func<Action,CancellationToken,Task> 
     }
     internal static DateOnly Day(string value)=>DateOnly.ParseExact(value,"yyyy-MM-dd",CultureInfo.InvariantCulture);
     internal static DateOnly ListDay(string v)=>Day(v.StartsWith("week:")?v[5..]:v.Length==0?DateTime.Today.ToString("yyyy-MM-dd"):v);
-    static string[] Fields(string a)=>a switch{
+    internal static string[] Fields(string a)=>a switch{
         "todo_add"=>["title","day","reminder","origin"],"todo_repeat"=>["title","day","frequency","reminder"],"todo_edit"=>["id","title","future"],"todo_move"=>["id","day"],"todo_remind"=>["id","time","series"],"todo_snooze"=>["id","minutes"],"todo_stop_repeat"=>["series_id","after"],"todo_completed" or "todo_important"=>["id","value"],"todo_match_sync" or "todo_match_hydrate"=>["matches","observed"],_=>[]};
     internal static void Validate(string a,string value)
     {

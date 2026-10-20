@@ -16,6 +16,7 @@ sealed class CapabilityRegistry
     public void ReplaceBuiltin(ILeoModule module)=>Register(module,true);
     void Register(ILeoModule module,bool replace)
     {
+        if(module is IModuleContractSource contracted)ModuleContracts.Validate(contracted);
         lock(gate){
             if(replace&&(!ModuleCatalog.Builtins.Any(m=>m.Id==module.Id)||module.Actions.Any(a=>ModuleCatalog.Owner(a)!=module.Id)||!module.Actions.OrderBy(a=>a).SequenceEqual(LeoActions.Names.Where(a=>ModuleCatalog.Owner(a)==module.Id).OrderBy(a=>a))))throw new InvalidOperationException("只能替换该内置模块拥有的动作");
             var others=registered.Values.Where(m=>!replace||m.Id!=module.Id).ToArray();
@@ -43,7 +44,7 @@ sealed class CapabilityRegistry
     {
         var next=(prefs.ApplicationModules??[]).ToArray();if(applications.SequenceEqual(next))return;
         // Build completely before replacing the snapshot. Disabled definitions remain discoverable.
-        var modules=next.Select(a=>(ILeoModule)new LocalApplicationModule(a,legacy,applicationHost,()=>FindApplication(a.Id))).ToArray();var index=Index(modules);
+        var modules=next.Select(a=>(ILeoModule)new LocalApplicationModule(a,legacy,applicationHost,()=>FindApplication(a.Id))).ToArray();foreach(var contracted in modules.OfType<IModuleContractSource>())ModuleContracts.Validate(contracted);var index=Index(modules);
         applications=next;locals=modules;localActions=index;
     }
     internal LocalApplication? FindApplication(string id)=>(prefs.ApplicationModules??[]).SingleOrDefault(a=>a.Id==id);
@@ -52,6 +53,7 @@ sealed class CapabilityRegistry
         lock(gate){var replacement=registered.Values.FirstOrDefault(m=>m.Actions.Contains(action));if(replacement!=null)return replacement;if(action.StartsWith("local:",StringComparison.Ordinal)){RefreshLocal();return localActions.GetValueOrDefault(action)??throw new CapabilityException("module_removed","应用模块已移除");}if(builtins.Value.Actions.TryGetValue(action,out var builtin))return builtin;return Index(extensions()).GetValueOrDefault(action)??throw new ArgumentException("操作不存在，或对应扩展未安装");}
     }
     public ILeoModule[] Read(){lock(gate){RefreshLocal();var result=(remainingBuiltins??builtins.Value.Modules).Concat(registered.Values).Concat(locals).Concat(extensions()).ToArray();Index(result);return result;}}
+    public ModuleContractSnapshot[] ReadContracts()=>Read().OfType<IModuleContractSource>().Select(ModuleContracts.Snapshot).ToArray();
     public CapabilityDefinition Describe(string action)
     {
         var module=Resolve(action);return module is IStructuredLeoModule structured?structured.Describe(action):new(action,module.Id,"legacy-adapter","legacy-string","legacy","legacy",null);

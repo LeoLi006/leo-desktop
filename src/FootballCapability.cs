@@ -1,7 +1,10 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 namespace LeoLauncher;
-sealed class FootballCapability(Func<bool> enabled,FootballQueries queries,Func<ActionRequest,CancellationToken,Task<ActionResult>> execute,Func<CancellationToken,Task> show,Func<string[]> following):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IRestartableQueryModule
+sealed class FootballCapability(Func<bool> enabled,FootballQueries queries,Func<ActionRequest,CancellationToken,Task<ActionResult>> execute,Func<CancellationToken,Task> show,Func<string[]> following):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IRestartableQueryModule,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Football(this);
+    public DependencyState[] ReadDependencies()=>[new("query-service",queries.IsClosed?"missing":"ready"),new("football-source","unknown")];
+
     public string Id=>"football-data";public string Name=>"足球查询";public string Version=>"1";public bool Enabled=>enabled();public bool ConfigurationIsCurrent=>Enabled;
     public IReadOnlyList<string> Actions=>["football_facts","football_open","football_schedule","football_team","football_events"];
     public IReadOnlyList<BrainAction> BrainActions=>[new("football_facts","查询足球赛程与积分榜","text",true,"球队名、今晚比赛；返回来源、缓存时间和实际比赛编号",Check:CheckText),new("football_open","打开足球日程","none",Check:v=>{if(v.Length!=0)throw new ArgumentException("足球窗口不接受参数");})];

@@ -34,6 +34,7 @@ sealed class FootballQueries:IDisposable
         Preview=preview;
     }
     public bool Preview{get;}
+    internal bool IsClosed{get{lock(gate)return disposed;}}
     bool Fresh(DateTimeOffset time)=>time>clock().AddMinutes(-10)&&time<=clock().AddMinutes(1);
     static T Copy<T>(T data)=>JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(data))!;
     static string Key(Club c)=>c.Id+":"+c.League;

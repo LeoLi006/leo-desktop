@@ -1,0 +1,1677 @@
+{
+  "format": "leo-host-contract/1",
+  "modules": [
+    {
+      "format": "leo-host-contract/1",
+      "id": "local:example-01",
+      "name": "\u672C\u673A\u5E94\u7528\u542F\u52A8",
+      "version": "1.0",
+      "kind": "application",
+      "runtime": "application-adapter",
+      "enablement": "optional",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.application-settings",
+      "dependencies": [
+        {
+          "id": "application-file",
+          "kind": "local-file",
+          "requirement": "repairable",
+          "unavailableBehavior": "existing-path-prepare",
+          "actions": [
+            "local:example-01"
+          ]
+        },
+        {
+          "id": "working-directory",
+          "kind": "local-directory",
+          "requirement": "repairable",
+          "unavailableBehavior": "existing-configuration-check",
+          "actions": [
+            "local:example-01"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "local:example-01",
+          "policy": {
+            "id": "local:example-01",
+            "moduleId": "local:example-01",
+            "runtime": "application-adapter",
+            "input": "application-id/v1",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "application-adapter",
+            "encoding": "object",
+            "legacyProfile": "application-id/v1",
+            "description": "parameters\u5305\u542B\u552F\u4E00applicationId\uFF0832\u4F4D\u5E94\u7528\u6807\u8BC6\uFF09\uFF0C\u4E0Elocal\u52A8\u4F5C\u4E00\u81F4\uFF1B\u65E7local_app_open\u7684value\u4ECD\u4E3A\u5E94\u7528\u6807\u8BC6\uFF0Clocal\u52A8\u4F5C\u6CBF\u7528\u65E7\u53C2\u6570\u5F52\u4E00\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "application-start",
+            "description": "Data\u4E3AapplicationId\u3001accepted\uFF1B\u7CFB\u7EDF\u63A5\u6536\u542F\u52A8\u8BF7\u6C42\u4E0D\u8BC1\u660E\u7A97\u53E3\u5C31\u7EEA\u3002",
+            "mayContainPrivateData": false,
+            "evidence": [
+              "accepted",
+              "unknown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "football-data",
+      "name": "\u8DB3\u7403\u67E5\u8BE2",
+      "version": "1",
+      "kind": "football",
+      "runtime": "in-process",
+      "enablement": "optional",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.football-cache",
+      "dependencies": [
+        {
+          "id": "query-service",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-query-validation",
+          "actions": [
+            "football_facts",
+            "football_open",
+            "football_schedule",
+            "football_team",
+            "football_events"
+          ]
+        },
+        {
+          "id": "football-source",
+          "kind": "network",
+          "requirement": "optional",
+          "unavailableBehavior": "cached-fallback",
+          "actions": [
+            "football_facts",
+            "football_schedule",
+            "football_team",
+            "football_events"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "football_facts",
+          "policy": {
+            "id": "football_facts",
+            "moduleId": "football-data",
+            "runtime": "in-process",
+            "input": "football-query/v1",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 90000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "football-query/v1",
+            "description": "parameters\u4E3A\u53EF\u9009query\u6587\u5B57\uFF08\u7403\u961F\u540D\u6216\u6BD4\u8D5B\u95EE\u9898\uFF09\uFF0C\u4FDD\u7559\u65E7view:\u67E5\u8BE2\u5F62\u72B6\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "football-snapshot",
+            "description": "Data\u4FDD\u6301\u73B0\u6709\u7F13\u5B58\u3001\u7403\u961F\u8868\u683C\u6216\u6BD4\u8D5B\u5FEB\u7167\uFF0C\u5305\u542B\u66F4\u65B0\u65F6\u95F4\u3001\u8FC7\u671F/\u5931\u8D25\u72B6\u6001\uFF1B\u7F3A\u5C11\u6765\u6E90\u65F6\u4E0D\u865A\u6784\u6BD4\u8D5B\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "football_open",
+          "policy": {
+            "id": "football_open",
+            "moduleId": "football-data",
+            "runtime": "in-process",
+            "input": "football-query/v1",
+            "effect": "window",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "football-query/v1",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u7A97\u53E3\u52A8\u4F5C\u4E0D\u63A5\u53D7\u989D\u5916\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "window-result",
+            "description": "Data\u53EF\u4E3A\u7A7A\uFF0C\u8FD4\u56DE\u7A97\u53E3\u5DF2\u663E\u793A\u8BC1\u636E\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "football_schedule",
+          "policy": {
+            "id": "football_schedule",
+            "moduleId": "football-data",
+            "runtime": "in-process",
+            "input": "football-query/v1",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 90000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "football-query/v1",
+            "description": "parameters\u4E3A\u552F\u4E00force\u5E03\u5C14\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "football-snapshot",
+            "description": "Data\u4FDD\u6301\u73B0\u6709\u7F13\u5B58\u3001\u7403\u961F\u8868\u683C\u6216\u6BD4\u8D5B\u5FEB\u7167\uFF0C\u5305\u542B\u66F4\u65B0\u65F6\u95F4\u3001\u8FC7\u671F/\u5931\u8D25\u72B6\u6001\uFF1B\u7F3A\u5C11\u6765\u6E90\u65F6\u4E0D\u865A\u6784\u6BD4\u8D5B\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "football_team",
+          "policy": {
+            "id": "football_team",
+            "moduleId": "football-data",
+            "runtime": "in-process",
+            "input": "football-query/v1",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 90000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "football-query/v1",
+            "description": "parameters\u4E3Aid\u3001league\u3001force\uFF1B\u7403\u961F\u4E0E\u8D5B\u4E8B\u5FC5\u987B\u6765\u81EA\u5F53\u524D\u76EE\u5F55\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "football-snapshot",
+            "description": "Data\u4FDD\u6301\u73B0\u6709\u7F13\u5B58\u3001\u7403\u961F\u8868\u683C\u6216\u6BD4\u8D5B\u5FEB\u7167\uFF0C\u5305\u542B\u66F4\u65B0\u65F6\u95F4\u3001\u8FC7\u671F/\u5931\u8D25\u72B6\u6001\uFF1B\u7F3A\u5C11\u6765\u6E90\u65F6\u4E0D\u865A\u6784\u6BD4\u8D5B\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "football_events",
+          "policy": {
+            "id": "football_events",
+            "moduleId": "football-data",
+            "runtime": "in-process",
+            "input": "football-query/v1",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 90000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "football-query/v1",
+            "description": "parameters\u4E3Aids\u6570\u7EC4\uFF0C\u6700\u591A24\u4E2A\u771F\u5B9E\u6BD4\u8D5B\u7F16\u53F7\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "football-snapshot",
+            "description": "Data\u4FDD\u6301\u73B0\u6709\u7F13\u5B58\u3001\u7403\u961F\u8868\u683C\u6216\u6BD4\u8D5B\u5FEB\u7167\uFF0C\u5305\u542B\u66F4\u65B0\u65F6\u95F4\u3001\u8FC7\u671F/\u5931\u8D25\u72B6\u6001\uFF1B\u7F3A\u5C11\u6765\u6E90\u65F6\u4E0D\u865A\u6784\u6BD4\u8D5B\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "media",
+      "name": "\u5A92\u4F53\u63A7\u5236",
+      "version": "1",
+      "kind": "media",
+      "runtime": "in-process",
+      "enablement": "optional",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.media-session-state",
+      "dependencies": [
+        {
+          "id": "media-provider",
+          "kind": "host-service",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-provider-verification",
+          "actions": [
+            "media_status",
+            "media_toggle",
+            "media_play",
+            "media_pause",
+            "media_next",
+            "media_previous",
+            "media_stop"
+          ]
+        },
+        {
+          "id": "potplayer",
+          "kind": "local-application",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-path-resolution",
+          "actions": [
+            "media_file"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "media_open",
+          "policy": {
+            "id": "media_open",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "window",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4E0D\u63A5\u53D7\u989D\u5916\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_file",
+          "policy": {
+            "id": "media_file",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009path\u6587\u5B57\uFF1B\u975E\u7A7A\u65F6\u4E3A\u5DF2\u5B58\u5728\u7684\u7EDD\u5BF9\u6587\u4EF6\u8DEF\u5F84\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_status",
+          "policy": {
+            "id": "media_status",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4E0D\u63A5\u53D7\u989D\u5916\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-sessions",
+            "description": "Data\u4E3A\u5B9E\u9645\u5A92\u4F53\u4F1A\u8BDD\u6570\u7EC4\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_toggle",
+          "policy": {
+            "id": "media_toggle",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009session\u6587\u5B57\uFF1B\u4F7F\u7528\u5DF2\u67E5\u8BE2\u7684\u7CBE\u786E\u4F1A\u8BDD\u7F16\u53F7\uFF0C\u65E7\u7A7A\u503C\u81EA\u52A8\u9009\u62E9\u903B\u8F91\u4FDD\u7559\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_play",
+          "policy": {
+            "id": "media_play",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009session\u6587\u5B57\uFF1B\u4F7F\u7528\u5DF2\u67E5\u8BE2\u7684\u7CBE\u786E\u4F1A\u8BDD\u7F16\u53F7\uFF0C\u65E7\u7A7A\u503C\u81EA\u52A8\u9009\u62E9\u903B\u8F91\u4FDD\u7559\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_pause",
+          "policy": {
+            "id": "media_pause",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009session\u6587\u5B57\uFF1B\u4F7F\u7528\u5DF2\u67E5\u8BE2\u7684\u7CBE\u786E\u4F1A\u8BDD\u7F16\u53F7\uFF0C\u65E7\u7A7A\u503C\u81EA\u52A8\u9009\u62E9\u903B\u8F91\u4FDD\u7559\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_next",
+          "policy": {
+            "id": "media_next",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009session\u6587\u5B57\uFF1B\u4F7F\u7528\u5DF2\u67E5\u8BE2\u7684\u7CBE\u786E\u4F1A\u8BDD\u7F16\u53F7\uFF0C\u65E7\u7A7A\u503C\u81EA\u52A8\u9009\u62E9\u903B\u8F91\u4FDD\u7559\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_previous",
+          "policy": {
+            "id": "media_previous",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009session\u6587\u5B57\uFF1B\u4F7F\u7528\u5DF2\u67E5\u8BE2\u7684\u7CBE\u786E\u4F1A\u8BDD\u7F16\u53F7\uFF0C\u65E7\u7A7A\u503C\u81EA\u52A8\u9009\u62E9\u903B\u8F91\u4FDD\u7559\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "media_stop",
+          "policy": {
+            "id": "media_stop",
+            "moduleId": "media",
+            "runtime": "in-process",
+            "input": "media-session-or-path",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "media-session-or-path",
+            "description": "parameters\u4E3A\u53EF\u9009session\u6587\u5B57\uFF1B\u4F7F\u7528\u5DF2\u67E5\u8BE2\u7684\u7CBE\u786E\u4F1A\u8BDD\u7F16\u53F7\uFF0C\u65E7\u7A7A\u503C\u81EA\u52A8\u9009\u62E9\u903B\u8F91\u4FDD\u7559\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "media-receipt",
+            "description": "Data\u6CBF\u7528\u5A92\u4F53\u63A7\u5236\u56DE\u6267\u6216\u4E3A\u7A7A\uFF1Baccepted\u4E0D\u7B49\u4E8E\u5B9E\u9645\u64AD\u653E\uFF0C\u72B6\u6001\u6838\u9A8C\u540E\u624D\u62A5\u544Astate-observed\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "unknown",
+              "accepted",
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "todos",
+      "name": "\u6E05\u5355\u4E0E\u63D0\u9192",
+      "version": "1",
+      "kind": "todos",
+      "runtime": "in-process",
+      "enablement": "host-core",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.todo-store",
+      "dependencies": [
+        {
+          "id": "todo-store",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-store-validation",
+          "actions": [
+            "todos_open",
+            "todo_list",
+            "todo_add",
+            "todo_repeat",
+            "todo_complete",
+            "todo_complete_title",
+            "todo_edit",
+            "todo_move",
+            "todo_remind",
+            "todo_snooze",
+            "todo_postpone",
+            "todo_stop_repeat",
+            "todo_skip_repeat",
+            "todo_undo",
+            "todo_natural",
+            "todo_snapshot",
+            "todo_ensure",
+            "todo_completed",
+            "todo_important",
+            "todo_delete",
+            "todo_restore",
+            "todo_postpone_ids",
+            "todo_follow_match",
+            "todo_match_add",
+            "todo_match_sync",
+            "todo_match_hydrate",
+            "todo_due",
+            "todo_ack",
+            "todo_backup",
+            "todo_restore_backup",
+            "todo_quiet",
+            "todo_quiet_save"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "todos_open",
+          "policy": {
+            "id": "todos_open",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "window",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u4E3A\u53EF\u9009value\u6587\u5B57\uFF1A\u7A7A\u6216week\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6253\u5F00\u73B0\u6709\u6E05\u5355\u89C6\u56FE\uFF0CData\u53EF\u4E3A\u7A7A\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_list",
+          "policy": {
+            "id": "todo_list",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "read",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u65E5\u671Fyyyy-MM-dd\u3001week:yyyy-MM-dd\u6216\u7A7A\uFF0C\u6CBF\u7528\u5F53\u524D\u65E5\u671F\u9ED8\u8BA4\u503C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_add",
+          "policy": {
+            "id": "todo_add",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Atitle, day, reminder, origin\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_repeat",
+          "policy": {
+            "id": "todo_repeat",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Atitle, day, frequency, reminder\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_complete",
+          "policy": {
+            "id": "todo_complete",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u73B0\u6709\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\uFF0C\u6CBF\u7528\u6A21\u5757\u5BF9\u4E8B\u9879\u548C\u91CD\u590D\u5B9E\u4F8B\u7684\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_complete_title",
+          "policy": {
+            "id": "todo_complete_title",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u5F53\u5929\u552F\u4E00\u5339\u914D\u7684\u4E8B\u9879\u6807\u9898\uFF0C\u4E0D\u80FD\u731C\u6D4B\u591A\u4E2A\u5339\u914D\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_edit",
+          "policy": {
+            "id": "todo_edit",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aid, title, future\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_move",
+          "policy": {
+            "id": "todo_move",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aid, day\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_remind",
+          "policy": {
+            "id": "todo_remind",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aid, time, series\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_snooze",
+          "policy": {
+            "id": "todo_snooze",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aid, minutes\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_postpone",
+          "policy": {
+            "id": "todo_postpone",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u6216day:yyyy-MM-dd\uFF0C\u6CBF\u7528\u539F\u987A\u5EF6\u9009\u62E9\u89C4\u5219\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_stop_repeat",
+          "policy": {
+            "id": "todo_stop_repeat",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aseries_id, after\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_skip_repeat",
+          "policy": {
+            "id": "todo_skip_repeat",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u73B0\u6709\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\uFF0C\u6CBF\u7528\u6A21\u5757\u5BF9\u4E8B\u9879\u548C\u91CD\u590D\u5B9E\u4F8B\u7684\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_undo",
+          "policy": {
+            "id": "todo_undo",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u4E3A\u53EF\u9009value\u6587\u5B57\uFF1B\u65E7value\u5FC5\u987B\u4E3A\u7A7A\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_natural",
+          "policy": {
+            "id": "todo_natural",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u662FNaturalTodoDraft\u7684JSON\u6587\u5B57\uFF1B\u6DFB\u52A0\u524D\u6CBF\u7528\u73B0\u6709\u786E\u8BA4\u754C\u9762\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_snapshot",
+          "policy": {
+            "id": "todo_snapshot",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "read",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u4E3A\u53EF\u9009value\u6587\u5B57\uFF1B\u65E7value\u5FC5\u987B\u4E3A\u7A7A\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_ensure",
+          "policy": {
+            "id": "todo_ensure",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3Ayyyy-MM-dd\u65E5\u671F\u6587\u5B57\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_completed",
+          "policy": {
+            "id": "todo_completed",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aid, value\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_important",
+          "policy": {
+            "id": "todo_important",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Aid, value\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_delete",
+          "policy": {
+            "id": "todo_delete",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u73B0\u6709\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\uFF0C\u6CBF\u7528\u6A21\u5757\u5BF9\u4E8B\u9879\u548C\u91CD\u590D\u5B9E\u4F8B\u7684\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_restore",
+          "policy": {
+            "id": "todo_restore",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u662F\u5E8F\u5217\u5316DailyTask\u7684JSON\u6587\u5B57\uFF1B\u7EE7\u7EED\u4F7F\u7528\u539F\u6062\u590D\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_postpone_ids",
+          "policy": {
+            "id": "todo_postpone_ids",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u662F\u4E8B\u9879\u7F16\u53F7\u6570\u7EC4\u7684JSON\u6587\u5B57\uFF1B\u4E0D\u662F\u76F4\u63A5\u6570\u7EC4\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_follow_match",
+          "policy": {
+            "id": "todo_follow_match",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u73B0\u6709\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\uFF0C\u6CBF\u7528\u6A21\u5757\u5BF9\u4E8B\u9879\u548C\u91CD\u590D\u5B9E\u4F8B\u7684\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_match_add",
+          "policy": {
+            "id": "todo_match_add",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u662FMatchEnvelope\u7684JSON\u6587\u5B57\uFF0C\u4FDD\u7559\u6765\u6E90\u3001\u6BD4\u8D5B\u7F16\u53F7\u3001\u65F6\u533A\u4E0E\u63D0\u9192\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_match_sync",
+          "policy": {
+            "id": "todo_match_sync",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Amatches, observed\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_match_hydrate",
+          "policy": {
+            "id": "todo_match_hydrate",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u76F4\u63A5\u4F7F\u7528\u73B0\u6709\u5B57\u6BB5\uFF1Amatches, observed\uFF1B\u5FC5\u586B\u3001\u65E5\u671F\u3001\u65F6\u95F4\u53CA\u771F\u5B9E\u4E8B\u9879\u7F16\u53F7\u7EE7\u7EED\u7531TodoCapability\u9002\u914D\u4E0E\u4E1A\u52A1\u6821\u9A8C\uFF0C\u4E0D\u7531\u63CF\u8FF0\u66FF\u4EE3\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_due",
+          "policy": {
+            "id": "todo_due",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "read",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u5E26\u65F6\u533A\u7684\u65E5\u671F\u65F6\u95F4\u6587\u5B57\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_ack",
+          "policy": {
+            "id": "todo_ack",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u662FReminderTicket\u6570\u7EC4\u7684JSON\u6587\u5B57\uFF0C\u4FDD\u7559\u63D0\u9192\u65F6\u95F4\u4E0E\u7A0D\u540E\u63D0\u9192\u7968\u636E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_backup",
+          "policy": {
+            "id": "todo_backup",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u4E3A\u53EF\u9009value\u6587\u5B57\uFF1B\u65E7value\u5FC5\u987B\u4E3A\u7A7A\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_restore_backup",
+          "policy": {
+            "id": "todo_restore_backup",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u4E3A\u7528\u6237\u9009\u62E9\u7684\u6E05\u5355\u5907\u4EFD\u5F15\u7528\uFF0C\u6CBF\u7528\u65E2\u6709\u5907\u4EFD\u76EE\u5F55\u9650\u5236\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_quiet",
+          "policy": {
+            "id": "todo_quiet",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "read",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters\u4E3A\u53EF\u9009value\u6587\u5B57\uFF1B\u65E7value\u5FC5\u987B\u4E3A\u7A7A\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        },
+        {
+          "id": "todo_quiet_save",
+          "policy": {
+            "id": "todo_quiet_save",
+            "moduleId": "todos",
+            "runtime": "in-process",
+            "input": "todo-local/v1",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "value-wrapper",
+            "legacyProfile": "todo-local/v1",
+            "description": "parameters.value\u662FQuietHours\u7684JSON\u6587\u5B57\uFF0C\u6CBF\u7528\u539F\u514D\u6253\u6270\u8BBE\u7F6E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "todo-payload",
+            "description": "\u6CBF\u7528\u73B0\u6709\u4E8B\u9879\u3001\u5217\u8868\u3001\u5E03\u5C14\u3001\u6570\u5B57\u6216\u7A7A\u503CData\uFF1B\u63D0\u4EA4\u56DE\u6267\u4FDD\u7559\u5DF2\u5199\u5165\u7ED3\u679C\uFF0C\u672A\u63D0\u4EA4\u5931\u8D25\u4E0D\u5199\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "commit-aware"
+        }
+      ]
+    }
+  ]
+}
