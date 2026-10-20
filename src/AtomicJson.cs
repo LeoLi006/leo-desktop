@@ -6,8 +6,11 @@ static class AtomicJson
 {
     static readonly object gate=new();
     internal static Action<string>? BeforeReplace;
+    internal static Action<string,string,string?>? ReplaceOverride;
     internal static readonly HashSet<string> Recovered=new(StringComparer.OrdinalIgnoreCase);
-    public static void Write(string path,string content)
+    public static void Write(string path,string content)=>WriteCore(path,content,false);
+    internal static void WriteNotes(string path,string content)=>WriteCore(path,content,true);
+    static void WriteCore(string path,string content,bool retryNotesReplace)
     {
         // Validate before touching the original. Keep the temporary file on the same volume.
         using var parsed=JsonDocument.Parse(content);
@@ -18,13 +21,29 @@ static class AtomicJson
                 }
                 BeforeReplace?.Invoke(path);
                 if(File.Exists(path)){
-                    bool valid;try{using var old=JsonDocument.Parse(File.ReadAllText(path));valid=true;}catch(JsonException){valid=false;}
+                    string original=File.ReadAllText(path);
+                    bool valid;try{using var old=JsonDocument.Parse(original);valid=true;}catch(JsonException){valid=false;}
                     if(!valid)PreserveCorrupt(path);
-                    File.Replace(temporary,path,valid?path+".bak":null);
+                    Replace(temporary,path,valid?path+".bak":null,retryNotesReplace&&valid,original,content);
                 }else File.Move(temporary,path);
             }finally{if(File.Exists(temporary))try{File.Delete(temporary);}catch(IOException){}catch(UnauthorizedAccessException){}}
         }
     }
+    static void Replace(string temporary,string path,string? backup,bool retry,string original,string content)
+    {
+        for(int attempt=0;;attempt++)try{
+            if(ReplaceOverride is {} replace)replace(temporary,path,backup);else File.Replace(temporary,path,backup);
+            return;
+        }catch(IOException error)when(retry&&attempt<3&&error.HResult==unchecked((int)0x80070497)){
+            // ERROR_UNABLE_TO_REMOVE_REPLACED (1175), observed during notes writes.
+            // Never replay the transaction or edit memory: retry only the failed atomic
+            // replace, and only while both files still have exactly the expected text.
+            if(!Unchanged(path,original)||!Unchanged(temporary,content))throw;
+            Thread.Sleep(20*(attempt+1));
+            if(!Unchanged(path,original)||!Unchanged(temporary,content))throw;
+        }
+    }
+    static bool Unchanged(string path,string expected){try{return File.ReadAllText(path)==expected;}catch(IOException){return false;}catch(UnauthorizedAccessException){return false;}}
     static void PreserveCorrupt(string path)=>File.Copy(path,path+".corrupt-"+DateTime.UtcNow.ToString("yyyyMMddHHmmssfffffff")+"-"+Guid.NewGuid().ToString("N"),false);
     public static T Read<T>(string path,Func<string,T> validate,params string[] alternatives)
     {

@@ -6,7 +6,7 @@ sealed class NoteStore
     public event Action? Changed;
     readonly ModuleJsonData<List<StickyNote>> data;
     public List<StickyNote> Items=>data.Read(items=>items.ToList());
-    public NoteStore(string? path){data=new(path,[],Validate,items=>items.ToList());}
+    public NoteStore(string? path){data=new(path,[],Validate,items=>items.ToList(),AtomicJson.WriteNotes);}
     internal NoteStore(string? path,Action<string,string> writer){data=new(path,[],Validate,items=>items.ToList(),writer);}
     internal static List<StickyNote> Validate(string text){var items=JsonSerializer.Deserialize<List<StickyNote>>(text)??throw new IOException("便签内容为空");if(items.Count>1000||items.Any(n=>n==null||n.Text==null||n.Text.Length>20000||string.IsNullOrWhiteSpace(n.Id))||items.Select(n=>n.Id).Distinct().Count()!=items.Count)throw new IOException("便签文件格式无效，请保留原文件后恢复备份。");return items;}
     public StickyNote Save(string? id,string text,CancellationToken token=default){text=text.Trim();if(text.Length is <1 or >20000)throw new ArgumentException("便签须为1～20000个字符");return Change(items=>{var old=items.FirstOrDefault(n=>n.Id==id);if(id!=null&&old==null)throw new ArgumentException("便签已删除，请另存为新便签");if(old==null&&items.Count>=1000)throw new InvalidOperationException("便签已达1000条，请先清理");var now=DateTimeOffset.Now;var item=old==null?new StickyNote(Guid.NewGuid().ToString("N"),text,now,now):old with{Text=text,Updated=now};if(old!=null)items.Remove(old);items.Insert(0,item);return item;},token);}

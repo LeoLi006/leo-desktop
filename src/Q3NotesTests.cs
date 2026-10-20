@@ -8,9 +8,9 @@ static class Q3NotesTests
     public static void Run(string report)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(report)!);using var window=new Form{Opacity=0,ShowInTaskbar=false};
-        window.Shown+=async(_,_)=>{try{var checks=await Check(Path.GetDirectoryName(report)!);File.WriteAllText(report,JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}finally{window.Close();}};Application.Run(window);
+        window.Shown+=async(_,_)=>{try{var evidence=new List<object>();var checks=await Check(Path.GetDirectoryName(report)!,evidence);File.WriteAllText(report,JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks,evidence},new JsonSerializerOptions{WriteIndented=true}));}catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString()}));}finally{window.Close();}};Application.Run(window);
     }
-    static async Task<Dictionary<string,bool>> Check(string root)
+    static async Task<Dictionary<string,bool>> Check(string root,List<object> evidence)
     {
         var c=new Dictionary<string,bool>();root=Path.Combine(root,"fixtures-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var notes=new NoteStore(Path.Combine(root,"notes.json"));int legacy=0,opened=0;
@@ -30,7 +30,9 @@ static class Q3NotesTests
         var snapshot=notes.Items;snapshot.Clear();c["external_snapshot_cannot_mutate_store"]=notes.Items.Count==1;
         c["diagnostic_history_excludes_note_bodies"]=bus.RecentResults.All(r=>r.Data==null);
         c["deleted_note_update_does_not_create_new_note"]=(await Run("note_save",new{id="missing",text="stale"})).Status=="failed"&&notes.Items.Count==1;
-        var many=await Task.WhenAll(Enumerable.Range(0,25).Select(i=>bus.ExecuteDetailedAsync(new("note_add","并发 "+i,"search"))));
+        var batchClock=Stopwatch.StartNew();
+        var many=await Task.WhenAll(Enumerable.Range(0,25).Select(async i=>{var clock=Stopwatch.StartNew();var result=await bus.ExecuteDetailedAsync(new("note_add","并发 "+i,"search"));lock(evidence)evidence.Add(new{phase="concurrent-write",ordinal=i,status=result.Status,error_code=result.ErrorCode,elapsed_ms=clock.ElapsedMilliseconds,error_type=result.Failure?.GetType().Name,native_error=result.Failure==null?(int?)null:result.Failure.HResult&65535});return result;}));
+        evidence.Add(new{phase="batch-summary",requested=25,succeeded=many.Count(r=>r.Status=="succeeded"),failed=many.Count(r=>r.Status=="failed"),cancelled=many.Count(r=>r.Status=="cancelled"),memory_count=notes.Items.Count,disk_count=new NoteStore(Path.Combine(root,"notes.json")).Items.Count,elapsed_ms=batchClock.ElapsedMilliseconds});
         c["concurrent_writes_are_serialized_without_lost_notes"]=many.All(r=>r.Status=="succeeded")&&notes.Items.Count==26;
         await Task.WhenAll(Enumerable.Range(0,20).Select(_=>Run("note_query",new{scope="all"})));
         c["read_write_concurrency_preserves_valid_json"]=new NoteStore(Path.Combine(root,"notes.json")).Items.Count==26;
