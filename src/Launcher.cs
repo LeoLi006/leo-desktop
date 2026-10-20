@@ -52,7 +52,7 @@ sealed partial class LauncherForm : Form
     }
     string lastExternal = "", lastObservedIdentity = "", activationContext = "";
     public bool IsIndexing => loading;
-    IEnumerable<AppEntry> AllApplications=>apps.Concat((prefs.ApplicationModules??[]).Where(a=>a.Enabled).Select(a=>new AppEntry(a.Name,a.Path,"自定义应用",a.Path))).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
+    IEnumerable<AppEntry> AllApplications=>apps.Concat(EntryContributions.Read(prefs).Where(a=>a.Enabled).Select(a=>a.SearchEntry)).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
     public IEnumerable<AppEntry> FileApplications => AllApplications;
     public bool HasTextInput => Visible && query.Focused && !string.IsNullOrWhiteSpace(query.Text);
     public void PreviewTyping(string text) { query.Text = text; query.Focus(); }
@@ -379,7 +379,7 @@ sealed partial class LauncherForm : Form
         var entries = VisibleEntries();
         if (selection >= 0 && selection < entries.Count) Launch(entries[selection]);
     }
-    LocalApplication? ConfiguredApplication(AppEntry app)=>(prefs.ApplicationModules??[]).LastOrDefault(a=>a.Enabled&&a.Path.Equals(app.Target,StringComparison.OrdinalIgnoreCase))??(prefs.ApplicationModules??[]).LastOrDefault(a=>a.Path.Equals(app.Target,StringComparison.OrdinalIgnoreCase));
+    LocalApplication? ConfiguredApplication(AppEntry app)=>EntryContributions.ForTarget(prefs,app.Target);
     internal ActionRequest ResolveApplicationRequest(ActionRequest request)
     {
         AppEntry? entry=null;

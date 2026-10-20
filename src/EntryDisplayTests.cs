@@ -14,6 +14,24 @@ static class EntryDisplayTests
     static async Task<Dictionary<string,bool>> Check(string root)
     {
         Directory.CreateDirectory(root);var c=new Dictionary<string,bool>();var prefs=new Preferences();var app=new LocalApplication(Guid.NewGuid().ToString("N"),"示例应用",Environment.ProcessPath!);prefs.ApplicationModules.Add(app);
+        var descriptor=EntryContributions.Read(prefs).Single();
+        c["contribution_owns_action"]=descriptor.Id==app.Id&&descriptor.ModuleId=="local:"+app.Id&&descriptor.ActionId==descriptor.ModuleId;
+        c["contribution_four_host_projections"]=descriptor.Shortcut&&descriptor.Menu&&descriptor.SearchEntry.Name==app.Name&&descriptor.Editor=="local-application";
+        c["foreign_action_rejected"]=Throws(()=>EntryContributions.Validate(descriptor with{ActionId="proxy_on"},app));
+        c["foreign_owner_rejected"]=Throws(()=>EntryContributions.Validate(descriptor with{ModuleId="local:other"},app));
+        c["arbitrary_editor_rejected"]=Throws(()=>EntryContributions.Validate(descriptor with{Editor="execute"},app));
+        var draft=LocalApplications.Clone(prefs);draft.ApplicationModules.Add(app);
+        c["duplicate_entry_rejected"]=Throws(()=>EntryContributions.Read(draft));draft.ApplicationModules.RemoveAt(1);
+        draft.Aliases[app.Path]=["demo"];draft.ApplicationModules[0]=app with{Name="更名",Arguments="--test",WorkingDirectory="C:\\",Administrator=true};
+        var changed=EntryContributions.Read(draft).Single();
+        c["rename_search_and_settings_sync"]=changed.Name=="更名"&&changed.SearchEntry.Name=="更名"&&EntryContributions.Configuration(draft,changed.Id)!.Name=="更名";
+        c["icon_alias_preserved"]=changed.Icon==app.Path&&changed.Aliases.SequenceEqual(new[]{"demo"});
+        c["launch_options_untouched"]=EntryContributions.Configuration(draft,app.Id) is {Arguments:"--test",Administrator:true};
+        draft.EntryDisplayModes[app.Id]=EntryDisplay.Search;changed=EntryContributions.Read(draft).Single();
+        c["hidden_entry_remains_callable"]=!changed.Shortcut&&!changed.Menu&&changed.Enabled&&EntryContributions.CurrentAction(draft,app.Id)==descriptor.ActionId;
+        draft.ApplicationModules[0]=draft.ApplicationModules[0] with{Enabled=false};
+        bool Rejected(){try{EntryContributions.CurrentAction(draft,app.Id);return false;}catch(InvalidOperationException){return true;}}
+        c["stale_disabled_entry_rejected"]=Rejected();draft.ApplicationModules.Clear();c["stale_removed_entry_rejected"]=Rejected();
         c["old_config_defaults_to_shortcuts"]=EntryDisplay.Entries(prefs).All(e=>EntryDisplay.Mode(prefs,e.Id)==EntryDisplay.Shortcut);c["custom_application_in_scope"]=EntryDisplay.Entries(prefs).Any(e=>e.Id==app.Id);c["invalid_mode_rejected"]=Throws(()=>EntryDisplay.Validate(new(){["music"]="invalid"}));c["invalid_key_rejected"]=Throws(()=>EntryDisplay.Validate(new(){["../app"]="menu"}));
         using(var form=new EntryDisplayForm(prefs)){Show(form);var combo=Walk(form).OfType<ComboBox>().Single(c=>c.AccessibleName=="music入口显示");combo.SelectedItem=combo.Items.Cast<ComboChoice>().Single(c=>c.Value==EntryDisplay.Menu);c["editor_does_not_apply_draft"]=prefs.EntryDisplayModes.Count==0;Walk(form).OfType<Button>().Single(b=>b.Text=="取消").PerformClick();c["cancel_keeps_settings"]=prefs.EntryDisplayModes.Count==0;}
         using(var form=new EntryDisplayForm(prefs)){Show(form);foreach(var combo in Walk(form).OfType<ComboBox>())combo.SelectedItem=combo.Items.Cast<ComboChoice>().Single(c=>c.Value==EntryDisplay.Menu);Capture(form,Path.Combine(root,"entry-display.png"));Walk(form).OfType<Button>().Single(b=>b.Text=="确定").PerformClick();c["editor_returns_all_modes"]=form.Result.Count==7&&form.Result.Values.All(v=>v==EntryDisplay.Menu);c["editor_does_not_change_enable_flags"]=EntryDisplay.Entries(prefs).All(e=>e.Enabled);prefs.EntryDisplayModes=new(form.Result);}
