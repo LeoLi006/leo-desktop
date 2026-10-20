@@ -13,14 +13,14 @@ static class MatchSyncService
 sealed partial class PetForm
 {
     ReminderForm? reminders;readonly System.Windows.Forms.Timer matchSyncTimer=new(){Interval=600000};
-    OwnedActivityTimer reminderActivity=null!,matchSyncActivity=null!;
+    IPeriodicTask reminderActivity=null!,matchSyncActivity=null!;
     internal Action? ReminderTickOverride;
     internal Func<string[],CancellationToken,Task<EventSnapshot>>? MatchSyncOverride;
     bool matchSyncBusy=>matchSyncActivity?.Running==true;
     void InitializeBackgroundActivities()
     {
-        reminderActivity=new(reminderTimer,"reminder-scheduler","清单提醒","reminder-check",t=>{t.ThrowIfCancellationRequested();if(ReminderTickOverride!=null)ReminderTickOverride();else CheckRemindersCore();return Task.CompletedTask;});
-        matchSyncActivity=new(matchSyncTimer,"match-sync","比赛后台校时","sync-request",SyncMatchesCoreAsync);
+        reminderActivity=new OwnedActivityTimer(reminderTimer,"reminder-scheduler","清单提醒","reminder-check",t=>{t.ThrowIfCancellationRequested();if(ReminderTickOverride!=null)ReminderTickOverride();else CheckRemindersCore();return Task.CompletedTask;});
+        matchSyncActivity=new OwnedActivityTimer(matchSyncTimer,"match-sync","比赛后台校时","sync-request",SyncMatchesCoreAsync);
         ConfigureBackgroundActivities();
     }
     void ConfigureBackgroundActivities()

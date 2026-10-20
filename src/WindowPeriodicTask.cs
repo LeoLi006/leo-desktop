@@ -2,15 +2,12 @@ namespace LeoLauncher;
 
 // UI-thread scoped service. The caller keeps its existing visibility policy;
 // the service owns timer registration, activity accounting and final release.
-interface IWindowPeriodicTask:IDisposable
-{
-    void Configure(bool enabled);
-    Task RunNowAsync();
-    void Retry();
-}
+interface IWindowPeriodicTask:IPeriodicTask;
 sealed class WindowPeriodicTask:IWindowPeriodicTask
 {
     readonly Form window;readonly OwnedActivityTimer activity;bool disposed;
+    public bool Enabled=>!disposed&&activity.Enabled;
+    public bool Running=>activity.Running;
     public WindowPeriodicTask(Form window,System.Windows.Forms.Timer timer,string module,string feature,string kind,Func<CancellationToken,Task> work)
     {
         this.window=window;

@@ -35,7 +35,7 @@ sealed class ClipboardHistoryService : IDisposable
     readonly System.Windows.Forms.Timer timer = new() { Interval = 450 };
     readonly Preferences prefs;
     readonly bool preview;
-    uint lastSequence;DateTimeOffset lastExpiry;bool disposed;readonly OwnedActivityTimer monitor;
+    uint lastSequence;DateTimeOffset lastExpiry;bool disposed;readonly IPeriodicTask monitor;
     public void RefreshPrivacy(){if(disposed)return;if(prefs.ClipboardHistory)History.Expire(prefs.ClipboardExpireDays,DateTimeOffset.Now);lastSequence=GetClipboardSequenceNumber();}
     public void OpenPrivacy(IWin32Window? owner=null){ObjectDisposedException.ThrowIf(disposed,this);using var form=new ClipboardPrivacyForm(prefs,RefreshPrivacy,preview);form.ShowDialog(owner);}
     public ClipHistory History { get; }
@@ -44,7 +44,7 @@ sealed class ClipboardHistoryService : IDisposable
         prefs = p; preview = previewMode;
         History = new(historyPath??(preview ? null : Path.Combine(Store.Root, "leo-clipboard.json")));
         History.Expire(p.ClipboardExpireDays,DateTimeOffset.Now);
-        monitor=new(timer,"clipboard-monitor","剪贴板监听","capture",t=>{t.ThrowIfCancellationRequested();if(captureOverride!=null)captureOverride();else CaptureCore();return Task.CompletedTask;});
+        monitor=new OwnedActivityTimer(timer,"clipboard-monitor","剪贴板监听","capture",t=>{t.ThrowIfCancellationRequested();if(captureOverride!=null)captureOverride();else CaptureCore();return Task.CompletedTask;});
         simulatedCapture=captureOverride!=null;
         ClipboardPrivacy.Changed+=RefreshPrivacy;
         ConfigureActivity();

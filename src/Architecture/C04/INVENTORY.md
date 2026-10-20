@@ -78,3 +78,8 @@
 ## 第十一批增量：窗口调度最小试点
 
 [调度接口与样例](WINDOW-SCHEDULING.md)：媒体周期轮询、剪贴板历史窗口刷新接入IWindowPeriodicTask，复用OwnedActivityTimer。活动摘要补齐剪贴板历史窗口及周期任务类型名称。宿主剪贴板监听、媒体执行队列与其他后台活动仍归原服务。
+
+
+## 第十二批增量：宿主周期任务接口
+
+[宿主调度契约](HOST-SCHEDULING.md)：提醒、比赛校时、剪贴板监听通过IPeriodicTask使用原OwnedActivityTimer；IWindowPeriodicTask继承该契约。两类所有者和原启停策略保持分离，Enabled与Running分别描述是否接受工作和是否仍有未结束工作。

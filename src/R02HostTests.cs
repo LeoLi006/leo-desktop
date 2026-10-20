@@ -18,21 +18,26 @@ static class R02HostTests
     {
         using(var timer=new System.Windows.Forms.Timer{Interval=600000}){
             int calls=0;bool fail=false;var held=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);CancellationToken token=default;
-            using var loop=new OwnedActivityTimer(timer,"fixture-host","后台测试","fixture-work",async t=>{calls++;token=t;if(calls==1)await held.Task;if(fail)throw new IOException("injected background fault");});
+            using IPeriodicTask loop=new OwnedActivityTimer(timer,"fixture-host","后台测试","fixture-work",async t=>{calls++;token=t;if(calls==1)await held.Task;if(fail)throw new IOException("injected background fault");});
             loop.Configure(true);loop.Configure(true);c["repeated_enable_has_one_polling_lease"]=Count("fixture-host","polling")==1;
+            c["contract_enabled_idle_state"]=loop.Enabled&&!loop.Running;
             var work=loop.RunNowAsync();await loop.RunNowAsync();Tick(timer);c["ticks_do_not_overlap_inflight_work"]=calls==1&&Count("fixture-host","fixture-work")==1;
+            c["contract_running_state"]=loop.Enabled&&loop.Running;
             loop.Configure(false);c["disable_stops_timer_and_cancels_work"]=!timer.Enabled&&token.IsCancellationRequested;
             c["cancelled_pending_work_remains_counted"]=Count("fixture-host","fixture-work")==1;
+            c["disabled_contract_still_reports_unfinished_work"]=!loop.Enabled&&loop.Running;
             loop.Configure(true);await loop.RunNowAsync();held.SetResult();await work;c["reenable_runs_once_after_old_work_finishes"]=calls==2&&Count("fixture-host","polling")==1&&Count("fixture-host","fixture-work")==0;
             fail=true;await loop.RunNowAsync();c["background_failure_stops_only_its_timer"]=!loop.Enabled&&!timer.Enabled&&Count("fixture-host")==0;
             loop.Configure(true);c["same_settings_do_not_silently_restart_faulted_timer"]=!timer.Enabled;
             loop.Configure(false);loop.Retry();c["stale_retry_cannot_restart_disabled_activity"]=!timer.Enabled;
             fail=false;loop.Configure(true);Tick(timer);c["explicit_reenable_recovers_without_duplicate_tick_handler"]=calls==4;
             loop.Dispose();loop.Configure(true);loop.Retry();Tick(timer);c["disposed_timer_has_no_handler_or_restart"]=calls==4&&Count("fixture-host")==0;
+            c["disposed_contract_state"]=!loop.Enabled&&!loop.Running;
         }
         int baseline=PrivacySubscribers(),captures=0;bool captureFails=false,captureSeen=false;var prefs=new Preferences{ClipboardHistory=true};
         using(var clipboard=new ClipboardHistoryService(prefs,true,captureOverride:()=>{captures++;captureSeen=Count("clipboard-monitor","capture")==1;if(captureFails)throw new IOException("fixture capture failure");})){
-            var timer=(System.Windows.Forms.Timer)Field(clipboard,"timer");var monitor=(OwnedActivityTimer)Field(clipboard,"monitor");clipboard.ConfigureActivity();clipboard.ConfigureActivity();
+            var timer=(System.Windows.Forms.Timer)Field(clipboard,"timer");var monitor=(IPeriodicTask)Field(clipboard,"monitor");clipboard.ConfigureActivity();clipboard.ConfigureActivity();
+            c["clipboard_declares_common_contract"]=typeof(ClipboardHistoryService).GetField("monitor",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask)&&monitor.Enabled&&!monitor.Running&&timer.Interval==450;
             c["clipboard_monitor_has_single_privacy_subscription"]=PrivacySubscribers()==baseline+1;c["clipboard_monitor_enable_is_idempotent"]=Count("clipboard-monitor","polling")==1;
             Tick(timer);c["clipboard_tick_is_registered_and_runs_once"]=captures==1&&captureSeen&&Count("clipboard-monitor","capture")==0;
             prefs.ClipboardHistory=false;clipboard.ConfigureActivity();Tick(timer);clipboard.Capture();c["clipboard_disable_blocks_timer_and_manual_capture"]=captures==1&&!timer.Enabled&&Count("clipboard-monitor")==0;
@@ -64,6 +69,8 @@ sealed partial class PetForm
         var plan=todoClient.AddMatch(new(new("espn",match.Id,TimeZoneInfo.Local.Id),match,DateTimeOffset.Now,"https://www.espn.com/"));
         var fresh=match with{Kickoff=match.Kickoff.AddDays(2)};var old=match with{Kickoff=match.Kickoff.AddDays(1)};var publications=new List<DateTimeOffset?>();todoStore.Changed+=()=>publications.Add(todoStore.Items.Single().MatchKickoff);
         MatchSyncOverride=(_,t)=>{requests++;oldToken=t;return requests==1?held.Task:Task.FromResult(new EventSnapshot([fresh],DateTimeOffset.Now,false,0));};ConfigureBackgroundActivities();
+        c["host_tasks_declare_common_contract"]=typeof(PetForm).GetField("reminderActivity",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask)&&typeof(PetForm).GetField("matchSyncActivity",BindingFlags.Instance|BindingFlags.NonPublic)!.FieldType==typeof(IPeriodicTask);
+        c["host_intervals_and_initial_state_preserved"]=reminderTimer.Interval==15000&&matchSyncTimer.Interval==600000&&reminderActivity.Enabled&&matchSyncActivity.Enabled&&!reminderActivity.Running&&!matchSyncActivity.Running;
         c["real_host_registers_reminder_and_match_polling"]=R02HostTests.Count("reminder-scheduler","polling")==1&&R02HostTests.Count("match-sync","polling")==1;
         ShowTodos();todoWindow!.Close();await reminderActivity.RunNowAsync();
         c["closing_todo_window_keeps_host_reminder_scheduler"]=reminderTimer.Enabled&&remindersChecked==1&&R02HostTests.Count("reminder-scheduler","polling")==1;

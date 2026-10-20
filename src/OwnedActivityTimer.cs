@@ -1,7 +1,7 @@
 namespace LeoLauncher;
 
 // UI-thread owner for one periodic activity and its in-flight work.
-sealed class OwnedActivityTimer:IDisposable
+sealed class OwnedActivityTimer:IPeriodicTask
 {
     readonly System.Windows.Forms.Timer timer;readonly ActivityOwner owner;readonly string feature,workKind;readonly Func<CancellationToken,Task> work;
     ActivityLease? polling;bool wanted,failed,disposed,running;long generation;

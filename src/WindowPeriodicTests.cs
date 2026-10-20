@@ -15,6 +15,7 @@ static class WindowPeriodicTests
                 var held=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 using var schedule=new WindowPeriodicTask(window,timer,"fixture-window-task","fixture周期","refresh",async t=>{calls++;if(calls==1){old=t;await held.Task;}t.ThrowIfCancellationRequested();writes++;});
                 schedule.Configure(true);schedule.Configure(true);c["enable_registers_once"]=Count("fixture-window-task","polling")==1&&timer.Enabled;
+                c["window_exposes_same_periodic_contract"]=schedule is IPeriodicTask contract&&contract.Enabled&&!contract.Running;
                 var running=schedule.RunNowAsync();await schedule.RunNowAsync();c["duplicate_tick_merged"]=calls==1&&Count("fixture-window-task","refresh")==1;
                 schedule.Configure(false);c["disable_cancels_and_stops_timer"]=old.IsCancellationRequested&&!timer.Enabled&&Count("fixture-window-task","polling")==0;
                 schedule.Configure(true);held.TrySetResult();await running;
