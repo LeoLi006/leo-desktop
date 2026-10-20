@@ -194,11 +194,11 @@ static class ClipboardTool
         search.TextChanged += (_, _) => RefreshItems();
         var refresh = new System.Windows.Forms.Timer { Interval = 900 };
         string signature = "";
-        FeatureFaults.Timer(refresh,"剪贴板窗口刷新",()=>{ if(window.IsDisposed||window.Disposing)return;string current = string.Join("|", service.History.Items.Select(x => x.Key + x.Pinned)); if (current != signature) { signature = current; RefreshItems(); } });
+        var schedule=new WindowPeriodicTask(window,refresh,"clipboard-window","剪贴板窗口刷新","window-refresh",token=>{token.ThrowIfCancellationRequested(); if(window.IsDisposed||window.Disposing)return Task.CompletedTask;string current = string.Join("|", service.History.Items.Select(x => x.Key + x.Pinned)); if (current != signature) { signature = current; RefreshItems(); } return Task.CompletedTask; });
         var theme=new ModuleThemeBinding(window);
-        bool released=false;void Release(){if(released)return;released=true;theme.Dispose();refresh.Stop();refresh.Dispose();picture.Image?.Dispose();if(shared==null)client.Dispose();}
+        bool released=false;void Release(){if(released)return;released=true;theme.Dispose();schedule.Dispose();picture.Image?.Dispose();if(shared==null)client.Dispose();}
         window.FormClosed += (_, _) => Release();window.Disposed+=(_,_)=>Release();
-        window.Shown += (_, _) => {if(!FeatureFaults.IsTestMode){FeatureFaults.Run("剪贴板窗口",()=>{WindowInteraction.Prepare(window);WindowInteraction.FocusInput(window);});} split.SplitterDistance = 280; RefreshItems(); refresh.Start(); };
+        window.Shown += (_, _) => {if(!FeatureFaults.IsTestMode){FeatureFaults.Run("剪贴板窗口",()=>{WindowInteraction.Prepare(window);WindowInteraction.FocusInput(window);});} split.SplitterDistance = 280; RefreshItems(); schedule.Configure(true); };
         window.Show();
         return window;
     }
