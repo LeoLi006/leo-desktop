@@ -1,8 +1,11 @@
 using System.Text.Json;
 namespace LeoLauncher;
 
-sealed class NotesCapability(Func<NoteStore> store,Func<string,string,CancellationToken,Task> show):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class NotesCapability(Func<NoteStore> store,Func<string,string,CancellationToken,Task> show):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Notes(this);
+    public DependencyState[] ReadDependencies()=>[new("note-store","unknown")];
+
     readonly object gate=new();
     readonly Dictionary<string,(string Action,string Value,ActionPayload Payload)> completed=new();
     public ActionRequest Adapt(StructuredActionRequest request)

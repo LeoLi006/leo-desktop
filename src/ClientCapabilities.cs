@@ -16,8 +16,11 @@ sealed class NativeCapabilityQueue
         finally{context.Finish();if(entered)gate.Release();if(cancelShown)try{OperationFeedback.Sink?.Invoke(new("操作等待已结束，请查看执行结果。",Module:resource,OperationId:operationId));}catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Report("客户端操作反馈",e);}}
     }
 }
-sealed class ProxyCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,Func<CancellationToken,Task<ProxyStatus>> read,Func<bool,CancellationToken,Action<string>,Task<ProxyStatus>> set,NativeCapabilityQueue queue,bool preview=false):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class ProxyCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,Func<CancellationToken,Task<ProxyStatus>> read,Func<bool,CancellationToken,Action<string>,Task<ProxyStatus>> set,NativeCapabilityQueue queue,bool preview=false):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Proxy(this);
+    public DependencyState[] ReadDependencies()=>[new("clash-client","unknown")];
+
     readonly string generation=configuration();
     public string Id=>"clash";public string Name=>"Clash 系统代理";public string Version=>"1";public bool Enabled=>enabled();
     public bool ConfigurationIsCurrent=>generation==configuration();public string BrainStamp=>configuration();

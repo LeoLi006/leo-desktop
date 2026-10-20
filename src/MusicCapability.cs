@@ -19,8 +19,11 @@ sealed class MusicSession(MusicHistory history)
         lock(gate){if(!step)queue=latest.Any(s=>s.Id==song.Id)?latest:history.Items.ToArray();if(queue.Length==0)queue=[song];index=Array.FindIndex(queue,s=>s.Id==song.Id);try{history.Add(song);return true;}catch(Exception e)when(FeatureFaults.Recoverable(e)){return false;}}
     }
 }
-sealed class MusicCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,MusicSession session,Func<string,CancellationToken,Task<MusicSong[]>> search,Func<MusicSong,CancellationToken,Action<string>,Task> play,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> pause,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> lyrics,Func<CancellationToken,Action<string>,Task> client,Func<MusicClientStatus> status,Func<CancellationToken,Task> show,NativeCapabilityQueue queue):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class MusicCapability(Func<bool> enabled,Func<string> configuration,Func<bool> available,MusicSession session,Func<string,CancellationToken,Task<MusicSong[]>> search,Func<MusicSong,CancellationToken,Action<string>,Task> play,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> pause,Func<CancellationToken,Action<string>,Task<MusicControlReceipt>> lyrics,Func<CancellationToken,Action<string>,Task> client,Func<MusicClientStatus> status,Func<CancellationToken,Task> show,NativeCapabilityQueue queue):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Music(this);
+    public DependencyState[] ReadDependencies()=>[new("music-source","unknown"),new("music-client","unknown"),new("song-selection",session.Candidates.Length>0||session.History.Length>0?"ready":"unknown")];
+
     readonly string generation=configuration();
     public string Id=>"music";public string Name=>"QQ音乐点歌";public string Version=>"1";public bool Enabled=>enabled();public bool ConfigurationIsCurrent=>generation==configuration();public string BrainStamp=>configuration();public bool BrainAvailable=>ConfigurationIsCurrent;
     bool Available{get{try{return available();}catch(Exception e)when(FeatureFaults.Recoverable(e)){return false;}}}

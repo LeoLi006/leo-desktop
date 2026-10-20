@@ -74,8 +74,11 @@ sealed class ReliableWorkflow(WorkflowJournal journal,Func<ActionRequest,Cancell
     }
 }
 
-sealed class WorkflowCapability(Func<ActionRequest,CancellationToken,Task<ActionPayload>> run):IStructuredLeoModule,IBrainContributor
+sealed class WorkflowCapability(Func<ActionRequest,CancellationToken,Task<ActionPayload>> run):IStructuredLeoModule,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Workflow(this);
+    public DependencyState[] ReadDependencies()=>[new("selected-actions","unknown"),new("workflow-journal","unknown")];
+
     public IReadOnlyList<BrainAction> BrainActions=>[new("combo_name","执行已保存组合","combo-name",Hint:"先用leo_catalog查询名称；组合只能作为单独的一步计划，内部仍受原组合限制")];
     public string Id=>"workflows";public string Name=>"自定义组合";public string Version=>"1";public bool Enabled=>true;public bool ConfigurationIsCurrent=>true;
     public IReadOnlyList<string> Actions=>["combo_name","scene_watch","combo_resume"];

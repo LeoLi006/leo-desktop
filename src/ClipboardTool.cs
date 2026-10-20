@@ -53,6 +53,7 @@ sealed class ClipboardHistoryService : IDisposable
     public void ConfigureActivity(){if(disposed)return;lastSequence=GetClipboardSequenceNumber();monitor.Configure((!preview||simulatedCapture)&&prefs.ClipboardHistory);}
     public bool Enabled { get => prefs.ClipboardHistory; set { ObjectDisposedException.ThrowIf(disposed,this);var next=LocalApplications.Clone(prefs);next.ClipboardHistory=value;if(!preview)ConfigMigration.Write(Store.FilePath,JsonSerializer.Serialize(next));prefs.ClipboardHistory=value;ConfigureActivity(); } }
     internal Preferences Preferences=>prefs;
+    internal bool IsClosed=>disposed;
     public void Capture(){if(!disposed)_=monitor.RunNowAsync();}
     void CaptureCore()
     {

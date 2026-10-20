@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 namespace LeoLauncher;
 
 // Host-internal metadata v1, not a replacement for LeoModule/1 or a package format.
+interface IContractInputBoundary{bool AcceptsStructuredAction(string action);}
 interface IModuleContractSource:ILeoModule
 {
     ModuleContract DescribeModule();
@@ -16,7 +17,7 @@ sealed record ContractAction(string Id,CapabilityDefinition Policy,ParameterCont
 sealed record ModuleContract(string Format,string Id,string Name,string Version,string Kind,string Runtime,string Enablement,string Configuration,string DataOwner,DependencyContract[] Dependencies,ContractAction[] Actions);
 sealed record ModuleContractSnapshot(ModuleContract Contract,bool Enabled,bool ConfigurationIsCurrent,DependencyState[] Dependencies);
 
-static class ModuleContracts
+static partial class ModuleContracts
 {
     public const string Format="leo-host-contract/1";
     static bool Text(string? value,int max=240)=>!string.IsNullOrWhiteSpace(value)&&value.Length<=max&&!value.Any(char.IsControl);
@@ -32,9 +33,9 @@ static class ModuleContracts
         Require(source is IStructuredLeoModule&&d.Actions!=null&&d.Actions.Length is >0 and <=512&&d.Actions.All(a=>a!=null)&&d.Actions.Select(a=>a.Id).Distinct().Count()==d.Actions.Length&&d.Actions.Select(a=>a.Id).Order().SequenceEqual(source.Actions.Order()));
         var structured=(IStructuredLeoModule)source;
         foreach(var action in d.Actions){
-            var p=action.Policy;Require(Text(action.Id,128)&&p!=null&&p==structured.Describe(action.Id)&&p.Id==action.Id&&p.ModuleId==d.Id&&p.Runtime==d.Runtime&&p.Effect is "read" or "write" or "window" or "external"&&p.Concurrency is "coalesce-inflight" or "serialized-store"&&p.TimeoutMs is >=1 and <=120000&&!p.Retry);
-            var input=action.Input;Require(input!=null&&input.Protocol=="leo-action/1"&&input.Adapter==(source is IActionRequestAdapter?"module-adapter":"application-adapter")&&input.Encoding is "object" or "value-wrapper"&&input.LegacyProfile==p.Input&&Text(input.Description,1200));
-            var output=action.Output;Require(output!=null&&output.Envelope=="ActionResult"&&Text(output.DataProfile)&&Text(output.Description,1200)&&output.Evidence!=null&&output.Evidence.Length>0&&output.Evidence.Distinct().Count()==output.Evidence.Length&&output.Evidence.All(e=>e is "unknown" or "accepted" or "snapshot" or "committed" or "window-shown" or "state-observed"));
+            var p=action.Policy;Require(Text(action.Id,128)&&p!=null&&p==structured.Describe(action.Id)&&p.Id==action.Id&&p.ModuleId==d.Id&&p.Runtime==d.Runtime&&p.Effect is "read" or "write" or "window" or "external" or "session"&&p.Concurrency is "coalesce-inflight" or "serialized-store"&&p.TimeoutMs is >=1 and <=120000&&!p.Retry);
+            var input=action.Input;var route=InputRoute(source,action.Id);Require(input!=null&&input.Protocol==route.Protocol&&input.Adapter==route.Adapter&&(route.Adapter=="host-private"?input.Encoding=="private-handle":route.Adapter=="legacy-only"?input.Encoding=="legacy-value":input.Encoding is "object" or "value-wrapper")&&input.LegacyProfile==p.Input&&Text(input.Description,1200));
+            var output=action.Output;Require(output!=null&&output.Envelope=="ActionResult"&&Text(output.DataProfile)&&Text(output.Description,1200)&&output.Evidence!=null&&output.Evidence.Length>0&&output.Evidence.Distinct().Count()==output.Evidence.Length&&output.Evidence.All(e=>e is "unknown" or "accepted" or "snapshot" or "committed" or "window-shown" or "state-observed" or "completed" or "released" or "cached" or "steps-completed"));
             Require(action.MaximumInputLength==structured.MaximumInputLength&&action.Cancellation==(source is ICommittedActionModule?"commit-aware":"host-cooperative"));
         }
         Require(d.Dependencies!=null&&d.Dependencies.All(x=>x!=null)&&d.Dependencies.Select(x=>x.Id).Distinct().Count()==d.Dependencies.Length);
@@ -50,9 +51,10 @@ static class ModuleContracts
         var d=Validate(source);var states=source.ReadDependencies();Require(states!=null&&states.All(s=>s!=null)&&states.Select(s=>s.Id).Distinct().Count()==states.Length&&states.Select(s=>s.Id).Order().SequenceEqual(d.Dependencies.Select(s=>s.Id).Order())&&states.All(s=>s.State is "ready" or "missing" or "unknown" or "degraded"));
         return new(d,source.Enabled,((IStructuredLeoModule)source).ConfigurationIsCurrent,states);
     }
+    static (string Protocol,string Adapter) InputRoute(ILeoModule module,string action)=>module is IContractInputBoundary boundary&&!boundary.AcceptsStructuredAction(action)?("ActionRequest","host-private"):module is IActionRequestAdapter?("leo-action/1","module-adapter"):module is LocalApplicationModule?("leo-action/1","application-adapter"):("ActionRequest","legacy-only");
     public static ModuleContract Build(IStructuredLeoModule module,string kind,string name,string enablement,string dataOwner,DependencyContract[] dependencies,Func<string,(string Encoding,string Description,string Profile,string Result,bool Private,string[] Evidence)> describe)
     {
-        var actions=module.Actions.Select(id=>{var p=module.Describe(id);var doc=describe(id);return new ContractAction(id,p,new("leo-action/1",module is IActionRequestAdapter?"module-adapter":"application-adapter",doc.Encoding,p.Input,doc.Description),new("ActionResult",doc.Profile,doc.Result,doc.Private,doc.Evidence),module.MaximumInputLength,module is ICommittedActionModule?"commit-aware":"host-cooperative");}).ToArray();
+        var actions=module.Actions.Select(id=>{var p=module.Describe(id);var doc=describe(id);var route=InputRoute(module,id);return new ContractAction(id,p,new(route.Protocol,route.Adapter,doc.Encoding,p.Input,doc.Description),new("ActionResult",doc.Profile,doc.Result,doc.Private,doc.Evidence),module.MaximumInputLength,module is ICommittedActionModule?"commit-aware":"host-cooperative");}).ToArray();
         return new(Format,module.Id,name,module.Version,kind,actions[0].Policy.Runtime,enablement,"preserve-existing",dataOwner,dependencies,actions);
     }
     public static ModuleContract Application(LocalApplicationModule module)=>Build(module,"application","本机应用启动","optional","host.application-settings",[

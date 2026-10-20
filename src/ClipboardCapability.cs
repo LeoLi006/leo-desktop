@@ -1,7 +1,10 @@
 using System.Text.Json;
 namespace LeoLauncher;
-sealed class ClipboardCapability(ClipboardHistoryService service,Preferences prefs,Func<Action,CancellationToken,Task> ui,Action show):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class ClipboardCapability(ClipboardHistoryService service,Preferences prefs,Func<Action,CancellationToken,Task> ui,Action show):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Clipboard(this);
+    public DependencyState[] ReadDependencies()=>[new("history-store",service.IsClosed?"missing":service.History.Error==null?"ready":"degraded"),new("system-clipboard","unknown")];
+
     public string Id=>"clipboard";public string Name=>"剪贴板历史与收藏";public string Version=>"1";public bool Enabled=>true;public bool ConfigurationIsCurrent=>true;
     public IReadOnlyList<string> Actions=>["clipboard_open","clipboard_pin_text","clipboard_query","clipboard_copy","clipboard_pin","clipboard_delete","clipboard_clear","clipboard_undo","clipboard_recording"];
     public IReadOnlyList<BrainAction> BrainActions=>[new("clipboard_open","打开剪贴板历史与收藏","none",Check:v=>{if(v.Length!=0)throw new ArgumentException("剪贴板窗口不接受正文参数");})];

@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace LeoLauncher;
 
@@ -23,8 +23,11 @@ sealed class MatchPlanningHost(Func<IEnumerable<(FootballMatch Match,DateTimeOff
     public static void Validate(MatchReference r){if(r.Provider!="espn"||string.IsNullOrWhiteSpace(r.EventId)||r.EventId.Length>128||r.EventId.Any(c=>!char.IsAsciiLetterOrDigit(c)&&c!='-'&&c!='_')||r.DisplayTimeZone!=TimeZoneInfo.Local.Id||r.ReminderMinutes!=10)throw new ArgumentException("比赛来源、编号、显示时区或提醒参数无效");}
 }
 
-sealed class MatchPlanningCapability(Func<bool> enabled,MatchPlanningHost host,TodoStore tasks,ModuleWindowService ui):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class MatchPlanningCapability(Func<bool> enabled,MatchPlanningHost host,TodoStore tasks,ModuleWindowService ui):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Match(this);
+    public DependencyState[] ReadDependencies()=>[new("match-source","unknown"),new("todo-store",tasks.Error==null?"ready":"degraded")];
+
     public IReadOnlyList<BrainAction> BrainActions=>[
         new("match_lookup","查询比赛安排参数","match-id",true,"先查赛程，使用实际返回的Id",ResultProperty:"Reference",ResultKind:"match-reference"),
         new("match_add","比赛加入清单并提醒","match-reference",Hint:"使用已查询的比赛Id，或引用查询步骤的Reference；不自行编造时间")];

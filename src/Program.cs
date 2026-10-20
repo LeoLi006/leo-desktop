@@ -212,6 +212,7 @@ static class Program
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--m05-conversation-test"){ConversationTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--additional-contract-test"){AdditionalContractTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--module-contract-test"){ModuleContractTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--contract-inventory"){ContractInventory.ExportExample(args[1]);return;}
         if(args.Length==2&&args[0]=="--r02-resident-test"){R02ResidentTests.Run(args[1]);return;}

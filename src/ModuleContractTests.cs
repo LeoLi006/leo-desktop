@@ -65,7 +65,7 @@ static class ModuleContractTests
         c["closed_query_service_cannot_return_fake_success"]=(await bus.ExecuteDetailedAsync(new("football_schedule","{\"force\":true}"))).Status=="failed";
         string corrupt=Path.Combine(root,"corrupt.json");File.WriteAllText(corrupt,"broken");var broken=new TodoStore(corrupt);var degraded=new TodoCapability(broken,(work,_)=>{work();return Task.CompletedTask;},_=>{},d=>d);c["degraded_store_is_reported_without_disclosing_error_text"]=ModuleContracts.Snapshot(degraded).Dependencies.Single().State=="degraded";
         using(var brokenBus=new ActionDispatcher(new(),(_,_,_)=>Task.FromResult("legacy"),new ExtensionStore(Path.Combine(root,"empty")))){brokenBus.Registry.Register(degraded);var failed=await brokenBus.ExecuteDetailedAsync(new("todo_add",JsonSerializer.Serialize(new{title="fixture",day=DateTime.Today.ToString("yyyy-MM-dd")})));c["degraded_store_keeps_existing_write_failure_protection"]=failed.Status=="failed"&&broken.Items.Count==0;}
-        using(var pet=new PetForm(new Preferences{ApplicationIndexing=false},true,true))c["actual_host_registers_valid_todo_football_media_contracts"]=pet.ContractRegistry.ReadContracts().Select(d=>d.Contract.Kind).ToHashSet().SetEquals(["todos","football","media"]);
+        using(var pet=new PetForm(new Preferences{ApplicationIndexing=false},true,true))c["actual_host_registers_all_migrated_contracts"]=pet.ContractRegistry.ReadContracts().Select(d=>d.Contract.Kind).ToHashSet().SetEquals(["todos","football","media","notes","proxy","music","clipboard","conversation","match-planning","workflows"]);
     }
 }
 

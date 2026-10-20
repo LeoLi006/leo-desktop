@@ -68,6 +68,733 @@
     },
     {
       "format": "leo-host-contract/1",
+      "id": "clipboard",
+      "name": "\u526A\u8D34\u677F\u5386\u53F2\u4E0E\u6536\u85CF",
+      "version": "1",
+      "kind": "clipboard",
+      "runtime": "in-process",
+      "enablement": "host-core",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.clipboard-history",
+      "dependencies": [
+        {
+          "id": "history-store",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-history-save-validation",
+          "actions": [
+            "clipboard_open",
+            "clipboard_pin_text",
+            "clipboard_query",
+            "clipboard_copy",
+            "clipboard_pin",
+            "clipboard_delete",
+            "clipboard_clear",
+            "clipboard_undo",
+            "clipboard_recording"
+          ]
+        },
+        {
+          "id": "system-clipboard",
+          "kind": "host-service",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-sensitive-content-protection",
+          "actions": [
+            "clipboard_copy"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "clipboard_open",
+          "policy": {
+            "id": "clipboard_open",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "window",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4EC5clipboard_open\u53EF\u7531\u6A21\u578B\u53D1\u73B0\uFF0C\u5176\u4ED6\u52A8\u4F5C\u7EF4\u6301\u672C\u5730\u9650\u5236\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_pin_text",
+          "policy": {
+            "id": "clipboard_pin_text",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3Atext\u6587\u5B57\uFF0C\u6CBF\u7528\u654F\u611F\u5185\u5BB9\u8FC7\u6EE4\u53CA\u6536\u85CF\u9650\u5236\uFF1B\u4E0D\u5411\u6A21\u578B\u5F00\u653E\u6B63\u6587\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_query",
+          "policy": {
+            "id": "clipboard_query",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "read",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3A\u53EF\u9009query\u6587\u5B57\uFF0C\u4EC5\u8FD4\u56DE\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\uFF1B\u6A21\u578B\u6765\u6E90\u4ECD\u88AB\u62D2\u7EDD\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-local-ids",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_copy",
+          "policy": {
+            "id": "clipboard_copy",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3Aid\u6587\u5B57\uFF0C\u4F7F\u7528\u672C\u5730\u7A97\u53E3\u5B9E\u9645\u8BB0\u5F55\u7F16\u53F7\uFF1B\u4E0D\u5411\u6A21\u578B\u5F00\u653E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_pin",
+          "policy": {
+            "id": "clipboard_pin",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3Aid\u6587\u5B57\uFF0C\u4F7F\u7528\u672C\u5730\u7A97\u53E3\u5B9E\u9645\u8BB0\u5F55\u7F16\u53F7\uFF1B\u4E0D\u5411\u6A21\u578B\u5F00\u653E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_delete",
+          "policy": {
+            "id": "clipboard_delete",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3Aid\u6587\u5B57\uFF0C\u4F7F\u7528\u672C\u5730\u7A97\u53E3\u5B9E\u9645\u8BB0\u5F55\u7F16\u53F7\uFF1B\u4E0D\u5411\u6A21\u578B\u5F00\u653E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_clear",
+          "policy": {
+            "id": "clipboard_clear",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4EC5clipboard_open\u53EF\u7531\u6A21\u578B\u53D1\u73B0\uFF0C\u5176\u4ED6\u52A8\u4F5C\u7EF4\u6301\u672C\u5730\u9650\u5236\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_undo",
+          "policy": {
+            "id": "clipboard_undo",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4EC5clipboard_open\u53EF\u7531\u6A21\u578B\u53D1\u73B0\uFF0C\u5176\u4ED6\u52A8\u4F5C\u7EF4\u6301\u672C\u5730\u9650\u5236\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "clipboard_recording",
+          "policy": {
+            "id": "clipboard_recording",
+            "moduleId": "clipboard",
+            "runtime": "in-process",
+            "input": "clipboard-local",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "clipboard-local",
+            "description": "parameters\u4E3Aenabled\u5E03\u5C14\u503C\u6216\u539F\u5E03\u5C14\u6587\u5B57true/false\uFF0C\u6CBF\u7528\u73B0\u6709\u5F00\u5173\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "clipboard-receipt",
+            "description": "Data\u6CBF\u7528\u672C\u5730\u8BB0\u5F55\u7F16\u53F7\u6216\u4E3A\u7A7A\uFF1B\u6B63\u6587\u548C\u8BB0\u5F55\u952E\u5747\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u590D\u5236accepted\u4E0D\u7B49\u4E8E\u5386\u53F2\u4FDD\u5B58\u6210\u529F\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 100000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "conversation",
+      "name": "\u804A\u5929\u4E0E\u8BED\u97F3",
+      "version": "1",
+      "kind": "conversation",
+      "runtime": "in-process",
+      "enablement": "host-core",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.private-conversation-jobs",
+      "dependencies": [
+        {
+          "id": "conversation-host",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-session-generation-check",
+          "actions": [
+            "chat_open",
+            "chat_reply",
+            "chat_close",
+            "chat_cancel",
+            "voice_start",
+            "voice_finish",
+            "voice_stop",
+            "voice_stop_listening",
+            "voice_stop_speaking",
+            "voice_accept",
+            "voice_speak"
+          ]
+        },
+        {
+          "id": "model-endpoint",
+          "kind": "network",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-local-route-and-provider-errors",
+          "actions": [
+            "chat_reply"
+          ]
+        },
+        {
+          "id": "speech-input",
+          "kind": "host-service",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-local-recognition-lifecycle",
+          "actions": [
+            "voice_start",
+            "voice_finish",
+            "voice_stop",
+            "voice_stop_listening",
+            "voice_accept"
+          ]
+        },
+        {
+          "id": "speech-output",
+          "kind": "host-service",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-speech-output-lifecycle",
+          "actions": [
+            "voice_speak",
+            "voice_stop_speaking"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "chat_open",
+          "policy": {
+            "id": "chat_open",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "window",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "private-session-handle",
+            "description": "\u5916\u90E8parameters\u5FC5\u987B\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u53EA\u6253\u5F00\u65E2\u6709\u804A\u5929\u754C\u9762\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "chat_reply",
+          "policy": {
+            "id": "chat_reply",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 120000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u6709\u754C\u4EFB\u52A1\u7968\u636E\uFF0C\u6B63\u6587\u3001\u51ED\u636E\u548C\u97F3\u9891\u7559\u5728\u8FDB\u7A0B\u5185\uFF1B\u5916\u90E8\u4E0D\u80FD\u521B\u5EFA\u7968\u636E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "completed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "chat_close",
+          "policy": {
+            "id": "chat_close",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "released"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "chat_cancel",
+          "policy": {
+            "id": "chat_cancel",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_start",
+          "policy": {
+            "id": "voice_start",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_finish",
+          "policy": {
+            "id": "voice_finish",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_stop",
+          "policy": {
+            "id": "voice_stop",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_stop_listening",
+          "policy": {
+            "id": "voice_stop_listening",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_stop_speaking",
+          "policy": {
+            "id": "voice_stop_speaking",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u5DF2\u9644\u7740\u4F1A\u8BDD\u53E5\u67C4\uFF1B\u6CBF\u7528\u4EE3\u6B21\u3001\u5173\u95ED\u4E0E\u53D6\u6D88\u6821\u9A8C\uFF0C\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_accept",
+          "policy": {
+            "id": "voice_accept",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u5305\u542B\u4F1A\u8BDD\u53E5\u67C4\u53CA\u8BC6\u522B\u4EE3\u6B21\uFF1B\u4E0D\u63A5\u53D7\u5916\u90E8\u7ED3\u6784\u5316\u53C2\u6570\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "voice_speak",
+          "policy": {
+            "id": "voice_speak",
+            "moduleId": "conversation",
+            "runtime": "in-process",
+            "input": "private-session-handle",
+            "effect": "session",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "host-private",
+            "encoding": "private-handle",
+            "legacyProfile": "private-session-handle",
+            "description": "\u4EC5\u5BBF\u4E3B\u79C1\u6709ActionRequest\uFF1Avalue\u4E3A\u6709\u754C\u4EFB\u52A1\u7968\u636E\uFF0C\u6B63\u6587\u3001\u51ED\u636E\u548C\u97F3\u9891\u7559\u5728\u8FDB\u7A0B\u5185\uFF1B\u5916\u90E8\u4E0D\u80FD\u521B\u5EFA\u7968\u636E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "conversation-private-result",
+            "description": "Data\u6CBF\u7528\u79C1\u6709\u56DE\u590D\u6216\u8BC6\u522B\u56DE\u6267\uFF1Bcompleted\u8868\u793A\u672C\u6B21\u56DE\u590D\u5DE5\u4F5C\u7ED3\u675F\uFF0Creleased\u8868\u793A\u91CA\u653E\u4F1A\u8BDD\uFF0C\u4E0D\u8BC1\u660E\u5916\u90E8\u5DE5\u5177\u7684\u4E1A\u52A1\u6548\u679C\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
       "id": "football-data",
       "name": "\u8DB3\u7403\u67E5\u8BE2",
       "version": "1",
@@ -254,6 +981,102 @@
             "mayContainPrivateData": true,
             "evidence": [
               "snapshot"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "match-planning",
+      "name": "\u6BD4\u8D5B\u52A0\u5165\u6E05\u5355",
+      "version": "1",
+      "kind": "match-planning",
+      "runtime": "in-process",
+      "enablement": "optional",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.match-reference-and-todos",
+      "dependencies": [
+        {
+          "id": "match-source",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-cached-reference-validation",
+          "actions": [
+            "match_lookup",
+            "match_add"
+          ]
+        },
+        {
+          "id": "todo-store",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-todo-commit-validation",
+          "actions": [
+            "match_add"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "match_lookup",
+          "policy": {
+            "id": "match_lookup",
+            "moduleId": "match-planning",
+            "runtime": "in-process",
+            "input": "match-reference/v1",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "match-reference/v1",
+            "description": "parameters\u76F4\u63A5\u5E8F\u5217\u5316\u4E3A\u539FMatchReference\uFF08Provider\u3001EventId\u3001DisplayTimeZone\u3001ReminderMinutes\uFF09\uFF1B\u65E7\u5B57\u7B26\u4E32\u6BD4\u8D5B\u7F16\u53F7\u4ECD\u4FDD\u7559\uFF0C\u4E0D\u731C\u6D4B\u672A\u67E5\u8BE2\u6BD4\u8D5B\u6216\u65F6\u533A\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "match-envelope",
+            "description": "Data\u4E3A\u5B9E\u9645\u7F13\u5B58\u6BD4\u8D5B\u53CA\u6765\u6E90\u5F15\u7528\uFF0Ccached\u4E0D\u662F\u65B0\u8054\u7F51\u67E5\u8BE2\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "cached"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "match_add",
+          "policy": {
+            "id": "match_add",
+            "moduleId": "match-planning",
+            "runtime": "in-process",
+            "input": "match-reference/v1",
+            "effect": "write",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "match-reference/v1",
+            "description": "parameters\u76F4\u63A5\u5E8F\u5217\u5316\u4E3A\u539FMatchReference\uFF08Provider\u3001EventId\u3001DisplayTimeZone\u3001ReminderMinutes\uFF09\uFF1B\u65E7\u5B57\u7B26\u4E32\u6BD4\u8D5B\u7F16\u53F7\u4ECD\u4FDD\u7559\uFF0C\u4E0D\u731C\u6D4B\u672A\u67E5\u8BE2\u6BD4\u8D5B\u6216\u65F6\u533A\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "match-todo-receipt",
+            "description": "Data\u6CBF\u7528Added\u3001Task\u3001Reference\u3001\u6765\u6E90\u53CAUTC\u5F00\u8D5B\u65F6\u95F4\uFF1B\u91CD\u590D\u6267\u884C\u8FD4\u56DE\u5DF2\u6709\u4E8B\u9879\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "committed"
             ]
           },
           "maximumInputLength": 16000,
@@ -588,6 +1411,708 @@
               "unknown",
               "accepted",
               "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "music",
+      "name": "\u5FEB\u901F\u70B9\u6B4C",
+      "version": "1",
+      "kind": "music",
+      "runtime": "in-process",
+      "enablement": "optional",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.music-session",
+      "dependencies": [
+        {
+          "id": "music-source",
+          "kind": "network",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-query-error-retention",
+          "actions": [
+            "music_search",
+            "music_open"
+          ]
+        },
+        {
+          "id": "music-client",
+          "kind": "local-application",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-start-wait-control",
+          "actions": [
+            "music_play",
+            "music_step",
+            "music_pause",
+            "music_client",
+            "music_lyrics",
+            "music_status"
+          ]
+        },
+        {
+          "id": "song-selection",
+          "kind": "host-service",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-real-candidate-validation",
+          "actions": [
+            "music_play",
+            "music_step"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "music_open",
+          "policy": {
+            "id": "music_open",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "window",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3A\u53EF\u9009query\u6587\u5B57\uFF0C\u641C\u7D22\u8981\u6C42\u975E\u7A7A\uFF1B\u7A97\u53E3\u53EF\u7A7A\uFF0C\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u548C\u65E7\u67E5\u8BE2\u957F\u5EA6\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-receipt",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_search",
+          "policy": {
+            "id": "music_search",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3A\u53EF\u9009query\u6587\u5B57\uFF0C\u641C\u7D22\u8981\u6C42\u975E\u7A7A\uFF1B\u7A97\u53E3\u53EF\u7A7A\uFF0C\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u548C\u65E7\u67E5\u8BE2\u957F\u5EA6\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-candidates",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot",
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_play",
+          "policy": {
+            "id": "music_play",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3Aid\u6587\u5B57\uFF0C\u5FC5\u987B\u4F7F\u7528\u5B9E\u9645\u641C\u7D22\u6216\u5386\u53F2\u5019\u9009\u7684\u6B4C\u66F2\u7F16\u53F7\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-receipt",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_step",
+          "policy": {
+            "id": "music_step",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3Adirection\u6587\u5B57\uFF0C\u4EC51\u6216-1\uFF0C\u6CBF\u7528\u539F\u70B9\u6B4C\u961F\u5217\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-receipt",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_pause",
+          "policy": {
+            "id": "music_pause",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF0C\u4E0D\u63A5\u53D7\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-receipt",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "state-observed",
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_client",
+          "policy": {
+            "id": "music_client",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF0C\u4E0D\u63A5\u53D7\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-receipt",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_lyrics",
+          "policy": {
+            "id": "music_lyrics",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 45000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF0C\u4E0D\u63A5\u53D7\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-receipt",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "state-observed",
+              "accepted"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "music_status",
+          "policy": {
+            "id": "music_status",
+            "moduleId": "music",
+            "runtime": "in-process",
+            "input": "music-text",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 5000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "music-text",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF0C\u4E0D\u63A5\u53D7\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "music-client-status",
+            "description": "Data\u6CBF\u7528\u5B9E\u9645\u5019\u9009\u3001\u5BA2\u6237\u7AEF\u72B6\u6001\u6216\u63A7\u5236\u56DE\u6267\uFF1Baccepted\u4EC5\u8BC1\u660E\u5DF2\u63D0\u4EA4\u5BA2\u6237\u7AEF\uFF0C\u4E0D\u8BC1\u660E\u64AD\u653E\u6210\u529F\u6216\u6B4C\u66F2\u6743\u9650\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "state-observed"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "notes",
+      "name": "\u4E34\u65F6\u4FBF\u7B7E",
+      "version": "1",
+      "kind": "notes",
+      "runtime": "in-process",
+      "enablement": "host-core",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.notes",
+      "dependencies": [
+        {
+          "id": "note-store",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "lazy-existing-store-validation",
+          "actions": [
+            "notes_open",
+            "note_quick_open",
+            "note_add",
+            "note_save",
+            "note_query",
+            "note_remove",
+            "note_pin",
+            "note_link"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "notes_open",
+          "policy": {
+            "id": "notes_open",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "window",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3A\u53EF\u9009text\u8349\u7A3F\uFF1B\u6253\u5F00\u4E0D\u81EA\u52A8\u4FDD\u5B58\u6B63\u6587\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u53EF\u4E3A\u7A7A\uFF0C\u4EC5\u8BC1\u660E\u7A97\u53E3\u5DF2\u663E\u793A\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_quick_open",
+          "policy": {
+            "id": "note_quick_open",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "window",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3A\u53EF\u9009text\uFF0C\u73B0\u6709\u901F\u8BB0\u5165\u53E3\u6309\u539F\u89C4\u5219\u5904\u7406\uFF1B\u6A21\u578B\u5165\u53E3\u4ECD\u53EA\u5141\u8BB8\u7A7A\u503C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u53EF\u4E3A\u7A7A\uFF0C\u4EC5\u8BC1\u660E\u7A97\u53E3\u5DF2\u663E\u793A\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "window-shown"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_add",
+          "policy": {
+            "id": "note_add",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3Atext\u6587\u5B57\uFF1B\u6CBF\u7528\u4FBF\u7B7E\u539F\u957F\u5EA6\u3001\u6765\u6E90\u4E0E\u4FDD\u5B58\u6821\u9A8C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u6CBF\u7528\u4FBF\u7B7E\u8BB0\u5F55\u3001\u5217\u8868\u6216\u7A7A\u503C\uFF1B\u6B63\u6587\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u4FDD\u5B58\u5931\u8D25\u4FDD\u7559\u539F\u6587\u4EF6\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_save",
+          "policy": {
+            "id": "note_save",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3Aid\u3001text\uFF1B\u65B0\u5EFA\u4F7F\u7528\u7A7Aid\uFF0C\u66F4\u65B0\u4F7F\u7528\u5B9E\u9645\u4FBF\u7B7E\u7F16\u53F7\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u6CBF\u7528\u4FBF\u7B7E\u8BB0\u5F55\u3001\u5217\u8868\u6216\u7A7A\u503C\uFF1B\u6B63\u6587\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u4FDD\u5B58\u5931\u8D25\u4FDD\u7559\u539F\u6587\u4EF6\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_query",
+          "policy": {
+            "id": "note_query",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "read",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3Atext\u3001scope\uFF1Bscope\u4E3Aactive\u3001linked\u6216all\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-list",
+            "description": "Data\u6CBF\u7528\u4FBF\u7B7E\u8BB0\u5F55\u3001\u5217\u8868\u6216\u7A7A\u503C\uFF1B\u6B63\u6587\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u4FDD\u5B58\u5931\u8D25\u4FDD\u7559\u539F\u6587\u4EF6\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "snapshot"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_remove",
+          "policy": {
+            "id": "note_remove",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3Aid\uFF0C\u5FC5\u987B\u6765\u81EA\u5B9E\u9645\u4FBF\u7B7E\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u6CBF\u7528\u4FBF\u7B7E\u8BB0\u5F55\u3001\u5217\u8868\u6216\u7A7A\u503C\uFF1B\u6B63\u6587\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u4FDD\u5B58\u5931\u8D25\u4FDD\u7559\u539F\u6587\u4EF6\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_pin",
+          "policy": {
+            "id": "note_pin",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3Aid\u3001value\u5E03\u5C14\u503C\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u6CBF\u7528\u4FBF\u7B7E\u8BB0\u5F55\u3001\u5217\u8868\u6216\u7A7A\u503C\uFF1B\u6B63\u6587\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u4FDD\u5B58\u5931\u8D25\u4FDD\u7559\u539F\u6587\u4EF6\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "note_link",
+          "policy": {
+            "id": "note_link",
+            "moduleId": "notes",
+            "runtime": "in-process",
+            "input": "legacy-text-or-json",
+            "effect": "write",
+            "concurrency": "serialized-store",
+            "timeoutMs": 15000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "legacy-text-or-json",
+            "description": "parameters\u4E3Aid\u3001task\uFF0C\u6CBF\u7528\u4FBF\u7B7E\u8F6C\u5F85\u529E\u7684\u5173\u8054\u89C4\u5219\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "note-result",
+            "description": "Data\u6CBF\u7528\u4FBF\u7B7E\u8BB0\u5F55\u3001\u5217\u8868\u6216\u7A7A\u503C\uFF1B\u6B63\u6587\u4E3A\u79C1\u6709\u6570\u636E\uFF0C\u4FDD\u5B58\u5931\u8D25\u4FDD\u7559\u539F\u6587\u4EF6\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "committed"
+            ]
+          },
+          "maximumInputLength": 125000,
+          "cancellation": "host-cooperative"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "clash",
+      "name": "\u7CFB\u7EDF\u4EE3\u7406",
+      "version": "1",
+      "kind": "proxy",
+      "runtime": "in-process",
+      "enablement": "optional",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.proxy-state",
+      "dependencies": [
+        {
+          "id": "clash-client",
+          "kind": "local-application",
+          "requirement": "optional",
+          "unavailableBehavior": "existing-start-wait-verify",
+          "actions": [
+            "proxy_status",
+            "proxy_on",
+            "proxy_off"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "proxy_status",
+          "policy": {
+            "id": "proxy_status",
+            "moduleId": "clash",
+            "runtime": "in-process",
+            "input": "none",
+            "effect": "read",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 5000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "none",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4E0D\u63A5\u53D7\u8DEF\u5F84\u3001\u5F00\u5173\u66FF\u4EE3\u53C2\u6570\u6216\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "proxy-status",
+            "description": "Data\u6CBF\u7528\u4EE3\u7406\u72B6\u6001\uFF1B\u5B9E\u9645\u6838\u9A8C\u540E\u624D\u6709state-observed\u8BC1\u636E\uFF0C\u9884\u89C8\u6216\u72B6\u6001\u672A\u77E5\u4FDD\u7559unknown\u3002",
+            "mayContainPrivateData": false,
+            "evidence": [
+              "state-observed",
+              "unknown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "proxy_on",
+          "policy": {
+            "id": "proxy_on",
+            "moduleId": "clash",
+            "runtime": "in-process",
+            "input": "none",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 60000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "none",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4E0D\u63A5\u53D7\u8DEF\u5F84\u3001\u5F00\u5173\u66FF\u4EE3\u53C2\u6570\u6216\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "proxy-status",
+            "description": "Data\u6CBF\u7528\u4EE3\u7406\u72B6\u6001\uFF1B\u5B9E\u9645\u6838\u9A8C\u540E\u624D\u6709state-observed\u8BC1\u636E\uFF0C\u9884\u89C8\u6216\u72B6\u6001\u672A\u77E5\u4FDD\u7559unknown\u3002",
+            "mayContainPrivateData": false,
+            "evidence": [
+              "state-observed",
+              "unknown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "proxy_off",
+          "policy": {
+            "id": "proxy_off",
+            "moduleId": "clash",
+            "runtime": "in-process",
+            "input": "none",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 60000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "leo-action/1",
+            "adapter": "module-adapter",
+            "encoding": "object",
+            "legacyProfile": "none",
+            "description": "parameters\u4E3A\u7A7A\u5BF9\u8C61\uFF1B\u4E0D\u63A5\u53D7\u8DEF\u5F84\u3001\u5F00\u5173\u66FF\u4EE3\u53C2\u6570\u6216\u989D\u5916\u5B57\u6BB5\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "proxy-status",
+            "description": "Data\u6CBF\u7528\u4EE3\u7406\u72B6\u6001\uFF1B\u5B9E\u9645\u6838\u9A8C\u540E\u624D\u6709state-observed\u8BC1\u636E\uFF0C\u9884\u89C8\u6216\u72B6\u6001\u672A\u77E5\u4FDD\u7559unknown\u3002",
+            "mayContainPrivateData": false,
+            "evidence": [
+              "state-observed",
+              "unknown"
             ]
           },
           "maximumInputLength": 16000,
@@ -1670,6 +3195,139 @@
           },
           "maximumInputLength": 125000,
           "cancellation": "commit-aware"
+        }
+      ]
+    },
+    {
+      "format": "leo-host-contract/1",
+      "id": "workflows",
+      "name": "\u81EA\u5B9A\u4E49\u7EC4\u5408",
+      "version": "1",
+      "kind": "workflows",
+      "runtime": "in-process",
+      "enablement": "host-core",
+      "configuration": "preserve-existing",
+      "dataOwner": "host.workflow-journal",
+      "dependencies": [
+        {
+          "id": "selected-actions",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-plan-action-and-dependency-validation",
+          "actions": [
+            "combo_name",
+            "scene_watch",
+            "combo_resume"
+          ]
+        },
+        {
+          "id": "workflow-journal",
+          "kind": "host-service",
+          "requirement": "required",
+          "unavailableBehavior": "existing-journal-and-recovery-validation",
+          "actions": [
+            "combo_name",
+            "scene_watch",
+            "combo_resume"
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "id": "combo_name",
+          "policy": {
+            "id": "combo_name",
+            "moduleId": "workflows",
+            "runtime": "in-process",
+            "input": "legacy-combo-name",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 120000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "legacy-only",
+            "encoding": "legacy-value",
+            "legacyProfile": "legacy-combo-name",
+            "description": "\u4EC5\u65E7ActionRequest\uFF1Avalue\u4E3A\u5B9E\u9645\u5DF2\u4FDD\u5B58\u7EC4\u5408\u540D\u79F0\uFF1B\u6CA1\u6709\u5916\u90E8\u7ED3\u6784\u5316\u9002\u914D\u5668\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "workflow-receipt",
+            "description": "Data\u6CBF\u7528\u8FD0\u884C\u7F16\u53F7\u4E0E\u5DF2\u5B8C\u6210\u6B65\u9AA4\u6570\u91CF\uFF1Bsteps-completed\u4EC5\u8BC1\u660E\u5DF2\u8BB0\u5F55\u6B65\u9AA4\u5B8C\u6210\uFF0C\u5916\u90E8\u6548\u679C\u4ECD\u4EE5\u5404\u6B65\u9AA4\u8BC1\u636E\u4E3A\u51C6\u3002\u9884\u89C8\u4E3Aunknown\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "steps-completed",
+              "unknown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "scene_watch",
+          "policy": {
+            "id": "scene_watch",
+            "moduleId": "workflows",
+            "runtime": "in-process",
+            "input": "legacy-combo-name",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 120000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "legacy-only",
+            "encoding": "legacy-value",
+            "legacyProfile": "legacy-combo-name",
+            "description": "\u4EC5\u65E7ActionRequest\uFF1A\u6CBF\u7528\u51C6\u5907\u770B\u7403\u7684\u5386\u53F2\u52A8\u4F5C\u522B\u540D\u53CA\u73B0\u6709\u53C2\u6570\u5904\u7406\uFF0C\u4E0D\u5F00\u653E\u7ED3\u6784\u5316\u8C03\u7528\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "workflow-receipt",
+            "description": "Data\u6CBF\u7528\u8FD0\u884C\u7F16\u53F7\u4E0E\u5DF2\u5B8C\u6210\u6B65\u9AA4\u6570\u91CF\uFF1Bsteps-completed\u4EC5\u8BC1\u660E\u5DF2\u8BB0\u5F55\u6B65\u9AA4\u5B8C\u6210\uFF0C\u5916\u90E8\u6548\u679C\u4ECD\u4EE5\u5404\u6B65\u9AA4\u8BC1\u636E\u4E3A\u51C6\u3002\u9884\u89C8\u4E3Aunknown\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "steps-completed",
+              "unknown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
+        },
+        {
+          "id": "combo_resume",
+          "policy": {
+            "id": "combo_resume",
+            "moduleId": "workflows",
+            "runtime": "in-process",
+            "input": "legacy-combo-name",
+            "effect": "external",
+            "concurrency": "coalesce-inflight",
+            "timeoutMs": 120000,
+            "retry": false
+          },
+          "input": {
+            "protocol": "ActionRequest",
+            "adapter": "legacy-only",
+            "encoding": "legacy-value",
+            "legacyProfile": "legacy-combo-name",
+            "description": "\u4EC5\u65E7ActionRequest\uFF1Avalue\u4E3Aname\u548CconfirmUnknown\u7EC4\u6210\u7684JSON\u6587\u5B57\uFF1B\u672A\u77E5\u72B6\u6001\u5148\u6838\u9A8C\u518D\u663E\u5F0F\u786E\u8BA4\u3002"
+          },
+          "output": {
+            "envelope": "ActionResult",
+            "dataProfile": "workflow-receipt",
+            "description": "Data\u6CBF\u7528\u8FD0\u884C\u7F16\u53F7\u4E0E\u5DF2\u5B8C\u6210\u6B65\u9AA4\u6570\u91CF\uFF1Bsteps-completed\u4EC5\u8BC1\u660E\u5DF2\u8BB0\u5F55\u6B65\u9AA4\u5B8C\u6210\uFF0C\u5916\u90E8\u6548\u679C\u4ECD\u4EE5\u5404\u6B65\u9AA4\u8BC1\u636E\u4E3A\u51C6\u3002\u9884\u89C8\u4E3Aunknown\u3002",
+            "mayContainPrivateData": true,
+            "evidence": [
+              "steps-completed",
+              "unknown"
+            ]
+          },
+          "maximumInputLength": 16000,
+          "cancellation": "host-cooperative"
         }
       ]
     }

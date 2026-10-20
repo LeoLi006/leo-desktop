@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 namespace LeoLauncher;
 
 interface ISpeechIO:IDisposable
@@ -31,6 +31,7 @@ sealed class ConversationJob(string session,string action,Func<CancellationToken
 sealed class ConversationHost:IDisposable
 {
     readonly object gate=new();readonly Dictionary<string,ConversationSession> sessions=new();readonly Dictionary<string,ConversationJob> jobs=new();
+    internal bool IsClosed{get{lock(gate)return disposed;}}
     readonly ActionDispatcher bus;readonly ModuleWindowService ui;readonly Action show;readonly bool owns;bool disposed;
     public ConversationHost(ActionDispatcher bus,ModuleWindowService ui,Action show,bool owns=false){this.bus=bus;this.ui=ui;this.show=show;this.owns=owns;bus.Registry.Register(new ConversationCapability(this));}
     public static ConversationHost Standalone(Control owner){var bus=new ActionDispatcher(new(),(_,_,_)=>throw new InvalidOperationException("会话不可绕回旧入口"),new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-chat-noextensions")));return new(bus,new(owner),()=>{},true);}
@@ -75,14 +76,18 @@ sealed class ConversationHost:IDisposable
         },token);return payload!;
     }
 }
-sealed class ConversationCapability(ConversationHost host):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor
+sealed class ConversationCapability(ConversationHost host):IStructuredLeoModule,IActionRequestAdapter,IBrainContributor,IModuleContractSource,IContractInputBoundary
 {
+    public ModuleContract DescribeModule()=>ModuleContracts.Conversation(this);
+    public DependencyState[] ReadDependencies()=>[new("conversation-host",host.IsClosed?"missing":"ready"),new("model-endpoint","unknown"),new("speech-input","unknown"),new("speech-output","unknown")];
+    public bool AcceptsStructuredAction(string action)=>action=="chat_open";
+
     public string Id=>"conversation";public string Name=>"聊天与语音";public string Version=>"1";public bool Enabled=>true;public bool ConfigurationIsCurrent=>true;
     public IReadOnlyList<string> Actions=>["chat_open","chat_reply","chat_close","chat_cancel","voice_start","voice_finish","voice_stop","voice_stop_listening","voice_stop_speaking","voice_accept","voice_speak"];
     public IReadOnlyList<BrainAction> BrainActions=>[new("chat_open","打开聊天窗口","none",Check:v=>{if(v.Length!=0)throw new ArgumentException("聊天窗口不接受参数");})];
     public CapabilityDefinition Describe(string action)=>new(action,Id,"in-process","private-session-handle",action=="chat_open"?"window":"session","coalesce-inflight",action=="chat_reply"?120000:15000);
     public string FailureCode(Exception e)=>e is ChatWorkException w?w.Code:e is ObjectDisposedException?"session_closed":e is ArgumentException or JsonException?"invalid_request":"conversation_failed";
-    public ActionRequest Adapt(StructuredActionRequest r){if(r.Protocol!="leo-action/1"||r.ActionId!="chat_open"||r.Parameters.ValueKind!=JsonValueKind.Object||r.Parameters.EnumerateObject().Any())throw new ArgumentException("会话内部句柄不接受外部结构化参数");return new(r.ActionId,"",r.Source,r.RequestId,r.TraceId,r.Deadline);}
+    public ActionRequest Adapt(StructuredActionRequest r){if(r.Protocol!="leo-action/1"||!AcceptsStructuredAction(r.ActionId)||r.Parameters.ValueKind!=JsonValueKind.Object||r.Parameters.EnumerateObject().Any())throw new ArgumentException("会话内部句柄不接受外部结构化参数");return new(r.ActionId,"",r.Source,r.RequestId,r.TraceId,r.Deadline);}
     public async Task<ActionPayload> ExecuteStructuredAsync(ActionRequest r,CancellationToken t){try{return await host.Execute(r,t);}catch(OperationCanceledException){throw;}catch(ChatWorkException){throw;}catch(ObjectDisposedException){throw new ChatWorkException("session_closed","会话已关闭，请重新打开");}catch(ArgumentException){throw new ChatWorkException("invalid_request","会话参数无效或请求已过期");}catch(Exception e)when(FeatureFaults.Recoverable(e)){throw new ChatWorkException("conversation_failed","会话操作未完成，请检查本地模型、麦克风或连接设置");}}
     public async Task<string> ExecuteAsync(ActionRequest r,CancellationToken t)=>(await ExecuteStructuredAsync(r,t)).Message;
 }

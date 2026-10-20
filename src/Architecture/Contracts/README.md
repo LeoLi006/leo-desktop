@@ -1,11 +1,11 @@
-# C01 / C02 / C06 第一批：统一模块契约收敛
+# 统一模块契约：接入与兼容说明
 
-日期：2026-10-20。范围：自定义应用、清单、足球与媒体。协议标识为 **leo-host-contract/1**，仅为当前宿主内部描述接口，不是新的模块安装包或进程外协议。`LeoModule/1`、`leo-action/1`、旧动作编号、业务与数据格式保持。
+第一批日期：2026-10-20。范围：自定义应用、清单、足球与媒体。第二批新增七类，详见 [接入边界与验证](SECOND-BATCH.md)；当前清册11类91动作。协议标识为 **leo-host-contract/1**，仅为当前宿主内部描述接口，不是新的模块安装包或进程外协议。`LeoModule/1`、`leo-action/1`、旧动作编号、业务与数据格式保持。
 
 ## 文件入口
 
 - `ModuleContracts.cs`：统一记录、验证器、四类描述；不含新的执行器。
-- [GENERATED.md](GENERATED.md)：隔离预览宿主实际注册表生成的47动作清册。
+- [GENERATED.md](GENERATED.md)：隔离预览宿主实际注册表生成的当前动作清册。
 - [inventory.json](inventory.json)：同一批清册的完整定义，应用编号已替换为示意别名。
 - [MinimalModule.cs](MinimalModule.cs)：可通过现有注册表/分发器运行的最小内置样例；不会自动注册，不是可安装的陌生代码包。
 - [VALIDATION.md](VALIDATION.md)：专项、兼容与隐私验证。
@@ -20,7 +20,7 @@ Q1的 `leo-capability-draft/0` 是历史草案，不能作为此接口的已实�
 | DependencyContract | id、kind、requirement、unavailableBehavior、适用动作列表。required/optional/repairable描述依赖性质，不独立授予执行权限 |
 | DependencyState | 只含id和ready/missing/unknown/degraded；与定义一一对应，不记录路径、错误正文或业务值 |
 | ContractAction | 原CapabilityDefinition、输入/输出说明、原输入长度上限和取消模式。动作集合必须与实际模块完全一致 |
-| ParameterContract | 原leo-action/1信封、适配器种类、object/value-wrapper编码、原输入类型引用和动作说明 |
+| ParameterContract | 原请求信封、适配边界、object/value-wrapper/private-handle/legacy-value编码、原输入类型引用和动作说明 |
 | ResultContract | 原ActionResult类型、Data类型说明、隐私标记与可能的证据；不是新结果信封或JSON Schema |
 
 `Configuration=preserve-existing` 明确本批不迁移配置文件。模块版本沿用当前数字字符串（含1、1.0及多段数字）；不把宿主内部契约版本当成模块发行版本。
@@ -49,7 +49,7 @@ Q1的 `leo-capability-draft/0` 是历史草案，不能作为此接口的已实�
 ## 新内置模块接入顺序
 
 1. 使用原`IStructuredLeoModule`实现执行；以`Describe`声明真实效果、合并/串行策略和超时，当前宿主不支持自动重试。
-2. 原结构化参数通过`IActionRequestAdapter`转换成同一请求；保留旧字符串入口需要的映射。
+2. 原结构化参数通过`IActionRequestAdapter`转换成同一请求；保留旧字符串入口需要的映射。没有适配器的旧动作应标明legacy-only，私有会话应如实声明host-private，不为满足描述而新增调用权限。
 3. 实现`DescribeModule`和`ReadDependencies`。可复用`ModuleContracts.Build`，说明原输入、输出、数据归属及依赖；依赖读取只能被动观察，不联网、不写入、不修复路径、不启动应用。
 4. 经宿主可信代码调用`Registry.Register`；不能重复动作或借此替换其他内置模块。
 5. 用现有`ExecuteStructuredAsync`和`ExecuteDetailedAsync`验证同一执行路径，以及缺失依赖、停用、取消和错误回执。数据提交能力继续复用已有提交规则，不能仅声明commit-aware。
@@ -58,7 +58,7 @@ Q1的 `leo-capability-draft/0` 是历史草案，不能作为此接口的已实�
 
 ## 可重复生成清册
 
-开发入口：`--contract-inventory <输出目录绝对路径>`。该入口构造固定的隔离预览宿主，再从其实际注册表生成 `GENERATED.md` 与 `inventory.json`，不读取用户应用配置。当前4类共47动作。
+开发入口：`--contract-inventory <输出目录绝对路径>`。该入口构造固定的隔离预览宿主，再从其实际注册表生成 `GENERATED.md` 与 `inventory.json`，不读取用户应用配置。第一批4类47动作，第二批后11类91动作。
 
 `ContractInventory.Generate` 默认导出定义，排除Enabled、配置是否当前、设备依赖状态和任何实际返回数据；应用的真实编号替换为local:example-01等示意值，名称改为通用名。清册中的别名不是可执行的应用编号，也不是可导入的模块包。可信模块作者仍须避免在静态说明中写入个人数据。
 
