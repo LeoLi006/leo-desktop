@@ -31,7 +31,9 @@ static class M06StabilityTests
                 checks["launcher_repeated_command_is_merged"]=calls==1;using var badCancel=captured.Register(()=>throw new IOException("injected cancellation failure"));launcher.Dispose();checks["launcher_dispose_cancels_command"]=captured.IsCancellationRequested;held.SetResult("late fixture");await first;checks["late_completion_does_not_reopen_disposed_launcher"]=launcher.IsDisposed;
             }
             using(var pet=new PetForm(new Preferences{ApplicationIndexing=false},true,true)){
-                var query=(FootballQueries)Field(pet,"footballQueries");var life=(CancellationTokenSource)Field(query,"life");using var bad=life.Token.Register(()=>throw new IOException("injected cleanup failure"));var launcher=(LauncherForm)Field(pet,"launcher");
+                var query=(FootballQueries)Field(pet,"footballQueries");var life=(CancellationTokenSource)Field(Field(query,"activities"),"life");using var bad=life.Token.Register(()=>throw new IOException("injected cleanup failure"));var launcher=(LauncherForm)Field(pet,"launcher");
+                var failingMedia=new MediaForm((_,_,_)=>Task.FromResult("[]"),true);failingMedia.Disposed+=(_,_)=>throw new IOException("injected window disposal failure");
+                typeof(PetForm).GetField("mediaWindow",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(pet,failingMedia);
                 pet.Dispose();checks["module_cleanup_failure_does_not_skip_launcher_release"]=launcher.IsDisposed;checks["host_cleanup_is_repeatable"]=pet.IsDisposed;pet.Dispose();
             }
             var clock=System.Diagnostics.Stopwatch.StartNew();var process=System.Diagnostics.Process.GetCurrentProcess();process.Refresh();int handlesBefore=process.HandleCount;long memoryBefore=process.WorkingSet64;

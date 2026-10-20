@@ -11,9 +11,9 @@ sealed partial class MusicForm:BarcaWindow
     readonly BarcaButton retrySearch=new(){Text="重试搜索",Dock=DockStyle.Right,Width=90,Visible=false};
     readonly Label state=new(){Dock=DockStyle.Bottom,Height=36,Padding=new Padding(20,8,12,0),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};
     readonly MusicClient client;readonly bool ownsClient;
-    readonly CancellationTokenSource lifetime=new();
+    readonly ActivityOwner searchActivities=new("music-window"),controlActivities=new("music-window");
     CancellationTokenSource? pending;
-    MusicSong[] latest=[];
+    MusicSong[] latest=[];long presentationGeneration;
     public MusicForm(bool previewMode=false,Func<string,CancellationToken,Task<MusicSong[]>>? searcher=null,MusicClient? shared=null)
     {
         preview=previewMode;client=shared??MusicClient.Standalone(preview,searcher);ownsClient=shared==null;client.Published+=Published;
@@ -25,23 +25,23 @@ sealed partial class MusicForm:BarcaWindow
         var search=new BarcaButton{Text="搜索",Dock=DockStyle.Right,Width=66};field.Controls.Add(input);field.Controls.Add(search);top.Controls.Add(field);
         search.Click+=async(_,_)=>await SearchAsync(input.Text);input.KeyDown+=async(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;await SearchAsync(input.Text);}};
         var controls=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=70,WrapContents=true};
-        void Button(string text,int width,Func<Task> action){var button=new BarcaButton{Text=text,Size=new Size(width,30),Font=BarcaUi.Font(8.5f)};button.Click+=async(_,_)=>{try{await action();}catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error(e.Message);}}};if(text=="媒体控制")mediaControlButton=button;controls.Controls.Add(button);}
+        void Button(string text,int width,Func<Task> action){var button=new BarcaButton{Text=text,Size=new Size(width,30),Font=BarcaUi.Font(8.5f)};button.Click+=async(_,_)=>{try{await action();}catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error(e.Message);}}};if(text=="媒体控制")mediaControlButton=button;controls.Controls.Add(button);}
         Button("媒体控制",90,()=>{MediaRequested?.Invoke();return Task.CompletedTask;});
         Button("最近点歌",87,()=>{Home();return Task.CompletedTask;});
         Button("上一首",70,async()=>{string message=await Step(-1);if(!IsDisposed)state.Text=message;});Button("下一首",70,async()=>{string message=await Step(1);if(!IsDisposed)state.Text=message;});
-        Button("播放/暂停",90,async()=>{string message=await client.Run("music_pause",token:lifetime.Token);if(!IsDisposed)state.Text=message;});
-        Button("歌词",57,async()=>{string message=await client.Run("music_lyrics",token:lifetime.Token);if(!IsDisposed)state.Text=message;});
-        Button("打开QQ音乐",112,async()=>{string message=await client.Run("music_client",token:lifetime.Token);if(!IsDisposed)state.Text=message;});
+        Button("播放/暂停",90,async()=>{string message=await RunControl("music_pause");if(!IsDisposed)state.Text=message;});
+        Button("歌词",57,async()=>{string message=await RunControl("music_lyrics");if(!IsDisposed)state.Text=message;});
+        Button("打开QQ音乐",112,async()=>{string message=await RunControl("music_client");if(!IsDisposed)state.Text=message;});
         var searchStatus=new Panel{Dock=DockStyle.Bottom,Height=36};state.Dock=DockStyle.Fill;searchStatus.Controls.Add(state);searchStatus.Controls.Add(retrySearch);retrySearch.Click+=async(_,_)=>await SearchAsync(input.Text);
         top.Controls.Add(controls);Controls.Add(songs);Controls.Add(searchStatus);Controls.Add(top);Controls.Add(chrome);
-        MaximizeBox=false;MinimumSize=MaximumSize=Size;Home();state.Text="快速点一首 · QQ音乐未运行时会自动启动";Shown+=(_,_)=>input.Focus();
+        MaximizeBox=false;MinimumSize=MaximumSize=Size;Home();state.Text="快速点一首 · QQ音乐未运行时会自动启动";Shown+=(_,_)=>input.Focus();VisibleChanged+=(_,_)=>{Interlocked.Increment(ref presentationGeneration);if(!Visible&&!released)searchActivities.Reset();};
     }
     public async Task SearchAsync(string query)
     {
-        if(IsDisposed)return;input.Text=query;pending?.Cancel();if(string.IsNullOrWhiteSpace(query))return;
-        var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);pending=request;retrySearch.Visible=false;state.Text="正在搜索QQ音乐…";
-        try{var found=await client.Search(query,request.Token);if(!IsDisposed&&ReferenceEquals(pending,request)){latest=found;Display(latest,"搜索结果");state.Text=latest.Length>0?"点选歌曲，在QQ音乐播放":"没有找到歌曲，试试歌名加歌手";}}
-        catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed&&ReferenceEquals(pending,request)){state.Text=e.Message+" · 已保留原结果";retrySearch.Visible=true;}}finally{if(ReferenceEquals(pending,request))pending=null;request.Dispose();}
+        if(IsDisposed||released)return;input.Text=query;Interlocked.Increment(ref presentationGeneration);searchActivities.Reset();if(string.IsNullOrWhiteSpace(query))return;
+        using var activity=searchActivities.Begin("search");var request=CancellationTokenSource.CreateLinkedTokenSource(activity.Token);pending=request;retrySearch.Visible=false;state.Text="正在搜索QQ音乐…";
+        try{var found=await client.Search(query,request.Token);if(!released&&!IsDisposed&&activity.Current&&ReferenceEquals(pending,request)){latest=found;Display(latest,"搜索结果");state.Text=latest.Length>0?"点选歌曲，在QQ音乐播放":"没有找到歌曲，试试歌名加歌手";}}
+        catch(OperationCanceledException){}catch(Exception e){if(!released&&!IsDisposed&&activity.Current&&ReferenceEquals(pending,request)){state.Text=e.Message+" · 已保留原结果";retrySearch.Visible=true;}}finally{if(ReferenceEquals(pending,request))pending=null;request.Dispose();}
     }
     void Display(MusicSong[] list,string title)
     {
@@ -59,19 +59,32 @@ sealed partial class MusicForm:BarcaWindow
     }
     async Task<bool> Play(MusicSong song)
     {
-        try{state.Text="正在准备QQ音乐并点歌…";string message=await client.Run("music_play",song.Id,lifetime.Token);if(IsDisposed)return false;state.Text=message;return true;}
-        catch(OperationCanceledException){if(!IsDisposed)state.Text="已停止后续点歌；已提交的请求可能生效";return false;}
+        try{state.Text="正在准备QQ音乐并点歌…";string message=await RunControl("music_play",song.Id);if(IsDisposed)return false;state.Text=message;return true;}
+        catch(OperationCanceledException){if(!released&&!IsDisposed)state.Text="已停止后续点歌；已提交的请求可能生效";return false;}
         catch(Exception e){if(!IsDisposed){state.Text=e.Message;if(!preview)OperationFeedback.Error("点歌失败："+e.Message,async()=>{await Play(song);},module:"music",operationId:"music:play:"+song.Id);}return false;}
+    }
+    async Task<string> RunControl(string action,string value="")
+    {
+        using var activity=controlActivities.Begin("control");
+        try{var result=await client.Run(action,value,activity.Token);activity.ThrowIfNotCurrent();return result;}catch(Exception e)when(!activity.Current&&FeatureFaults.Recoverable(e)){throw new OperationCanceledException(activity.Token);}
     }
     public void Home()=>Display(client.History,"最近点歌");
     public MusicSong[] Candidates=>latest;
     internal bool SearchRetryVisible=>retrySearch.Visible;
     internal bool SearchStatusFits=>songs.Bottom<=retrySearch.Parent!.Top;
     public async Task<bool> TryPlayCandidate(string id){var song=latest.Concat(client.History).FirstOrDefault(s=>s.Id==id);return song!=null&&await Play(song);}
-    public Task<string> Step(int direction)=>client.Run("music_step",direction.ToString(),lifetime.Token);
-    void Published(string query,MusicSong[] rows){if(IsDisposed||Disposing||!IsHandleCreated)return;if(InvokeRequired){try{BeginInvoke(()=>Published(query,rows));}catch(InvalidOperationException){}return;}if(pending!=null)return;input.Text=query;latest=rows;Display(rows,"搜索结果");state.Text=rows.Length>0?"点选歌曲，在QQ音乐播放":"没有找到歌曲，试试歌名加歌手";}
+    public Task<string> Step(int direction)=>RunControl("music_step",direction.ToString());
+    void Published(string query,MusicSong[] rows)=>ApplyPublished(Volatile.Read(ref presentationGeneration),query,rows);
+    void ApplyPublished(long generation,string query,MusicSong[] rows)
+    {
+        if(released||IsDisposed||Disposing||!IsHandleCreated)return;
+        if(InvokeRequired){try{BeginInvoke(()=>ApplyPublished(generation,query,rows));}catch(InvalidOperationException){}return;}
+        if(!Visible||generation!=Volatile.Read(ref presentationGeneration)||pending!=null)return;
+        input.Text=query;latest=rows;Display(rows,"搜索结果");state.Text=rows.Length>0?"点选歌曲，在QQ音乐播放":"没有找到歌曲，试试歌名加歌手";
+    }
+
     public void OpenQuery(string query){input.Text=query;WindowInteraction.Show(this);if(query.Length>0)_=SearchAsync(query);}
     bool released;
-    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;client.Published-=Published;if(ownsClient)client.Dispose();pending?.Cancel();lifetime.Cancel();lifetime.Dispose();}base.Dispose(disposing);}
-    protected override void OnFormClosing(FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;pending?.Cancel();Hide();return;}base.OnFormClosing(e);}
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;client.Published-=Published;searchActivities.Dispose();controlActivities.Dispose();if(ownsClient)client.Dispose();}base.Dispose(disposing);}
+    protected override void OnFormClosing(FormClosingEventArgs e){if(e.CloseReason==CloseReason.UserClosing){e.Cancel=true;searchActivities.Reset();Hide();return;}base.OnFormClosing(e);}
 }

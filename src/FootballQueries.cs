@@ -18,7 +18,7 @@ sealed class FootballQueries:IDisposable
     readonly Dictionary<string,(FootballMatch Match,DateTimeOffset Updated)> events=new();
     readonly Dictionary<string,SemaphoreSlim> lanes=new();readonly Dictionary<string,long> revisions=new();
     readonly Dictionary<string,TeamSnapshot> teams=new();ScheduleSnapshot? schedule;
-    CancellationTokenSource life=new();long epoch;bool disposed;string? scheduleConfig;
+    readonly ActivityOwner activities=new("football");long epoch;bool disposed;string? scheduleConfig;
     public FootballQueries(Func<bool> enabled,Func<string> configuration,bool preview=false,
         Func<FootballCache,CancellationToken,Task<FootballCache>>? fetchSchedule=null,
         Func<Club,TeamData,CancellationToken,Task<(TeamData Data,bool MatchesFailed,bool TableFailed)>>? fetchTeam=null,
@@ -55,9 +55,9 @@ sealed class FootballQueries:IDisposable
             lock(gate){Current(job.Epoch,job.Config,token);var now=clock();foreach(var row in rows)events[row.Id]=(row,now);while(events.Count>128)events.Remove(events.MinBy(p=>p.Value.Updated).Key);return new(rows,now,rows.Length!=ids.Length,ids.Length-rows.Length);}
         }finally{job.Lane.Release();}
     }
-    (SemaphoreSlim Lane,long Revision,long Epoch,string Config,CancellationTokenSource Token) Begin(string key,CancellationToken token)
+    (SemaphoreSlim Lane,long Revision,long Epoch,string Config,ActivityLease Token) Begin(string key,CancellationToken token)
     {
-        lock(gate){Require();if(!lanes.TryGetValue(key,out var lane))lanes[key]=lane=new(1,1);return(lane,revisions.GetValueOrDefault(key),epoch,configuration(),CancellationTokenSource.CreateLinkedTokenSource(token,life.Token));}
+        lock(gate){Require();if(!lanes.TryGetValue(key,out var lane))lanes[key]=lane=new(1,1);return(lane,revisions.GetValueOrDefault(key),epoch,configuration(),activities.Begin(key=="schedule"?"schedule-refresh":key=="events"?"event-refresh":"team-refresh",token));}
     }
     void Require(){if(disposed)throw new ObjectDisposedException(nameof(FootballQueries));if(!enabled())throw new OperationCanceledException("足球模块已停用");}
     void Current(long generation,string config,CancellationToken token){token.ThrowIfCancellationRequested();Require();if(epoch!=generation||configuration()!=config)throw new OperationCanceledException("关注配置已改变，请重新查询",token);}
@@ -88,6 +88,6 @@ sealed class FootballQueries:IDisposable
     internal static bool QueryFailure(Exception e)=>e is TimeoutException or OperationCanceledException or HttpRequestException or IOException or UnauthorizedAccessException or JsonException or FormatException or InvalidOperationException or ArgumentException;
     internal static void Validate(FootballCache data){if(data.Matches==null||data.Matches.Count>20000||data.FailedSources<0||data.Matches.Any(m=>m==null||string.IsNullOrWhiteSpace(m.Id)))throw new FormatException("赛程缓存无效");}
     internal static void Validate(TeamData data){if(data.Matches==null||data.Rows==null||data.Matches.Count>20000||data.Rows.Count>2000||data.Matches.Any(m=>m==null||string.IsNullOrWhiteSpace(m.Id))||data.Rows.Any(r=>r==null))throw new FormatException("球队缓存无效");}
-    public void Suspend(){CancellationTokenSource old;lock(gate){if(disposed)return;epoch++;old=life;life=new();}try{old.Cancel();}finally{old.Dispose();}}
-    public void Dispose(){CancellationTokenSource old;lock(gate){if(disposed)return;disposed=true;old=life;}try{old.Cancel();}finally{old.Dispose();}}
+    public void Suspend(){lock(gate){if(disposed)return;epoch++;}activities.Reset();}
+    public void Dispose(){lock(gate){if(disposed)return;disposed=true;}activities.Dispose();}
 }

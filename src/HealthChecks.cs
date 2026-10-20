@@ -21,7 +21,7 @@ sealed class HealthChecksView:Panel
     void Check()
     {
         using var passive=ModulePaths.PassiveRead();
-        if(preview){startup.Enabled=paths.Enabled=shortcuts.Enabled=false;result.Text="示例模式 · 不修改启动项，不启动外部软件，不联网。";return;}
+        if(preview){startup.Enabled=paths.Enabled=shortcuts.Enabled=false;result.Text="示例模式 · 不修改启动项，不启动外部软件，不联网。\n\n"+ModuleActivities.Summary();return;}
         startup.Enabled=!LeoStartup.Enabled;shortcuts.Enabled=hotkeys?.Invoke().Contains("被占用")==true;paths.Enabled=false;
         var lines=new List<string>();
         lines.Add((LeoStartup.Enabled?"✓":"○")+" 开机启动："+(LeoStartup.Enabled?"已启用":"未启用或被 Windows 停用"));
@@ -33,6 +33,7 @@ sealed class HealthChecksView:Panel
         var config=ChatSettings.Load();lines.Add("API 配置："+(config.ReadKey().Length>0&&config.Model.Length>0?"已填写（连接请手动检测）":"尚未完整填写"));
         try{var used=ApiUsageLedger.Shared.Today();var limit=ApiUsageConfig.Load().DailyLimit;lines.Add("今日模型请求："+used.Requests+" / "+(limit==0?"不限":limit));}catch{lines.Add("○ API 用量配置或记录无法读取，模型调用暂停");}
         foreach(var failure in FeatureFaults.Snapshot())lines.Add("本次运行已隔离："+failure.Feature+" · "+failure.ErrorType+" · "+failure.Count+"次（其他功能保留）");
+        lines.Add(ModuleActivities.Summary());
         result.Text=string.Join("\n\n",lines);
     }
     bool released;
