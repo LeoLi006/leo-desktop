@@ -33,8 +33,8 @@ static class EntryDisplayTests
         bool Rejected(){try{EntryContributions.CurrentAction(draft,app.Id);return false;}catch(InvalidOperationException){return true;}}
         c["stale_disabled_entry_rejected"]=Rejected();draft.ApplicationModules.Clear();c["stale_removed_entry_rejected"]=Rejected();
         var builtinPrefs=new Preferences();
-        c["builtin_three_entries"]=EntryContributions.ReadBuiltins(builtinPrefs).Select(e=>e.Id).SequenceEqual(new[]{"football","music","media"});
-        foreach(var id in new[]{"football","music","media"}){
+        c["builtin_six_entries"]=EntryContributions.ReadBuiltins(builtinPrefs).Select(e=>e.Id).SequenceEqual(new[]{"football","music","media","terminal","clash","edge"});
+        foreach(var id in new[]{"football","music","media","terminal","clash","edge"}){
             var entry=EntryContributions.Builtin(builtinPrefs,id);
             c[id+"_default_visible"]=entry.Shortcut&&entry.Menu;
             c[id+"_foreign_action_rejected"]=Throws(()=>EntryContributions.ValidateBuiltin(entry with{ActionId="proxy_on"}));
@@ -47,13 +47,18 @@ static class EntryDisplayTests
             entry=EntryContributions.Builtin(builtinPrefs,id);
             c[id+"_passive_missing_keeps_window"]=entry.Icon=="icon-reference"&&entry.Dependency=="missing"&&entry.Enabled;
         }
-        builtinPrefs.FootballModule=builtinPrefs.MusicModule=builtinPrefs.MediaModule=false;
-        foreach(var id in new[]{"football","music","media"}){
+        builtinPrefs.FootballModule=builtinPrefs.MusicModule=builtinPrefs.MediaModule=builtinPrefs.TerminalModule=builtinPrefs.ClashModule=builtinPrefs.EdgeModule=false;
+        foreach(var id in new[]{"football","music","media","terminal","clash","edge"}){
             var entry=EntryContributions.Builtin(builtinPrefs,id);
             bool rejected=false;try{EntryContributions.BuiltinAction(builtinPrefs,id);}catch(InvalidOperationException){rejected=true;}
             c[id+"_stale_disabled_blocked"]=!entry.Enabled&&!entry.Menu&&!entry.Shortcut&&rejected;
             c[id+"_disabled_setting_retains_mode"]=EntryDisplay.Entries(builtinPrefs).Single(e=>e.Id==id).Enabled==false&&entry.Mode==EntryDisplay.Search;
         }
+        var edgeDescriptor=EntryContributions.Builtin(new Preferences(),"edge");
+        c["edge_menu_keeps_web_expand"]=edgeDescriptor.MenuActions.Single() is {ActionId:"launcher_open",Value:"web"};
+        var clashDescriptor=EntryContributions.Builtin(new Preferences(),"clash");
+        c["proxy_explicit_menu_preserved"]=clashDescriptor.MenuActions.Select(a=>a.ActionId).SequenceEqual(new[]{"proxy_on","proxy_off","proxy_status"});
+        c["foreign_submenu_rejected"]=Throws(()=>EntryContributions.ValidateBuiltin(clashDescriptor with{MenuActions=[new("bad","terminal_open")]}));
         c["old_config_defaults_to_shortcuts"]=EntryDisplay.Entries(prefs).All(e=>EntryDisplay.Mode(prefs,e.Id)==EntryDisplay.Shortcut);c["custom_application_in_scope"]=EntryDisplay.Entries(prefs).Any(e=>e.Id==app.Id);c["invalid_mode_rejected"]=Throws(()=>EntryDisplay.Validate(new(){["music"]="invalid"}));c["invalid_key_rejected"]=Throws(()=>EntryDisplay.Validate(new(){["../app"]="menu"}));
         using(var form=new EntryDisplayForm(prefs)){Show(form);var combo=Walk(form).OfType<ComboBox>().Single(c=>c.AccessibleName=="music入口显示");combo.SelectedItem=combo.Items.Cast<ComboChoice>().Single(c=>c.Value==EntryDisplay.Menu);c["editor_does_not_apply_draft"]=prefs.EntryDisplayModes.Count==0;Walk(form).OfType<Button>().Single(b=>b.Text=="取消").PerformClick();c["cancel_keeps_settings"]=prefs.EntryDisplayModes.Count==0;}
         using(var form=new EntryDisplayForm(prefs)){Show(form);foreach(var combo in Walk(form).OfType<ComboBox>())combo.SelectedItem=combo.Items.Cast<ComboChoice>().Single(c=>c.Value==EntryDisplay.Menu);Capture(form,Path.Combine(root,"entry-display.png"));Walk(form).OfType<Button>().Single(b=>b.Text=="确定").PerformClick();c["editor_returns_all_modes"]=form.Result.Count==7&&form.Result.Values.All(v=>v==EntryDisplay.Menu);c["editor_does_not_change_enable_flags"]=EntryDisplay.Entries(prefs).All(e=>e.Enabled);prefs.EntryDisplayModes=new(form.Result);}
@@ -61,6 +66,24 @@ static class EntryDisplayTests
         using(var form=new Form()){using var view=new ModulesView(prefs,true);view.Dock=DockStyle.Fill;form.ClientSize=new(590,560);form.Controls.Add(view);Show(form);c["settings_has_entry_button"]=Walk(view).OfType<Button>().Any(b=>b.Text=="入口显示…");var next=new Preferences();view.Apply(next,false);c["module_save_preserves_modes"]=next.EntryDisplayModes.SequenceEqual(prefs.EntryDisplayModes);c["module_save_preserves_enable_flags"]=EntryDisplay.Entries(next).All(e=>e.Enabled);}
         using(var tools=new FootTools(130,true)){Show(tools);tools.ConfigureModules(prefs);tools.PreviewUtilities();c["menu_mode_hides_foot_shortcuts"]=tools.Controls.OfType<GlyphButton>().All(b=>!b.Visible||b.AccessibleName is "问 Leo" or "每日清单");c["empty_utility_arrow_hidden"]=!tools.Controls.OfType<Button>().Single(b=>b.AccessibleName=="展开更多工具").Visible&&tools.Width==64;c["hide_keeps_clash_polling"]=Field<System.Windows.Forms.Timer>(tools,"proxyTimer").Enabled;c["hide_keeps_modules_enabled"]=prefs.TerminalModule&&prefs.ClashModule&&prefs.EdgeModule;
             prefs.EntryDisplayModes["edge"]=EntryDisplay.Shortcut;tools.ConfigureModules(prefs);tools.PreviewTyping("test");c["edge_shortcut_can_expand"]=tools.IsSearchOpen;prefs.EntryDisplayModes["edge"]=EntryDisplay.Search;tools.ConfigureModules(prefs);c["hiding_edge_collapses_existing_input"]=!tools.IsSearchOpen&&tools.Width==64;var disabled=LocalApplications.Clone(prefs);disabled.ClashModule=false;tools.ConfigureModules(disabled);c["disable_stops_clash_polling"]=!Field<System.Windows.Forms.Timer>(tools,"proxyTimer").Enabled;}
+        using(var tools=new FootTools(130,true)){
+            var settings=new Preferences();Show(tools);tools.ConfigureModules(settings);tools.PreviewUtilities();
+            var terminalButton=Walk(tools).OfType<Button>().Single(b=>b.AccessibleName=="打开管理员终端");
+            var proxyButton=Walk(tools).OfType<Button>().Single(b=>b.AccessibleName=="Clash Verge 系统代理");
+            var edgeButton=Walk(tools).OfType<Button>().Single(b=>b.AccessibleName=="展开 Edge 搜索");
+            c["utility_three_buttons_present"]=terminalButton.Visible&&proxyButton.Visible&&edgeButton.Visible;
+            using(var icon=new Bitmap(8,8)){using var g=Graphics.FromImage(icon);g.Clear(Color.Red);icon.Save(Path.Combine(root,"utility-icon.png"));}
+            foreach(var id in new[]{"terminal","clash","edge"})settings.ModuleIcons[id]=Path.Combine(root,"utility-icon.png");
+            tools.ConfigureModules(settings);c["utility_icons_sync"]=new[]{terminalButton,proxyButton,edgeButton}.All(b=>b.Image!=null);
+            tools.PreviewTyping("hello");settings.EntryDisplayModes["edge"]=EntryDisplay.Menu;tools.ConfigureModules(settings);
+            c["utility_hide_closes_search"]=!tools.IsSearchOpen&&!edgeButton.Visible&&settings.EdgeModule;
+            settings.ClashModule=false;settings.TerminalModule=false;tools.ConfigureModules(settings);
+            c["utility_disable_hides_and_stops_poll"]=!terminalButton.Visible&&!proxyButton.Visible&&!Field<System.Windows.Forms.Timer>(tools,"proxyTimer").Enabled;
+            settings.ClashModule=true;settings.TerminalModule=true;settings.EntryDisplayModes["edge"]=EntryDisplay.Shortcut;tools.ConfigureModules(settings);tools.PreviewUtilities();
+            c["utility_reenable_restores"]=terminalButton.Visible&&proxyButton.Visible&&edgeButton.Visible;
+            foreach(var id in new[]{"terminal","clash","edge"})settings.ModuleIcons.Remove(id);
+            tools.ConfigureModules(settings);c["utility_removed_icons_clear"]=new[]{terminalButton,proxyButton,edgeButton}.All(b=>b.Image==null);
+        }
         // The real settings apply path updates live controls and retains the module's enable state.
         var live=new Preferences{ApplicationModules=[app],ShortcutOrder=["media",app.Id,"music","football"]};using(var pet=new PetForm(live,true,true)){
             var launcher=Field<LauncherForm>(pet,"launcher");Show(launcher);launcher.Open();c["default_top_buttons_present"]=Field<Dictionary<string,(string Title,Action Run)>>(launcher,"shortcutActions").Keys.Order().SequenceEqual(new[]{"football","music","media",app.Id}.Order());var originalMusic=launcher.MusicWithoutOpening();

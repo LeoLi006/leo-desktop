@@ -8,11 +8,11 @@ sealed class FootTools : Form
     public const int Space = 64;
     float uiScale = 1f;
     Preferences modules=new();
-    bool Quick(string id)=>Modules.Enabled(modules,id)&&EntryDisplay.ShowShortcut(modules,id);
+    bool Quick(string id)=>EntryContributions.Builtin(modules,id).Shortcut;
     int CompactUnits=>UtilityUnits==4?64:94;
     int UtilityUnits=>4+30*((Quick("terminal")?1:0)+(Quick("clash")?1:0)+(Quick("edge")?1:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
-    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(p.ModuleIcons?.GetValueOrDefault(pair.Item1));old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!Quick("edge"))expanded=false;if(!p.ClashModule)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
+    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var entry=EntryContributions.Builtin(p,pair.Item1);pair.Item2.AccessibleName=entry.Name;var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(entry.Icon);old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!Quick("edge"))expanded=false;if(!EntryContributions.Builtin(p,"clash").Enabled)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
     Font? scaledFont;
     int S(int value) => Math.Max(1, (int)Math.Round(value * uiScale));
@@ -92,24 +92,24 @@ sealed class FootTools : Form
         async Task<ProxyStatus> ReadProxy(){if(preview)return new(true,true,"Clash 系统代理已开启 · 示例");if(ProxyAction==null)throw new InvalidOperationException("代理入口尚未就绪");return System.Text.Json.JsonSerializer.Deserialize<ProxyStatus>(await ProxyAction("proxy_status",proxyLife.Token))??throw new IOException("代理状态无效");}
         async Task RefreshProxy()
         {
-            if(proxyBusy||proxyRefreshing||IsDisposed||!modules.ClashModule)return;proxyRefreshing=true;
+            if(proxyBusy||proxyRefreshing||IsDisposed||!EntryContributions.Builtin(modules,"clash").Enabled)return;proxyRefreshing=true;
             try{var state=await ReadProxy();if(IsDisposed)return;proxyButton.ActiveState=state.Enabled;tip.SetToolTip(proxyButton,state.Description);proxyButton.Invalidate();}
             catch(OperationCanceledException){}catch(Exception error){if(!IsDisposed)tip.SetToolTip(proxyButton,error.Message);}finally{proxyRefreshing=false;}
         }
         async Task ChangeProxy(bool? target=null) {
-            if(preview||proxyBusy||!modules.ClashModule)return;
+            if(preview||proxyBusy||!EntryContributions.Builtin(modules,"clash").Enabled)return;
             proxyBusy=true;proxyButton.Enabled=false;bool? desired=target;
             try{desired??=(await ReadProxy()).Enabled!=true;OperationFeedback.Pending(desired.Value?"正在开启系统代理…":"正在关闭系统代理…");string message=await ProxyAction!(desired.Value?"proxy_on":"proxy_off",proxyLife.Token);if(!IsDisposed)OperationFeedback.Show(message);}
             catch(OperationCanceledException){}catch(Exception error){if(!IsDisposed)OperationFeedback.Error(error.Message,()=>ChangeProxy(desired));}
             finally{if(!IsDisposed){proxyBusy=false;proxyButton.Enabled=true;await RefreshProxy();}}
         }
         proxyButton.Click+=async(_,_)=>await ChangeProxy();
-        FeatureFaults.Timer(proxyTimer,"代理状态检查",()=>{_ = RefreshProxy();},enabled:()=>modules.ClashModule);
+        FeatureFaults.Timer(proxyTimer,"代理状态检查",()=>{_ = RefreshProxy();},enabled:()=>EntryContributions.Builtin(modules,"clash").Enabled);
         search.SetBounds(67, 6, 154, 21); search.PlaceholderText = "输入关键词，回车搜索";
         search.BorderStyle = BorderStyle.None; search.BackColor = Appearance.Background; search.ForeColor = Appearance.Ink;
         search.Visible = false;
         terminal.Click += (_, _) => {
-            try { Process.Start(TerminalStart()); }
+            try { EntryContributions.BuiltinAction(modules,"terminal");Process.Start(TerminalStart()); }
             catch (Win32Exception e) when (e.NativeErrorCode == 1223) { }
             catch (Exception e) { MessageBox.Show("无法打开管理员终端：" + e.Message, "Leo"); }
         };
@@ -118,12 +118,12 @@ sealed class FootTools : Form
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
             if (string.IsNullOrWhiteSpace(search.Text)) return;
-            try { Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
+            try { EntryContributions.BuiltinAction(modules,"edge");Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
             catch (Exception error) { MessageBox.Show("无法打开 Edge：" + error.Message, "Leo"); }
         };
         Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, search]);
         ApplyScale(petSize);
-        Shown += (_, _) => { SetExpanded(false); _ = RefreshProxy(); if (!preview&&modules.ClashModule) proxyTimer.Start(); };
+        Shown += (_, _) => { SetExpanded(false); _ = RefreshProxy(); if (!preview&&EntryContributions.Builtin(modules,"clash").Enabled) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
         Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true;proxyLife.Cancel();proxyLife.Dispose();proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
     }
