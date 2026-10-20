@@ -32,9 +32,3 @@ sealed class ModuleWindowService(Control owner)
         finally{owner.Disposed-=closed;}
     }
 }
-
-sealed class ModuleFeedbackService(Action<string> success,Action<string> failure)
-{
-    public void Report(ActionResult result,bool acknowledge=false)
-    {if(result.Status=="failed")failure(result.Message);else if(acknowledge&&result.Status=="succeeded")success(result.Message);}
-}

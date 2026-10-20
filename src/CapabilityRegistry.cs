@@ -58,6 +58,7 @@ sealed class CapabilityRegistry
     {
         lock(gate){var replacement=registered.Values.FirstOrDefault(m=>m.Actions.Contains(action));if(replacement!=null)return replacement;if(action.StartsWith("local:",StringComparison.Ordinal)){RefreshLocal();return localActions.GetValueOrDefault(action)??throw new CapabilityException("module_removed","应用模块已移除");}if(builtins.Value.Actions.TryGetValue(action,out var builtin))return builtin;return Index(extensions()).GetValueOrDefault(action)??throw new ArgumentException("操作不存在，或对应扩展未安装");}
     }
+    internal int HostServiceScopes(){lock(gate){RefreshLocal();return locals.Length+registered.Values.Count(m=>m is ProxyCapability or MusicCapability or MediaCapability);}}
     // Passive lookup for entry validation. No dependency probes or action execution.
     internal string? EntryOwner(string action)
     {

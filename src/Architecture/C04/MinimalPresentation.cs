@@ -9,5 +9,7 @@ static class MinimalPresentationExample
     public static IModuleWindowPort QuickNotePort(ModulePresentationService host)=>host.For(ModuleWindowTarget.QuickNote);
     public static IModuleWindowPort ChatPort(ModulePresentationService host)=>host.For(ModuleWindowTarget.Chat);
     public static IModuleWindowPort ClipboardPort(ModulePresentationService host)=>host.For(ModuleWindowTarget.Clipboard);
+    // Host shutdown happens before disposing its controls, not inside a module.
+    public static void Shutdown(ModulePresentationService host)=>host.Dispose();
     public static Task Report(ModulePresentationFeedback feedback,ActionResult result)=>feedback.ReportAsync(result);
 }

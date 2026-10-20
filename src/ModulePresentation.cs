@@ -4,15 +4,34 @@ enum ModuleWindowTarget { Applications,Football,Music,Media,Todos,Notes,QuickNot
 sealed record ModuleWindowRequest(ModuleWindowTarget Target,string Query="",bool Web=false,string View="",QuickIntent? PlannerIntent=null);
 interface IModuleWindowPort { Task ShowAsync(CancellationToken token); }
 sealed class ModulePresentationService(ModuleWindowService ui,Func<ModuleWindowTarget,bool> enabled,
-    Action<ModuleWindowRequest> open,Action<LeoNotice> publish,Action<string> dismiss)
+    Action<ModuleWindowRequest> open,Action<LeoNotice> publish,Action<string> dismiss):IDisposable
 {
     public const string Protocol="leo-host-presentation/1";
     readonly object gate=new();readonly long[] generations=new long[Enum.GetValues<ModuleWindowTarget>().Length];readonly bool[] states=Enumerable.Repeat(true,Enum.GetValues<ModuleWindowTarget>().Length).ToArray();
+    readonly CancellationTokenSource lifetime=new();bool closed,cancelIssued,lifetimeReleased;int pendingWindows,pendingFeedback;
+    internal (bool Closed,int Targets,int Available,int Windows,int Feedback) Snapshot()
+    {
+        lock(gate){int available=0;if(!closed)foreach(var target in Enum.GetValues<ModuleWindowTarget>())try{if(enabled(target))available++;}catch(Exception e)when(FeatureFaults.Recoverable(e)){}
+            return(closed,generations.Length,available,pendingWindows,pendingFeedback);}
+    }
+    async Task Dispatch(Action action,CancellationToken token,Func<bool>? current,bool feedback)
+    {
+        CancellationTokenSource linked;
+        lock(gate){if(closed)throw new OperationCanceledException("窗口宿主已关闭");linked=CancellationTokenSource.CreateLinkedTokenSource(token,lifetime.Token);if(feedback)pendingFeedback++;else pendingWindows++;}
+        try{await ui.ShowAsync(action,linked.Token,current);}
+        finally{linked.Dispose();lock(gate){if(feedback)pendingFeedback--;else pendingWindows--;ReleaseLifetime();}}
+    }
+    void ReleaseLifetime(){if(closed&&cancelIssued&&!lifetimeReleased&&pendingWindows+pendingFeedback==0){lifetimeReleased=true;lifetime.Dispose();}}
+    public void Dispose()
+    {
+        lock(gate){if(closed)return;closed=true;for(int i=0;i<generations.Length;i++)generations[i]++;}
+        try{lifetime.Cancel();}finally{lock(gate){cancelIssued=true;ReleaseLifetime();}}
+    }
     static int Index(ModuleWindowTarget target)=>Enum.IsDefined(target)?(int)target:throw new ArgumentException("未知窗口目标");
-    public void Configure(){foreach(var target in Enum.GetValues<ModuleWindowTarget>()){bool state=enabled(target);lock(gate){int i=Index(target);if(states[i]!=state){states[i]=state;generations[i]++;}}}}
+    public void Configure(){lock(gate)if(closed)return;foreach(var target in Enum.GetValues<ModuleWindowTarget>()){bool state=enabled(target);lock(gate){int i=Index(target);if(states[i]!=state){states[i]=state;generations[i]++;}}}}
     public void Invalidate(ModuleWindowTarget target){lock(gate)generations[Index(target)]++;}
     internal long Capture(ModuleWindowTarget target){lock(gate)return generations[Index(target)];}
-    internal bool Current(ModuleWindowTarget target,long generation){lock(gate)return generations[Index(target)]==generation&&enabled(target);}
+    internal bool Current(ModuleWindowTarget target,long generation){lock(gate)return !closed&&generations[Index(target)]==generation&&enabled(target);}
     public IModuleWindowPort For(ModuleWindowTarget target)=>new Port(this,target);
     sealed class Port(ModulePresentationService owner,ModuleWindowTarget target):IModuleWindowPort
     {public Task ShowAsync(CancellationToken token)=>owner.ShowAsync(new(target),token);}
@@ -24,17 +43,17 @@ sealed class ModulePresentationService(ModuleWindowService ui,Func<ModuleWindowT
             !todos&&(request.View.Length>0||request.PlannerIntent!=null)||todos&&request.View is not("" or "day" or "week")||
             request.PlannerIntent is {} intent&&(intent.Kind is not(QuickKind.Todos or QuickKind.AddTodo or QuickKind.CompleteTodo)||intent.Value.Length>20000))throw new ArgumentException("窗口请求参数无效");
         long generation=Capture(request.Target);
-        return ui.ShowAsync(()=>open(request),token,()=>Current(request.Target,generation));
+        return Dispatch(()=>open(request),token,()=>Current(request.Target,generation),false);
     }
     public ModulePresentationFeedback Feedback(ModuleWindowTarget target,CancellationToken token)=>new(this,target,Capture(target),token);
     internal async Task Emit(ModuleWindowTarget target,long generation,LeoNotice notice,CancellationToken token,Func<bool>? active=null)
     {
-        try{await ui.ShowAsync(()=>publish(notice),token,()=>Current(target,generation)&&(active?.Invoke()??true));}
+        try{await Dispatch(()=>publish(notice),token,()=>Current(target,generation)&&(active?.Invoke()??true),true);}
         catch(OperationCanceledException){}catch(ObjectDisposedException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Module feedback: "+e.GetType().Name);}
     }
     internal async Task Dismiss(string operation)
     {
-        try{await ui.ShowAsync(()=>dismiss(operation),CancellationToken.None);}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Cleanup cannot fail a completed action. */}
+        try{await Dispatch(()=>dismiss(operation),CancellationToken.None,null,true);}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Cleanup cannot fail a completed action. */}
     }
 }
 sealed class ModulePresentationFeedback(ModulePresentationService host,ModuleWindowTarget target,long generation,CancellationToken token)
