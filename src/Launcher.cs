@@ -3,6 +3,7 @@ namespace LeoLauncher;
 
 sealed partial class LauncherForm : Form
 {
+    readonly ModuleThemeBinding theme;
     internal Func<string,CancellationToken,Task<string>>? CommandRequested;
     internal Func<string,bool>? RecognizesCommand;
     internal Action? MediaRequested;
@@ -185,7 +186,7 @@ sealed partial class LauncherForm : Form
         };
         Deactivate += (_, _) => { if (!preview) ProcessDeactivation(PointerOverPet?.Invoke() == true); };
         Disposed+=(_,_)=>{shortcutTips.Dispose();shortcutOverflowMenu.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
-        ConfigureActivity();
+        ConfigureActivity();theme=new(this);
     }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -460,7 +461,7 @@ sealed partial class LauncherForm : Form
         if(disposing&&!launcherReleased){
             launcherReleased=true;
             void Cleanup(Action action){try{action();}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Leo launcher cleanup: "+e.GetType().Name);}}
-            Cleanup(commandLife.Cancel);Cleanup(commandLife.Dispose);Cleanup(CancelCatalog);Cleanup(catalogActivities.Dispose);Cleanup(observationActivity.Dispose);
+            Cleanup(theme.Dispose);Cleanup(commandLife.Cancel);Cleanup(commandLife.Dispose);Cleanup(CancelCatalog);Cleanup(catalogActivities.Dispose);Cleanup(observationActivity.Dispose);
             Cleanup(()=>clipboardWindow?.Dispose());Cleanup(()=>music?.Dispose());Cleanup(()=>football?.Dispose());
             Cleanup(observer.Dispose);Cleanup(debounce.Dispose);Cleanup(icons.Dispose);Cleanup(()=>clipboard?.Dispose());
         }

@@ -82,6 +82,7 @@ sealed class ChatTurn
 
 sealed partial class ChatForm : BarcaWindow
 {
+    readonly ModuleThemeBinding theme;
     readonly ConversationView transcript = new();
     readonly TextBox input = new();
     readonly Button send = new(), stop = new(), configure = new(), reset = new();
@@ -169,7 +170,7 @@ sealed partial class ChatForm : BarcaWindow
         renderTimer.Tick += (_, _) => { if (dirty) { dirty = false; Render(); } };
         renderTimer.Start(); Render(); ShowHome(); UpdateState();
         bodyHost.SizeChanged+=(_,_)=>{foreach(Control c in results.Controls)c.Width=ResultWidth;};
-        Shown += (_, _) => input.Focus();
+        Shown += (_, _) => input.Focus();theme=new(this);
     }
     void VoiceChanged(long generation){OnUi(()=>{if(voice.IsCurrent(generation))UpdateVoice();});}
     void VoiceStatus(string message,long generation){OnUi(()=>{if(voice.IsCurrent(generation))state.Text=message;});}
@@ -280,7 +281,7 @@ sealed partial class ChatForm : BarcaWindow
     internal void PreviewRetryReply()=>retryReply.PerformClick();
     public void PreviewStop() => stop.PerformClick();
     public bool PreviewWasStopped => turns.LastOrDefault()?.Status == "已停止" && send.Enabled && !stop.Enabled;
-    void ReleaseChat(){if(chatReleased)return;chatReleased=true;appTools?.Brain?.Dispose();fallbackFootball?.Dispose();conversation.Dispose();if(ownsSessionHost)sessionHost.Dispose();voice.Changed-=VoiceChanged;voice.Status-=VoiceStatus;voice.Recognized-=VoiceRecognized;deviceMenu.Dispose();chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();chatLife.Dispose();}
+    void ReleaseChat(){if(chatReleased)return;chatReleased=true;theme.Dispose();appTools?.Brain?.Dispose();fallbackFootball?.Dispose();conversation.Dispose();if(ownsSessionHost)sessionHost.Dispose();voice.Changed-=VoiceChanged;voice.Status-=VoiceStatus;voice.Recognized-=VoiceRecognized;deviceMenu.Dispose();chatLife.Cancel();pending?.Cancel();renderTimer.Stop();renderTimer.Dispose();chatLife.Dispose();}
     protected override void OnFormClosed(FormClosedEventArgs e) { ReleaseChat(); base.OnFormClosed(e); }
     protected override void Dispose(bool disposing){if(disposing)ReleaseChat();base.Dispose(disposing);}
 }

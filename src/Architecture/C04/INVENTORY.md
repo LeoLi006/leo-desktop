@@ -63,3 +63,8 @@
 ## 第八批增量：清单、便签与足球主题
 
 [接入详情](PLANNER-FOOTBALL-THEMES.md)：TodoForm、NotesForm、QuickNoteForm、FootballForm复用主题绑定；TeamView及动态比赛卡片由父窗控件树适配。宿主提醒、赛程后台校时和模块启停的资源归属不变。
+
+
+## 第九批增量：聊天、剪贴板与应用搜索主题
+
+[接入详情](CONVERSATION-SEARCH-THEMES.md)：ChatForm、LauncherForm、ClipboardTool.Open生成的历史窗口接入同一主题订阅；聊天释放、搜索释放与剪贴板窗口Release先结束绑定，再执行原业务清理。主题与语音、监听和索引的归属分开。
