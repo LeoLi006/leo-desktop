@@ -7,7 +7,7 @@ sealed class HostServiceDiagnostics(Preferences prefs,CapabilityRegistry registr
 {
     static readonly ConditionalWeakTable<Preferences,HostServiceDiagnostics> hosts=new();
     public static void Bind(Preferences prefs,CapabilityRegistry registry,ModulePresentationService presentation){hosts.Remove(prefs);hosts.Add(prefs,new(prefs,registry,presentation));}
-    public static string Summary(Preferences prefs)=>hosts.TryGetValue(prefs,out var host)?Format(host.Read()):"宿主服务：未连接 · 配置作用域 0 · 窗口端口 0";
+    public static string Summary(Preferences prefs)=>hosts.TryGetValue(prefs,out var host)?Format(host.Read()):"宿主服务：未连接 · 配置作用域 0 · 窗口端口 0"+ThemeSummary();
     internal HostServiceSnapshot Read()
     {
         var window=presentation.Snapshot();if(window.Closed)return new(true,0,0,window.Targets,0,window.Windows,window.Feedback,0,0,0,0,0);
@@ -22,5 +22,6 @@ sealed class HostServiceDiagnostics(Preferences prefs,CapabilityRegistry registr
         "宿主服务："+(snapshot.Closed?"已关闭":"运行中")+" · 配置作用域 "+snapshot.ConfigurationScopes+" · 依赖作用域 "+snapshot.DependencyScopes+
         "\n窗口端口 "+snapshot.WindowTargets+" · 可用 "+snapshot.AvailableWindows+" · 在途窗口 "+snapshot.PendingWindows+" · 在途反馈 "+snapshot.PendingFeedback+
         "\n异常入口 "+snapshot.InvalidEntries+" · 核验失败 "+snapshot.CheckFailures+
-        "\n内存故障记录：配置 "+snapshot.ConfigurationFaults+" · 依赖 "+snapshot.DependencyFaults+" · 执行 "+snapshot.ExecutionFaults;
+        "\n内存故障记录：配置 "+snapshot.ConfigurationFaults+" · 依赖 "+snapshot.DependencyFaults+" · 执行 "+snapshot.ExecutionFaults+ThemeSummary();
+    internal static string ThemeSummary(){var theme=ModuleThemeBinding.Diagnostics();return "\n主题（进程）：绑定 "+theme.Bindings+" · 活跃订阅 "+theme.Subscriptions+" · 在途通知 "+theme.Pending;}
 }

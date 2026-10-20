@@ -6,12 +6,22 @@ sealed record ModuleThemeFont(string Family,float Points,FontStyle Style);
 sealed record ModuleThemeSnapshot(int Revision,string Skin,string Name,string Team,string Motto,
     Color Canvas,Color Surface,Color Raised,Color Text,Color Muted,Color Accent,
     int Radius,double Opacity,ModuleThemeFont Font,double LogicalScale);
+sealed record ModuleThemeDiagnostics(int Bindings,int Subscriptions,int Pending);
 
 // A pilot window uses this binding instead of the global open-window refresh.
 // No timers, shared Fonts, controls or mutable user configuration in the snapshot.
 sealed class ModuleThemeBinding:IDisposable
 {
     static readonly ConditionalWeakTable<Form,ModuleThemeBinding> bindings=new();
+    static int pending;
+    // Weak enumeration does not retain closed windows; pending also includes removed bindings
+    // until their cancelled dispatcher tasks have actually completed.
+    internal static ModuleThemeDiagnostics Diagnostics()
+    {
+        int count=0,subscribed=0;
+        foreach(var pair in bindings){if(pair.Value.disposed)continue;count++;if(pair.Value.Subscribed)subscribed++;}
+        return new(count,subscribed,Volatile.Read(ref pending));
+    }
     readonly Form window;readonly ModuleWindowService ui;
     CancellationTokenSource? subscription;CancellationToken subscriptionToken;Action<ModuleThemeSnapshot>? listener;long generation;bool disposed;
     public ModuleThemeSnapshot Current{get;private set;}
@@ -28,9 +38,10 @@ sealed class ModuleThemeBinding:IDisposable
     {
         Stop();if(disposed||!window.Visible||window.IsDisposed||window.Disposing)return;
         subscription=new();subscriptionToken=subscription.Token;var token=subscriptionToken;
-        listener=snapshot=>Enqueue(snapshot,token);UiTheme.Changed+=listener;Apply(UiTheme.Snapshot());
+        listener=snapshot=>Enqueue(snapshot,token);UiTheme.Changed+=listener;
+        FeatureFaults.Run("窗口主题",()=>Apply(UiTheme.Snapshot()));
     }
-    void Apply(ModuleThemeSnapshot snapshot){Current=snapshot;UiTheme.Attach(window);}
+    void Apply(ModuleThemeSnapshot snapshot){UiTheme.Attach(window);Current=snapshot;}
     void Changed(ModuleThemeSnapshot snapshot)
     {
         if(subscription==null)return;Enqueue(snapshot,subscriptionToken);
@@ -39,13 +50,16 @@ sealed class ModuleThemeBinding:IDisposable
     {
         if(disposed||token.IsCancellationRequested)return;
         long version=Interlocked.Increment(ref generation);
+        Interlocked.Increment(ref pending);
         _=Deliver(snapshot,token,version);
     }
     async Task Deliver(ModuleThemeSnapshot snapshot,CancellationToken token,long version)
     {
         try{await ui.ShowAsync(()=>Apply(snapshot),token,()=>!disposed&&version==Interlocked.Read(ref generation)&&window.Visible&&snapshot.Revision==UiTheme.Snapshot().Revision);}
         catch(OperationCanceledException){}
+        catch(ObjectDisposedException)when(token.IsCancellationRequested||disposed||window.IsDisposed){}
         catch(Exception e)when(FeatureFaults.Recoverable(e)){FeatureFaults.Run("主题投递",()=>throw e);}
+        finally{Interlocked.Decrement(ref pending);}
     }
     void Stop(){Interlocked.Increment(ref generation);if(listener!=null)UiTheme.Changed-=listener;listener=null;var old=subscription;subscription=null;old?.Cancel();old?.Dispose();}
     void Closed(object? sender,EventArgs e)=>Dispose();
