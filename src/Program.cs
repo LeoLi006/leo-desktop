@@ -212,6 +212,7 @@ static class Program
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--m05-conversation-test"){ConversationTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--r02-resident-test"){R02ResidentTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--r02-host-test"){R02HostTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--r02-activity-test"){R02ActivityTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m06-stability-test"){M06StabilityTests.Run(args[1]);return;}
@@ -916,7 +917,7 @@ sealed partial class PetForm : Form
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
         void Cleanup(Action action){try{action();}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Leo cleanup: "+e.GetType().Name);}}
-        Cleanup(()=>reminderActivity?.Dispose());Cleanup(()=>matchSyncActivity?.Dispose());
+        Cleanup(()=>reminderActivity?.Dispose());Cleanup(()=>matchSyncActivity?.Dispose());Cleanup(()=>companionActivity?.Dispose());
         Cleanup(()=>layeredSurface.Dispose());Cleanup(()=>paintSurface?.Dispose());paintSurface=null;
         Cleanup(()=>updateNotifications?.Dispose());Cleanup(()=>quickNoteWindow?.Dispose());Cleanup(()=>companionTimer.Stop());Cleanup(()=>companionTimer.Dispose());Cleanup(()=>noticeWindow?.Dispose());Cleanup(()=>focusWindow?.Dispose());Cleanup(()=>dockBridge?.Dispose());foreach(var skin in animationSkins.Values)Cleanup(()=>skin.Dispose());Cleanup(()=>animationSkins.Clear());
         Cleanup(()=>dockTimer.Stop());Cleanup(()=>dockTimer.Dispose());Cleanup(()=>dockSprites?.Dispose());var pickup=dragPickup;dragPickup=null;Cleanup(()=>pickup?.Dispose());

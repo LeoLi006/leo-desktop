@@ -59,20 +59,20 @@ sealed class FocusSession
 }
 sealed class FocusForm:BarcaWindow
 {
-    readonly System.Windows.Forms.Timer timer=new(){Interval=1000};
+    readonly System.Windows.Forms.Timer timer=new(){Interval=1000};readonly OwnedActivityTimer displayActivity;bool released;
     public FocusForm(FocusSession session,Action changed)
     {
         Text="Leo · 临时专注";ClientSize=new(455,360);StartPosition=FormStartPosition.CenterParent;var header=BarcaUi.Chrome(this,"专注一会儿","Leo 安静陪着你，普通提醒收进通知盒。");var state=new Label{Bounds=new(24,107,405,43),ForeColor=BarcaUi.Gold,Font=BarcaUi.Font(18,true)};var important=new CheckBox{Text="重要事项和开赛提醒仍然弹出",Checked=session.AllowImportant,Bounds=new(24,170,405,28),ForeColor=BarcaUi.Text};var error=new Label{Bounds=new(24,279,405,55),ForeColor=BarcaUi.Muted};
         void Update(){state.Text=session.Active(DateTimeOffset.Now)?"还剩 "+session.Remaining(DateTimeOffset.Now):"选一段留给自己的时间";}
         important.CheckedChanged+=(_,_)=>{try{session.SetImportant(important.Checked);changed();}catch(Exception e){error.Text=e.Message;}};
         int x=24;foreach(int minutes in new[]{25,45,60}){var start=new BarcaButton{Text=minutes+" 分钟",Bounds=new(x,224,96,34)};start.Click+=(_,_)=>{try{session.Start(minutes,important.Checked,DateTimeOffset.Now);changed();Update();error.Text="已开始；清单右键可标为重要事项。";}catch(Exception e){error.Text=e.Message;}};Controls.Add(start);x+=104;}
-        var end=new BarcaButton{Text="结束",Bounds=new(336,224,94,34)};end.Click+=(_,_)=>{try{session.Stop();changed();Update();error.Text="专注已结束，提醒恢复正常。";}catch(Exception e){error.Text=e.Message;}};Controls.AddRange([state,important,error,end,header]);timer.Tick+=(_,_)=>Update();timer.Start();Update();MinimumSize=MaximumSize=Size;
+        var end=new BarcaButton{Text="结束",Bounds=new(336,224,94,34)};end.Click+=(_,_)=>{try{session.Stop();changed();Update();error.Text="专注已结束，提醒恢复正常。";}catch(Exception e){error.Text=e.Message;}};Controls.AddRange([state,important,error,end,header]);displayActivity=new(timer,"focus-window","专注窗口","focus-display",t=>{t.ThrowIfCancellationRequested();if(!released&&!IsDisposed)Update();return Task.CompletedTask;});VisibleChanged+=(_,_)=>displayActivity.Configure(Visible&&!released);Update();MinimumSize=MaximumSize=Size;
     }
-    protected override void Dispose(bool disposing){if(disposing)timer.Dispose();base.Dispose(disposing);}
+    protected override void Dispose(bool disposing){if(disposing&&!released){released=true;displayActivity.Dispose();}base.Dispose(disposing);}
 }
 sealed partial class PetForm
 {
-    readonly NoticeInbox notices;readonly FocusSession focus;readonly System.Windows.Forms.Timer companionTimer=new(){Interval=1000};NoticeInboxForm? noticeWindow;FocusForm? focusWindow;bool noticePress,pointerPressed;
+    readonly NoticeInbox notices;readonly FocusSession focus;readonly System.Windows.Forms.Timer companionTimer=new(){Interval=1000};OwnedActivityTimer companionActivity=null!;internal Action? FocusTickOverride;NoticeInboxForm? noticeWindow;FocusForm? focusWindow;bool noticePress,pointerPressed;
     Rectangle NoticeHitBounds=>notices.Unread>0&&dockMotion.Progress<.001f?new Rectangle(Math.Max(0,Width-36),0,36,36):Rectangle.Empty;
     void BeginPetPress(Point pointer)
     {
@@ -91,8 +91,20 @@ sealed partial class PetForm
     }
     void WireCompanionMenu(ContextMenuStrip menu)
     {
-        var inbox=new ToolStripMenuItem("通知收纳盒");inbox.Click+=(_,_)=>ShowNotices();var concentrate=new ToolStripMenuItem("临时专注");concentrate.Click+=(_,_)=>{RevealDock(true);if(focusWindow==null||focusWindow.IsDisposed)focusWindow=new FocusForm(focus,()=>{Invalidate();CheckReminders();});if(!focusWindow.Visible)WindowPositions.Prepare(focusWindow,"focus",Bounds,previewMode);WindowInteraction.Show(focusWindow);};menu.Items.Insert(0,inbox);menu.Items.Insert(1,concentrate);menu.Opening+=(_,_)=>{inbox.Text="通知收纳盒"+(notices.Unread>0?" · "+notices.Unread:"");concentrate.Text=focus.Active(DateTimeOffset.Now)?"专注中 · "+focus.Remaining(DateTimeOffset.Now):"临时专注";};
-        notices.Changed+=()=>{if(!IsDisposed)Invalidate();};companionTimer.Tick+=(_,_)=>{try{if(focus.Complete(DateTimeOffset.Now)){if(QuietHours.Load().Contains(DateTime.Now))notices.Add("这段专注完成了，休息一下吧。","focus");else PresentFeedback(new("这段专注完成了，休息一下吧。",Attention:true));CheckReminders();}if(focus.Active(DateTimeOffset.Now))Invalidate();}catch(Exception e){companionTimer.Stop();PresentFeedback(new("专注状态未能保存："+e.Message,true));}};if(!previewMode)companionTimer.Start();
+        var inbox=new ToolStripMenuItem("通知收纳盒");inbox.Click+=(_,_)=>ShowNotices();var concentrate=new ToolStripMenuItem("临时专注");concentrate.Click+=(_,_)=>{RevealDock(true);if(focusWindow==null||focusWindow.IsDisposed)focusWindow=new FocusForm(focus,()=>{if(resourcesDisposed)return;Invalidate();CheckReminders();});if(!focusWindow.Visible)WindowPositions.Prepare(focusWindow,"focus",Bounds,previewMode);WindowInteraction.Show(focusWindow);};menu.Items.Insert(0,inbox);menu.Items.Insert(1,concentrate);menu.Opening+=(_,_)=>{inbox.Text="通知收纳盒"+(notices.Unread>0?" · "+notices.Unread:"");concentrate.Text=focus.Active(DateTimeOffset.Now)?"专注中 · "+focus.Remaining(DateTimeOffset.Now):"临时专注";};
+        notices.Changed+=()=>{if(!resourcesDisposed&&!IsDisposed)Invalidate();};
+        companionActivity=new(companionTimer,"focus-host","专注计时","focus-check",t=>{t.ThrowIfCancellationRequested();if(resourcesDisposed||IsDisposed)return Task.CompletedTask;if(FocusTickOverride!=null)FocusTickOverride();else CheckFocus();return Task.CompletedTask;});
+        companionActivity.Configure(!previewMode);
+
+    }
+    void CheckFocus()
+    {
+        if(focus.Complete(DateTimeOffset.Now)){
+            if(QuietHours.Load().Contains(DateTime.Now))notices.Add("这段专注完成了，休息一下吧。","focus");
+            else PresentFeedback(new("这段专注完成了，休息一下吧。",Attention:true));
+            CheckReminders();
+        }
+        if(focus.Active(DateTimeOffset.Now))Invalidate();
     }
     void ShowNotices(){RevealDock(true);launcher.Hide();if(noticeWindow==null||noticeWindow.IsDisposed)noticeWindow=new(notices,id=>{var task=todoStore.Items.FirstOrDefault(t=>t.Id==id);if(task==null)throw new InvalidOperationException("这条事项已经删除。");OpenReminderTask(task);});if(!noticeWindow.Visible)WindowPositions.Prepare(noticeWindow,"notifications",Bounds,previewMode);WindowInteraction.Show(noticeWindow);}
     void DrawCompanionBadges(Graphics g,RectangleF bounds)

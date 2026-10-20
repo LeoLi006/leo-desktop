@@ -8,8 +8,8 @@ static class ModuleActivities
     internal static void Add(ActivityLease activity,string module,string kind){lock(gate)live.Add(activity,(module,kind));}
     internal static void Remove(ActivityLease activity){lock(gate)live.Remove(activity);}
     public static ActivityCount[] Snapshot(){lock(gate)return live.GroupBy(x=>x.Value).Select(g=>new ActivityCount(g.Key.Module,g.Key.Kind,g.Count(),g.Count(x=>x.Key.Token.IsCancellationRequested))).OrderBy(x=>x.Module).ThenBy(x=>x.Kind).ToArray();}
-    static string ModuleName(string id)=>id switch{"football"=>"足球","music-window"=>"音乐窗口","media-window"=>"媒体窗口","reminder-scheduler"=>"清单提醒","match-sync"=>"比赛后台校时","clipboard-monitor"=>"剪贴板监听",_=>id};
-    static string KindName(string id)=>id switch{"schedule-refresh"=>"赛程刷新","team-refresh"=>"球队刷新","event-refresh"=>"比赛校时","search"=>"搜索请求","control"=>"控制请求","refresh"=>"刷新请求","polling"=>"轮询","reminder-check"=>"提醒检查","sync-request"=>"校时请求","capture"=>"剪贴板检查",_=>id};
+    static string ModuleName(string id)=>id switch{"football"=>"足球","music-window"=>"音乐窗口","media-window"=>"媒体窗口","reminder-scheduler"=>"清单提醒","match-sync"=>"比赛后台校时","clipboard-monitor"=>"剪贴板监听","application-index"=>"应用索引","application-context"=>"应用上下文","update-check"=>"自动检查更新","focus-host"=>"专注计时","focus-window"=>"专注窗口",_=>id};
+    static string KindName(string id)=>id switch{"schedule-refresh"=>"赛程刷新","team-refresh"=>"球队刷新","event-refresh"=>"比赛校时","search"=>"搜索请求","control"=>"控制请求","refresh"=>"刷新请求","polling"=>"轮询","reminder-check"=>"提醒检查","sync-request"=>"校时请求","capture"=>"剪贴板检查","scan"=>"索引扫描","context-check"=>"上下文检查","update-request"=>"更新检查","focus-check"=>"专注检查","focus-display"=>"窗口刷新",_=>id};
     public static string Summary()
     {
         var rows=Snapshot();return "后台活动（已登记任务）"+(rows.Length==0?"：0":"：\n"+string.Join("\n",rows.Select(r=>ModuleName(r.Module)+" · "+KindName(r.Kind)+"："+r.Active+(r.Cancelling==0?"":"（取消收尾 "+r.Cancelling+"）"))));

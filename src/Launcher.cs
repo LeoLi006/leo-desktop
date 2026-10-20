@@ -34,8 +34,11 @@ sealed partial class LauncherForm : Form
     readonly System.Windows.Forms.Timer observer = new() { Interval = 1500 };
     readonly System.Windows.Forms.Timer debounce = new() { Interval = 140 };
     List<AppEntry> apps = new(), filtered = new();
-    void CancelCatalog(){try{catalogRequest?.Cancel();}catch(ObjectDisposedException){}}
-    bool loading;CancellationTokenSource? catalogRequest;int catalogGeneration;bool catalogStarted;
+    readonly ActivityOwner catalogActivities=new("application-index");
+    readonly Func<CancellationToken,List<AppEntry>> scanCatalog;
+    readonly Action? observeOverride;readonly OwnedActivityTimer observationActivity;
+    void CancelCatalog(){catalogGeneration++;catalogRestartRequested=false;catalogActivities.Reset();}
+    bool loading;int catalogGeneration;bool catalogStarted,catalogWorkerRunning,catalogRestartRequested;
     FootballForm? football;
     MusicForm? music;
     public bool VerifyFootballEntry()
@@ -108,8 +111,10 @@ sealed partial class LauncherForm : Form
         query.Text = "剪切板"; debounce.Stop(); Filter();
         return VisibleEntries().Any(x => x.Target == ClipboardTool.Target);
     }
-    public LauncherForm(Preferences p, Action openSettings, bool previewMode, bool demoMode,TodoStore? planner=null,Action<AppEntry>? appLauncher=null)
+    public LauncherForm(Preferences p, Action openSettings, bool previewMode, bool demoMode,TodoStore? planner=null,Action<AppEntry>? appLauncher=null,Func<CancellationToken,List<AppEntry>>? scanner=null,Action? observationOverride=null)
     {
+        scanCatalog=scanner??Catalog.Scan;observeOverride=observationOverride;
+        observationActivity=new(observer,"application-context","应用上下文","context-check",t=>{t.ThrowIfCancellationRequested();ObserveCore();return Task.CompletedTask;});
         launchApplication=appLauncher??Catalog.Launch;tasks=planner??new(previewMode?null:Path.Combine(Store.Root,"leo-todos.json"));prefs = p; resizePet = openSettings; preview = previewMode; demo = demoMode;
         memory = new Memory(demo ? null : Path.Combine(Store.Root, "leo-history.json"));
         Text = "Leo · 应用搜索"; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -179,7 +184,6 @@ sealed partial class LauncherForm : Form
         };
         Deactivate += (_, _) => { if (!preview) ProcessDeactivation(PointerOverPet?.Invoke() == true); };
         Disposed+=(_,_)=>{shortcutTips.Dispose();shortcutOverflowMenu.Dispose();if(!footballShortcut.IsDisposed)footballShortcut.Dispose();};
-        FeatureFaults.Timer(observer,"应用上下文",Observe,enabled:()=>prefs.ApplicationIndexing&&prefs.ContextAware);
         ConfigureActivity();
     }
     protected override void OnPaint(PaintEventArgs e)
@@ -195,53 +199,59 @@ sealed partial class LauncherForm : Form
         var button = new Button { Text = text, Left = x, Top = y, Width = width, Height = 24, FlatStyle = FlatStyle.Flat, BackColor = Appearance.Background, ForeColor = Appearance.Muted, TabStop = false };
         button.FlatAppearance.BorderSize = 0; button.Click += (_, _) => action(); Controls.Add(button);
     }
-    void PostCatalog(Action action){if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((Action)(()=>{if(!IsDisposed)FeatureFaults.Run("应用索引结果",action);}));}catch(InvalidOperationException){}}
+    void PostCatalog(Action action){if(launcherReleased||IsDisposed||!IsHandleCreated)return;try{BeginInvoke((Action)(()=>{if(!launcherReleased&&!IsDisposed)FeatureFaults.Run("应用索引结果",action);}));}catch(InvalidOperationException){}}
     void LoadCatalog()
     {
-        catalogStarted=true;CancelCatalog();var pending=new CancellationTokenSource();catalogRequest=pending;int generation=++catalogGeneration;
-        loading = true; status.Text = "正在读取本机应用…";
-        // Create the handle before the STA worker posts its completion callback.
-        _ = Handle;
-        var thread = new Thread(() => {
-            try
-            {
-                var scanned = Catalog.Scan(pending.Token);
-                scanned.Add(ClipboardTool.Entry);
-                PostCatalog(() => {
-                    if(generation!=catalogGeneration||!prefs.ApplicationIndexing||pending.IsCancellationRequested)return;apps = scanned; loading = false;
-                    if (demo)
-                    {
-                        var sample = apps.Where(x => x.ExePath.Length > 0).Take(14).ToArray();
-                        for (int i = 0; i < sample.Length; i++) memory.Record(sample[i], "preview", DateTimeOffset.UtcNow.AddMinutes(-i - 1), false);
-                        if (sample.Length > 0 && !prefs.Favorites.Contains(sample[0].Target)) prefs.Favorites.Insert(0, sample[0].Target);
-                    }
-                    Observe(); Filter();
-                    if (!preview&&prefs.ContextAware&&prefs.ApplicationIndexing) observer.Start();
-                });
+        if(launcherReleased||!prefs.ApplicationIndexing)return;
+        catalogStarted=true;
+        if(catalogWorkerRunning){catalogRestartRequested=true;return;}
+        CancelCatalog();var pending=catalogActivities.Begin("scan");int generation=catalogGeneration;
+        var token=pending.Token;catalogWorkerRunning=true;loading=true;status.Text="正在读取本机应用…";_=Handle;
+        void Complete(List<AppEntry>? scanned,Exception? error)
+        {
+            catalogWorkerRunning=false;
+            if(!launcherReleased&&generation==catalogGeneration&&prefs.ApplicationIndexing&&!token.IsCancellationRequested){
+                loading=false;
+                if(error!=null){status.Text="应用索引失败，请稍后重新开启索引。";FeatureFaults.Report("应用索引",error);}
+                else if(scanned!=null){
+                    apps=scanned;
+                    if(demo){var sample=apps.Where(x=>x.ExePath.Length>0).Take(14).ToArray();for(int i=0;i<sample.Length;i++)memory.Record(sample[i],"preview",DateTimeOffset.UtcNow.AddMinutes(-i-1),false);if(sample.Length>0&&!prefs.Favorites.Contains(sample[0].Target))prefs.Favorites.Insert(0,sample[0].Target);}
+                    Observe();Filter();
+                }
             }
+            if(catalogRestartRequested&&!launcherReleased&&prefs.ApplicationIndexing)LoadCatalog();
+        }
+        var thread=new Thread(()=>{
+            List<AppEntry>? scanned=null;Exception? error=null;
+            try{scanned=scanCatalog(token);token.ThrowIfCancellationRequested();scanned.Add(ClipboardTool.Entry);}
             catch(OperationCanceledException){}
-            catch (Exception e) when(FeatureFaults.Recoverable(e))
-            {
-                FeatureFaults.Report("应用索引",e);PostCatalog(() => { if(generation==catalogGeneration){loading = false; status.Text = "应用索引失败，请稍后重新开启索引。";} });
-            }
+            catch(Exception e)when(FeatureFaults.Recoverable(e)){error=e;}
             finally{pending.Dispose();}
-        }) { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+            PostCatalog(()=>Complete(scanned,error));
+        }){IsBackground=true};
+        try{thread.SetApartmentState(ApartmentState.STA);thread.Start();}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){pending.Dispose();Complete(null,e);}
     }
-    void Observe()
+    void Observe(){if(!launcherReleased)_=observationActivity.RunNowAsync();}
+    void ObserveCore()
     {
-        if (!prefs.ContextAware || preview) return;
-        var active = DesktopContext.Read();
-        if (active == null) return;
-        var identity = active.AppId.Length > 0 ? active.AppId : active.ExePath.Length > 0 ? active.ExePath : active.Process;
-        if (identity.Equals(lastObservedIdentity, StringComparison.OrdinalIgnoreCase)) return;
-        lastObservedIdentity = identity;
-        var previous = lastExternal;
-        var match = DesktopContext.Match(apps, active);
-        lastExternal = match?.Name ?? active.Process;
-        if (match != null && prefs.RememberHistory) memory.Record(match, previous, DateTimeOffset.UtcNow);
+        if(launcherReleased||!prefs.ApplicationIndexing||!prefs.ContextAware||preview&&observeOverride==null)return;
+        if(observeOverride!=null){observeOverride();return;}
+        var active=DesktopContext.Read();if(active==null)return;
+        var identity=active.AppId.Length>0?active.AppId:active.ExePath.Length>0?active.ExePath:active.Process;
+        if(identity.Equals(lastObservedIdentity,StringComparison.OrdinalIgnoreCase))return;
+        lastObservedIdentity=identity;var previous=lastExternal;var match=DesktopContext.Match(apps,active);
+        lastExternal=match?.Name??active.Process;
+        if(match!=null&&prefs.RememberHistory)memory.Record(match,previous,DateTimeOffset.UtcNow);
     }
-    public void ConfigureActivity(){clipboard?.ConfigureActivity();if(!prefs.ApplicationIndexing){CancelCatalog();catalogGeneration++;catalogStarted=false;loading=false;apps=[ClipboardTool.Entry];observer.Stop();Filter();}else{if(!catalogStarted)LoadCatalog();if(!preview&&prefs.ContextAware)observer.Start();else observer.Stop();}}
+    public void ConfigureActivity()
+    {
+        if(launcherReleased)return;clipboard?.ConfigureActivity();
+        observationActivity.Configure(prefs.ApplicationIndexing&&prefs.ContextAware&&(!preview||observeOverride!=null));
+        if(!prefs.ApplicationIndexing){CancelCatalog();catalogStarted=false;loading=false;apps=[ClipboardTool.Entry];Filter();}
+        else if(!catalogStarted)LoadCatalog();
+    }
+
     public void RefreshModules(){RefreshShortcuts();ConfigureActivity();
         if(!prefs.FootballModule){football?.Close();football=null;}
         if(!prefs.MusicModule){music?.Dispose();music=null;}
@@ -449,7 +459,7 @@ sealed partial class LauncherForm : Form
         if(disposing&&!launcherReleased){
             launcherReleased=true;
             void Cleanup(Action action){try{action();}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Leo launcher cleanup: "+e.GetType().Name);}}
-            Cleanup(commandLife.Cancel);Cleanup(commandLife.Dispose);Cleanup(CancelCatalog);
+            Cleanup(commandLife.Cancel);Cleanup(commandLife.Dispose);Cleanup(CancelCatalog);Cleanup(catalogActivities.Dispose);Cleanup(observationActivity.Dispose);
             Cleanup(()=>clipboardWindow?.Dispose());Cleanup(()=>music?.Dispose());Cleanup(()=>football?.Dispose());
             Cleanup(observer.Dispose);Cleanup(debounce.Dispose);Cleanup(icons.Dispose);Cleanup(()=>clipboard?.Dispose());
         }
