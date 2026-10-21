@@ -33,15 +33,29 @@ $documentation=Join-Path $payload 'assets/docs'
 $screenshotDir=Join-Path $documentation 'screenshots'
 New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $root 'src/docs/screenshots') -Filter '*.png' -File | Copy-Item -Destination $screenshotDir
-foreach($name in @('ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md')){
- $content=Get-Content -LiteralPath (Join-Path $root ('src/'+$name)) -Raw
- $content.Replace('](Assets/MatchDay/','](../MatchDay/') | Set-Content -LiteralPath (Join-Path $documentation $name) -Encoding utf8
+# Keep all maintained guides; resolve links to packaged docs or tagged source.
+$docFiles=@('USER_GUIDE.md','RELEASE_NOTES.md','ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md','PRODUCT_AND_DEVELOPER_GUIDE.md','ROADMAP.md','RESEARCH.md','Architecture/README.md','Localization/README.md','Assets/MatchDay/Kits/README.md')
+$docMap=@{}
+foreach($name in $docFiles){
+ $source=[IO.Path]::GetFullPath((Join-Path $root ('src/'+$name)))
+ $destination=if($name -in @('USER_GUIDE.md','RELEASE_NOTES.md')){Join-Path $payload $name}elseif($name.StartsWith('Assets/')){Join-Path $payload ('assets/'+$name.Substring(7))}else{Join-Path $documentation $name}
+ $docMap[$source]=$destination
 }
-foreach($name in @('USER_GUIDE.md','RELEASE_NOTES.md')){
- $path=Join-Path $payload $name
- $content=Get-Content -LiteralPath $path -Raw
- foreach($extra in @('ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md')){$content=$content.Replace(']('+$extra+')','](assets/docs/'+$extra+')')}
- $content.Replace('](docs/screenshots/','](assets/docs/screenshots/').Replace('](Assets/docs/','](assets/docs/') | Set-Content -LiteralPath $path -Encoding utf8
+foreach($name in $docFiles){
+ $source=[IO.Path]::GetFullPath((Join-Path $root ('src/'+$name)));$destination=$docMap[$source]
+ $content=Get-Content -LiteralPath $source -Raw -Encoding utf8
+ $rewrite={param($match)
+  $url=$match.Groups[1].Value
+  if($url -match '^[a-zA-Z][a-zA-Z0-9+.-]*:' -or $url.StartsWith('#')){return $match.Value}
+  $parts=$url.Split('#',2);$anchor=if($parts.Count -gt 1){'#'+$parts[1]}else{''}
+  $target=[IO.Path]::GetFullPath((Join-Path (Split-Path $source -Parent) $parts[0]))
+  if($docMap.ContainsKey($target)){$link=[IO.Path]::GetRelativePath((Split-Path $destination -Parent),$docMap[$target]).Replace('\','/')}
+  else{$relative=[IO.Path]::GetRelativePath($root,$target).Replace('\','/');$link="https://github.com/LeoLi006/leo-desktop/blob/v$version/$relative"}
+  return ']('+$link+$anchor+')'
+ }
+ $content=[regex]::Replace($content,'\]\(([^)]+)\)',$rewrite)
+ New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
+ $content | Set-Content -LiteralPath $destination -Encoding utf8
 }
 Get-ChildItem -LiteralPath $payload -File | Where-Object {$_.Extension -in '.pdb','.xml'} | Remove-Item
 $files=[ordered]@{}
@@ -75,6 +89,11 @@ Leo v$version · Windows x64
 
 包含 Windows 桌面运行时，无需安装开发环境。不含个人数据、API Key、语音模型、QQ 音乐或 Clash 客户端。
 需要本地语音时，按安装目录 USER_GUIDE.md 的语音模型说明配置。
+
+Extract the complete archive, then run Install-Leo.cmd and select a dedicated Leo folder.
+For updates select the existing folder; the installer backs up and supports rollback.
+The Windows desktop runtime is bundled. No personal data, keys, voice models or third-party clients are included.
+See USER_GUIDE.md for optional features and voice setup.
 更新仅处理发布清单中的程序文件，清单、缓存、录音、模型和配置不会被覆盖。
 "@ | Set-Content -LiteralPath (Join-Path $stage '使用说明.txt') -Encoding utf8
 $archive=Join-Path $OutputDirectory "Leo-v$version-win-x64.zip"

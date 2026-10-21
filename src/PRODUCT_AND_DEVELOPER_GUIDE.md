@@ -1,6 +1,6 @@
 # Leo 产品与扩展开发说明
 
-本文面向想使用、理解或自行扩展 Leo 的读者。实现依据为主分支42fea41及其之前的阶段交付；本文更新不产生新的Windows发布包。仓库main、工程版本与Release标签可能不同，请用对应提交的文档与源码开发。
+本文面向想使用、理解或自行扩展 Leo 的读者。实现依据为主分支42fea41及其之前的阶段交付；本次以v1.05.0发布Windows安装包，接口实现基于下述提交及后续打包修订。仓库main、工程版本与Release标签可能不同，请用对应提交的文档与源码开发。
 
 [首页](../README.md) · [日常操作说明](USER_GUIDE.md) · [模块包与stdio协议](MODULES.md) · [路线图](ROADMAP.md) · [阶段验收与限制](Architecture/README.md)
 
@@ -360,7 +360,7 @@ cd leo-desktop
 
 # Product and developer guide — English
 
-This reference describes main through source commit `42fea41`. The project version is `1.04.0`; the existing downloadable release remains `v1.00.0`. Documentation publication does not create a new binary release. Use documentation and source from the same commit.
+This reference describes main through source commit `42fea41`. The release version is `1.05.0`, consolidating implementation through the stated commit and subsequent packaging revisions. Use documentation and source from the same commit.
 
 ## 1. Product and requirements
 

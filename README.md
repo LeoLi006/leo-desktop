@@ -3,9 +3,9 @@
 把应用、清单、便签、足球、音乐和本地操作放进一个可自定义的 Windows 桌面伙伴，按需启用功能。
 Bring apps, tasks, notes, football, music and local actions into a customizable Windows companion. Enable only what you need.
 
-**主分支工程版本 / main project version：1.04.0。现有安装包 / existing binary release：v1.00.0。** 主分支包含后续改进，本次仅同步源码与文档，不创建新安装包。Main includes later changes; this update publishes source and documentation, not a new binary release.
+**最新发布 / Latest release：v1.05.0 · Windows x64。** 包含中英文界面、当前模块底座和后续修复，安装包附SHA-256校验。Includes Chinese–English UI, the current module foundation and later fixes, with a SHA-256 checksum.
 
-[下载 / Download](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.00.0) · [问题反馈 / Issues](https://github.com/LeoLi006/leo-desktop/issues)
+[下载 / Download](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.05.0) · [问题反馈 / Issues](https://github.com/LeoLi006/leo-desktop/issues)
 
 ## 文档 / Documentation
 
@@ -38,9 +38,9 @@ Local features need no model API. Free chat/complex understanding use your confi
 
 ## 开始使用 / Getting started
 
-1. 在发布页下载 `Leo-v1.00.0-win-x64.zip`，完整解压，运行 `Install-Leo.cmd`。Download the ZIP from the release page, extract everything and run `Install-Leo.cmd`.
+1. 在发布页下载 `Leo-v1.05.0-win-x64.zip`，完整解压，运行 `Install-Leo.cmd`。Download the ZIP from the release page, extract everything and run `Install-Leo.cmd`.
 2. 右键伙伴进入设置，按需启用模块、配置本机程序路径。Right-click the companion to open settings and configure optional modules/local paths.
-3. 主分支支持设置 → 常规 → 界面语言：简体中文 / English；旧安装包不一定包含此功能。Main supports Settings → General → Interface language; the older binary release may not include it.
+3. 设置 → 常规 → 界面语言可切换简体中文 / English。Switch between Chinese and English in Settings → General → Interface language.
 4. 聊天需单独配置API；SenseVoice语音需本地模型。API chat and the local SenseVoice model are optional, separately configured dependencies.
 
 单击打开/关闭应用搜索；拖动移动；Esc收起当前窗口。脚下按钮、右键菜单和快捷栏按已启用模块显示。

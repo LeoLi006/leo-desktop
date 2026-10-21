@@ -1,7 +1,7 @@
 # 使用手册 / User guide
 
-适用主分支工程1.04.0；旧v1.00.0安装包不包含全部后续变化。本文不产生新安装包。
-Applies to main, project version 1.04.0. The older v1.00.0 binary does not contain every later change. No new binary is published by this documentation update.
+适用v1.05.0。旧v1.00.0安装包不包含全部后续变化。
+Applies to v1.05.0. The older v1.00.0 binary does not contain every later change.
 
 [首页 / Home](../README.md) · [开发指南 / Developer guide](PRODUCT_AND_DEVELOPER_GUIDE.md)
 

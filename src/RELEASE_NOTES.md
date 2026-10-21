@@ -1,9 +1,14 @@
 # 更新记录 / Change log
 
-## 主分支1.04.0 / Main1.04.0 — 2026-10-21
+## v1.05.0 — 2026-10-22
 
-工程版本用于当前源码，不代表发布了同名安装包。现有下载标签仍为v1.00.0；本次上传不创建Release。
-This is the current source project version, not a newly published binary. The downloadable release remains v1.00.0; this upload creates no Release.
+本次将v1.00.0之后的主分支改进集中发布为Windows x64安装包，附SHA-256校验文件。
+This Windows x64 release consolidates main changes since v1.00.0 and includes a SHA-256 checksum.
+
+### 安装与兼容 / Installation and compatibility
+
+完整解压，运行Install-Leo.cmd，更新时选择原安装目录；发布清单校验、更新前备份和回退沿用现有安装器。包内包含Windows桌面运行时，不含个人配置、Key、语音模型或第三方客户端。
+Extract everything and run Install-Leo.cmd. For updates select the existing installation. The installer verifies the manifest, backs up and supports rollback. The bundled Windows desktop runtime needs no development environment; personal settings, keys, speech models and third-party clients are excluded.
 
 ### 最近变化 / Recent changes
 
@@ -11,7 +16,7 @@ This is the current source project version, not a newly published binary. The do
 - `874b78f`：比赛后台元数据按相关事项筛选、去重和分批，避免大缓存超过动作输入上限；聊天文字重排、18种图标及电脑状态布局改进。Filter/deduplicate/chunk relevant match metadata to avoid oversized actions; chat reflow,18 icons and status-window improvements.
 - `6e4bca5`：聊天缩放/还原后合并布局和原生子窗口重绘，避免空闲循环刷新。Coalesced layout/native-child repaint after chat resize/restore without idle polling.
 - `42fea41`：简体中文/英文界面、本地资源、设置入口、动态控件与用户内容保护。Chinese–English UI using local resources, settings, dynamic bindings and user-content protection.
-- 本次文档：归并历史重复报告，更新有用说明并补齐中英文；不修改运行代码。Documentation update: consolidate repeated reports and update useful bilingual guides; no runtime-code change.
+- 文档归并为中英双文指南；安装包附本地说明，源码接口链接指向本版本标签。Consolidated bilingual guides are included; source-interface links target this release tag.
 
 ### 此前主分支底座 / Earlier main foundations
 
