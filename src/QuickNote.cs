@@ -2,7 +2,7 @@ namespace LeoLauncher;
 sealed class QuickNoteForm:BarcaWindow
 {
     readonly ModuleThemeBinding theme;
-    readonly TextBox input=new(){Bounds=new(24,108,472,33),MaxLength=2000,TabIndex=0,BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,PlaceholderText="先记一句话…",AccessibleName="速记内容"};readonly Label status=new(){Bounds=new(24,152,472,38),ForeColor=BarcaUi.Muted};
+    readonly TextBox input=new(){Bounds=new(24,108,472,33),MaxLength=2000,TabIndex=0,BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,PlaceholderText=UiLanguage.T("先记一句话…"),AccessibleName="速记内容"};readonly Label status=new(){Bounds=new(24,152,472,38),ForeColor=BarcaUi.Muted};
     public QuickNoteForm(NoteStore store):this(NotesClient.Standalone(store)){}
     internal ActionResult? SavedResult{get;private set;}
     readonly NotesClient client;

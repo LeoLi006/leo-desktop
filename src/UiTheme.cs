@@ -87,7 +87,7 @@ static class UiTheme
     {
         readonly ToolStripItem item;string? text;string rendered="";
         public ItemStyle(ToolStripItem i){item=i;}
-        public void Apply(){item.BackColor=BarcaUi.Surface;item.ForeColor=BarcaUi.Text;if(item.Text!=rendered){text=Branded(item.Text??"")?item.Text:null;}if(text!=null){rendered=Rename(text);item.Text=rendered;}}
+        public void Apply(){item.BackColor=BarcaUi.Surface;item.ForeColor=BarcaUi.Text;if(UiLanguage.Managed(item)||UiLanguage.IsPreserved(item))return;if(item.Text!=rendered){text=Branded(item.Text??"")?item.Text:null;}if(text!=null){rendered=Rename(text);item.Text=rendered;}}
     }
     [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr hwnd,int attribute,ref int value,int size);
     static void Caption(Form form){if(!form.IsHandleCreated||form.FormBorderStyle==FormBorderStyle.None)return;try{foreach(var pair in new[]{(35,BarcaUi.Canvas),(36,BarcaUi.Text),(34,BarcaUi.Line)}){int value=pair.Item2.R|(pair.Item2.G<<8)|(pair.Item2.B<<16);DwmSetWindowAttribute(form.Handle,pair.Item1,ref value,4);}}catch(DllNotFoundException){}catch(EntryPointNotFoundException){}}
@@ -95,13 +95,13 @@ static class UiTheme
     {
         readonly Control control;System.Drawing.Color back,fore;bool applying;string? text;string rendered="";string skin="",name="";int version=-1;
         public Style(Control c){control=c;back=Canonical(c.BackColor);fore=Canonical(c.ForeColor);c.BackColorChanged+=(_,_)=>{if(!applying)back=Canonical(c.BackColor);};c.ForeColorChanged+=(_,_)=>{if(!applying)fore=Canonical(c.ForeColor);};c.ControlAdded+=(_,e)=>{if(e.Control!=null)Attach(e.Control);};c.HandleCreated+=(_,_)=>Apply();if(c is ComboBox combo&&combo.DrawMode==DrawMode.Normal)CompanionUi.ThemeCombo(combo);c.TextChanged+=(_,_)=>{if(!applying)CaptureText();};if(c is ToolStrip strip)strip.ItemAdded+=(_,e)=>ApplyItem(e.Item!);CaptureText();}
-        void CaptureText(){if(control is TextBoxBase or ListControl)return;var current=control.Text;if(current==rendered)return;text=Branded(current)?current:null;}
+        void CaptureText(){if(control is TextBoxBase or ListControl||UiLanguage.Managed(control)||UiLanguage.IsPreserved(control)){text=null;return;}var current=control.Text;if(current==rendered)return;text=Branded(current)?current:null;}
         public void Apply(){if(control.IsDisposed)return;applying=true;try{
             var bg=back==SystemColors.Control||back==SystemColors.Window?BarcaUi.Canvas:Map(back);
             var fg=fore==SystemColors.ControlText||fore==SystemColors.WindowText?BarcaUi.Text:Map(fore);
             if(control is ButtonBase button){button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.CheckedBackColor=Appearance.Blue;if(button is Button){button.FlatAppearance.BorderColor=BarcaUi.Line;button.FlatAppearance.MouseOverBackColor=BarcaUi.Raised;button.FlatAppearance.MouseDownBackColor=Appearance.Blue;}if(back==SystemColors.Control)bg=BarcaUi.Surface;}
             if(control.BackColor!=bg)control.BackColor=bg;if(control.ForeColor!=fg)control.ForeColor=fg;
-            if(text!=null){rendered=Rename(text);if(control.Text!=rendered)control.Text=rendered;}
+            if(text!=null&&!UiLanguage.Managed(control)&&!UiLanguage.IsPreserved(control)){rendered=Rename(text);if(control.Text!=rendered)control.Text=rendered;}
             if(control.AccessibleName is string label&&Branded(label))control.AccessibleName=Rename(label);
             if(control is DateTimePicker date){date.CalendarMonthBackground=BarcaUi.Surface;date.CalendarForeColor=BarcaUi.Text;date.CalendarTitleBackColor=Appearance.Blue;date.CalendarTitleForeColor=BarcaUi.Text;date.CalendarTrailingForeColor=BarcaUi.Muted;}
             if(skin!=Skin||name!=Name||version!=revision){version=revision;Appearance.RefreshRound(control);if(control is Form top&&top.TopLevel)top.Opacity=top is ThemeEditor?1:WindowOpacity;if(control is Form window)Caption(window);skin=Skin;name=Name;control.Invalidate(true);}

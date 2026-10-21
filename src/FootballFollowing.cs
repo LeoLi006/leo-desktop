@@ -32,7 +32,7 @@ sealed class FollowingManager:BarcaWindow
 {
     readonly FootballFollowing following;readonly HashSet<string> selected;
     readonly FlowLayoutPanel rows=new(){Dock=DockStyle.Fill,AutoScroll=true,Padding=new Padding(16,8,8,8)};
-    readonly TextBox query=new(){Bounds=new Rectangle(22,13,410,28),PlaceholderText="搜索球队、简称或英文名",BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle};
+    readonly TextBox query=new(){Bounds=new Rectangle(22,13,410,28),PlaceholderText=UiLanguage.T("搜索球队、简称或英文名"),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle};
     readonly Label count=new(){Bounds=new Rectangle(24,12,460,27),ForeColor=BarcaUi.Gold};
     string league="全部";
     public FollowingManager(FootballFollowing store)
@@ -40,7 +40,7 @@ sealed class FollowingManager:BarcaWindow
         following=store;selected=store.Ids.ToHashSet();Text="Leo · 管理关注";StartPosition=FormStartPosition.CenterParent;ClientSize=new Size(740,635);
         var header=BarcaUi.Chrome(this,"我的球队","俱乐部与国家队 · 搜索、筛选，选择自己的关注");
         var filters=new Panel{Dock=DockStyle.Top,Height=102};filters.Controls.Add(query);var leagues=new FlowLayoutPanel{Bounds=new Rectangle(20,53,700,40)};
-        foreach(string name in new[]{"全部","英超","西甲","意甲","德甲","法甲","美职联","国家队"}){var button=new BarcaButton{Text=name,Size=new Size(75,30),Selected=name==league};button.Click+=(_,_)=>{league=name;foreach(var b in leagues.Controls.OfType<BarcaButton>()){b.Selected=b.Text==name;b.Invalidate();}Render();};leagues.Controls.Add(button);}filters.Controls.Add(leagues);
+        foreach(string name in new[]{"全部","英超","西甲","意甲","德甲","法甲","美职联","国家队"}){var button=new BarcaButton{Text=name,Size=new Size(75,30),Selected=name==league};button.Click+=(_,_)=>{league=name;foreach(var b in leagues.Controls.OfType<BarcaButton>()){b.Selected=UiLanguage.Source(b)==name;b.Invalidate();}Render();};leagues.Controls.Add(button);}filters.Controls.Add(leagues);
         var footer=new Panel{Dock=DockStyle.Bottom,Height=58};var save=new BarcaButton{Text="保存关注",Bounds=new Rectangle(581,9,130,35)};save.Click+=(_,_)=>{try{following.Replace(ClubCatalog.All.Where(c=>selected.Contains(c.Id)).Select(c=>c.Id));DialogResult=DialogResult.OK;}catch(Exception e){count.Text=e.Message;}};footer.Controls.AddRange([count,save]);
         Controls.Add(rows);Controls.Add(footer);Controls.Add(filters);Controls.Add(header);query.TextChanged+=(_,_)=>Render();Render();
     }

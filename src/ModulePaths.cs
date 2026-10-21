@@ -36,7 +36,7 @@ sealed class ModulePathsForm:BarcaWindow
         int y=103;
         foreach(var (id,name) in ModulePaths.Entries){
             Controls.Add(new Label{Text=name,Bounds=new Rectangle(23,y,550,23),ForeColor=BarcaUi.Gold,Font=BarcaUi.Font(10,true)});
-            var field=new TextBox{Text=paths.GetValueOrDefault(id)??"",PlaceholderText="自动检测（留空）",Bounds=new Rectangle(23,y+28,410,28),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle};fields[id]=field;
+            var field=new TextBox{Text=paths.GetValueOrDefault(id)??"",PlaceholderText=UiLanguage.T("自动检测（留空）"),Bounds=new Rectangle(23,y+28,410,28),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle};fields[id]=field;
             var choose=new BarcaButton{Text="选择…",Bounds=new Rectangle(442,y+26,72,31)};choose.Click+=(_,_)=>{using var picker=new OpenFileDialog{Title="选择 "+name,Filter="应用程序 (*.exe)|*.exe",CheckFileExists=true};if(picker.ShowDialog(this)==DialogResult.OK)field.Text=picker.FileName;};
             var auto=new BarcaButton{Text="自动",Bounds=new Rectangle(522,y+26,72,31)};auto.Click+=(_,_)=>field.Clear();Controls.AddRange([field,choose,auto]);y+=76;
         }

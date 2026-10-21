@@ -3,7 +3,7 @@ static class PetMenuHierarchy
 {
     public static void Organize(ContextMenuStrip menu,Action notes,Action chat,Action voice,Action launcher,Action appearance)
     {
-        var entries=menu.Items.OfType<ToolStripMenuItem>().ToArray();ToolStripMenuItem? Find(string name)=>entries.FirstOrDefault(e=>e.Text==name||e.Text?.StartsWith(name)==true);
+        var entries=menu.Items.OfType<ToolStripMenuItem>().ToArray();ToolStripMenuItem? Find(string name)=>entries.FirstOrDefault(e=>UiLanguage.Source(e)==name||UiLanguage.Source(e).StartsWith(name));
         var records=new ToolStripMenuItem("清单与记录");var applications=new ToolStripMenuItem("应用与媒体");var looks=new ToolStripMenuItem("外观");
         void Move(ToolStripMenuItem? item,ToolStripMenuItem parent){if(item==null)return;menu.Items.Remove(item);parent.DropDownItems.Add(item);}
         Move(Find("每日清单"),records);records.DropDownItems.Add("临时便签…",null,(_,_)=>notes());Move(Find("通知收纳盒"),records);Move(Find("临时专注"),records);

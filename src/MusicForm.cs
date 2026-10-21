@@ -22,7 +22,7 @@ sealed partial class MusicForm:BarcaWindow
         var chrome=BarcaUi.Chrome(this,"LEO  /  点一首","搜歌名或歌手，点完即走。歌单请在QQ音乐中操作。");
         var top=new Panel{Dock=DockStyle.Top,Height=136,Padding=new Padding(18,8,18,0)};
         var field=new RoundedSurface{Dock=DockStyle.Top,Height=45,Padding=new Padding(13,12,7,8),BackColor=BarcaUi.Raised};
-        input.Dock=DockStyle.Fill;input.Font=BarcaUi.Font(11);input.BorderStyle=BorderStyle.None;input.BackColor=BarcaUi.Raised;input.ForeColor=BarcaUi.Text;input.MaxLength=120;input.PlaceholderText="歌名 / 歌手，回车搜索";
+        input.Dock=DockStyle.Fill;input.Font=BarcaUi.Font(11);input.BorderStyle=BorderStyle.None;input.BackColor=BarcaUi.Raised;input.ForeColor=BarcaUi.Text;input.MaxLength=120;input.PlaceholderText=UiLanguage.T("歌名 / 歌手，回车搜索");
         var search=new BarcaButton{Text="搜索",Dock=DockStyle.Right,Width=66};field.Controls.Add(input);field.Controls.Add(search);top.Controls.Add(field);
         search.Click+=async(_,_)=>await SearchAsync(input.Text);input.KeyDown+=async(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;await SearchAsync(input.Text);}};
         var controls=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=70,WrapContents=true};
@@ -51,8 +51,8 @@ sealed partial class MusicForm:BarcaWindow
         foreach(var song in list)
         {
             var row=new RoundedSurface{Width=555,Height=72,BackColor=BarcaUi.Surface,Margin=new Padding(0,0,0,8)};
-            row.Controls.Add(new Label{Text=song.Name,Bounds=new Rectangle(14,10,365,25),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(10.5f,true),AutoEllipsis=true});
-            row.Controls.Add(new Label{Text=song.Artist+(song.Album.Length>0?" · "+song.Album:""),Bounds=new Rectangle(15,41,365,22),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f),AutoEllipsis=true});
+            row.Controls.Add(new Label{Tag="user-content",Text=song.Name,Bounds=new Rectangle(14,10,365,25),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(10.5f,true),AutoEllipsis=true});
+            row.Controls.Add(new Label{Tag="user-content",Text=song.Artist+(song.Album.Length>0?" · "+song.Album:""),Bounds=new Rectangle(15,41,365,22),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f),AutoEllipsis=true});
             var play=new BarcaButton{Text="播放 ▶",Bounds=new Rectangle(398,21,100,32),ForeColor=BarcaUi.Gold};
             play.Click+=async(_,_)=>{await Play(song);};row.Controls.Add(play);songs.Controls.Add(row);
         }

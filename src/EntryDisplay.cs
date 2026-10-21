@@ -26,8 +26,9 @@ sealed class EntryDisplayForm:BarcaWindow
         var scroll=new Panel{Bounds=new(22,108,726,346),AutoScroll=true};int y=0;
         foreach(var entry in EntryDisplay.Entries(prefs)){
             var title=new Label{Text=entry.Name,Bounds=new(8,y+4,305,25),AutoEllipsis=true,ForeColor=BarcaUi.Text,Font=BarcaUi.Font(10,true)};
+            if(!EntryContributions.ReadBuiltins(prefs).Any(e=>e.Id==entry.Id)&&entry.Id is not("system-monitor/open" or "mail-client/open"))UiLanguage.Preserve(title);
             var enabled=new Label{Text=entry.Enabled?"已启用":"已停用",Bounds=new(320,y+5,77,24),ForeColor=entry.Enabled?BarcaUi.Gold:BarcaUi.Muted,Font=BarcaUi.Font(9)};
-            var field=new ComboBox{Bounds=new(408,y,260,31),DropDownStyle=ComboBoxStyle.DropDownList,AccessibleName=entry.Id+"入口显示"};CompanionUi.ThemeCombo(field);foreach(var mode in EntryDisplay.Modes)field.Items.Add(new ComboChoice(mode.Label,mode.Value));field.SelectedItem=field.Items.Cast<ComboChoice>().First(m=>m.Value==EntryDisplay.EffectiveMode(prefs,entry.Id));fields[entry.Id]=field;
+            var field=new ComboBox{Bounds=new(408,y,260,31),DropDownStyle=ComboBoxStyle.DropDownList,AccessibleName=entry.Id+"入口显示"};CompanionUi.ThemeCombo(field);foreach(var mode in EntryDisplay.Modes)field.Items.Add(new ComboChoice(mode.Label,mode.Value,true));field.SelectedItem=field.Items.Cast<ComboChoice>().First(m=>m.Value==EntryDisplay.EffectiveMode(prefs,entry.Id));fields[entry.Id]=field;
             var hint=new Label{Text="搜索口令："+entry.Hint,Bounds=new(8,y+33,660,23),AutoEllipsis=true,ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};scroll.Controls.AddRange([title,enabled,field,hint]);y+=70;
         }
         scroll.AutoScrollMinSize=new(0,y+4);var note=new Label{Text="快捷栏显示：保留原位置的快捷按钮，也能从右键菜单进入。\n仅菜单显示：隐藏快捷按钮，保留右键入口。仅搜索调用：两种入口都隐藏。\n聊天、语音、组合、已有快捷键和内容操作仍可调用已启用能力。\n停用模块的显示选择会保留，重新启用后恢复。确认后还需保存设置。",Bounds=new(28,468,710,75),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};
@@ -38,10 +39,10 @@ sealed partial class PetForm
 {
     void WireOptionalEntryMenus(ContextMenuStrip menu)
     {
-        var parent=menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="应用与媒体");
+        var parent=menu.Items.OfType<ToolStripMenuItem>().Single(i=>UiLanguage.Source(i)=="应用与媒体");
         menu.Opening+=(_,_)=>{
             foreach(var old in parent.DropDownItems.OfType<ToolStripMenuItem>().Where(i=>i.Tag as string=="optional-entry").ToArray()){parent.DropDownItems.Remove(old);old.Dispose();}
-            ToolStripMenuItem Item(string title,string action,string value="",string owner=""){var item=new ToolStripMenuItem(title){Tag="optional-entry"};item.Click+=async(_,_)=>{try{if(owner.Length>0)EntryContributions.BuiltinAction(prefs,owner);var delivery=owner=="football"?presentation.Feedback(ModuleWindowTarget.Football,CancellationToken.None):action.StartsWith("local:",StringComparison.Ordinal)?presentation.Feedback(ModuleWindowTarget.Applications,CancellationToken.None):null;
+            ToolStripMenuItem Item(string title,string action,string value="",string owner=""){var item=new ToolStripMenuItem(title){Tag="optional-entry"};if(Guid.TryParseExact(owner,"N",out _))UiLanguage.Preserve(item);item.Click+=async(_,_)=>{try{if(owner.Length>0)EntryContributions.BuiltinAction(prefs,owner);var delivery=owner=="football"?presentation.Feedback(ModuleWindowTarget.Football,CancellationToken.None):action.StartsWith("local:",StringComparison.Ordinal)?presentation.Feedback(ModuleWindowTarget.Applications,CancellationToken.None):null;
                 var result=await commands.ExecuteDetailedAsync(new(action.StartsWith("local:",StringComparison.Ordinal)?EntryContributions.CurrentAction(prefs,action[6..]):action,value,"menu"));if(!IsDisposed){if(delivery!=null)await delivery.ReportAsync(result,true);else OperationFeedback.Show(result.ToLegacy(CancellationToken.None));}}catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed)OperationFeedback.Error(e.Message);}};return item;}
             foreach(var entry in EntryContributions.ReadBuiltins(prefs).Where(e=>e.Id is "football" or "terminal" or "clash" or "edge")){
                 if(!entry.Menu)continue;

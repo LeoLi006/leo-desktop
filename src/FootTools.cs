@@ -75,7 +75,7 @@ sealed class FootTools : Form
         terminal.FlatAppearance.BorderSize = 0;
         foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)})ShortcutManagement.Wire(pair.Item2,pair.Item1,id=>ManageShortcut?.Invoke(id));
         terminal.FlatAppearance.MouseOverBackColor = Appearance.Hover;
-        var tip = new ToolTip(); tip.SetToolTip(terminal, "管理员终端");
+        var tip = new UiToolTip(); tip.SetToolTip(terminal, "管理员终端");
         moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / Edge");
         searchButton.SetBounds(33, 2, 28, 24); searchButton.FlatStyle = FlatStyle.Flat;
         searchButton.FlatAppearance.BorderSize = 0; searchButton.BackColor = Appearance.Background;
@@ -105,13 +105,13 @@ sealed class FootTools : Form
         }
         proxyButton.Click+=async(_,_)=>await ChangeProxy();
         FeatureFaults.Timer(proxyTimer,"代理状态检查",()=>{_ = RefreshProxy();},enabled:()=>EntryContributions.Builtin(modules,"clash").Enabled);
-        search.SetBounds(67, 6, 154, 21); search.PlaceholderText = "输入关键词，回车搜索";
+        search.SetBounds(67, 6, 154, 21); search.PlaceholderText = UiLanguage.T("输入关键词，回车搜索");
         search.BorderStyle = BorderStyle.None; search.BackColor = Appearance.Background; search.ForeColor = Appearance.Ink;
         search.Visible = false;
         terminal.Click += (_, _) => {
             try { EntryContributions.BuiltinAction(modules,"terminal");Process.Start(TerminalStart()); }
             catch (Win32Exception e) when (e.NativeErrorCode == 1223) { }
-            catch (Exception e) { MessageBox.Show("无法打开管理员终端：" + e.Message, "Leo"); }
+            catch (Exception e) { UiDialogs.Show("无法打开管理员终端：" + e.Message, "Leo"); }
         };
         search.KeyDown += (_, e) => {
             if (e.KeyCode == Keys.Escape) { SetExpanded(false); e.SuppressKeyPress = true; return; }
@@ -119,7 +119,7 @@ sealed class FootTools : Form
             e.SuppressKeyPress = true;
             if (string.IsNullOrWhiteSpace(search.Text)) return;
             try { EntryContributions.BuiltinAction(modules,"edge");Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
-            catch (Exception error) { MessageBox.Show("无法打开 Edge：" + error.Message, "Leo"); }
+            catch (Exception error) { UiDialogs.Show("无法打开 Edge：" + error.Message, "Leo"); }
         };
         Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, search]);
         ApplyScale(petSize);

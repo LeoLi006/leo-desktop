@@ -36,7 +36,7 @@ sealed class LeoToast : Form
     }
     public void Present(LeoNotice notice)
     {
-        current = notice; messageText = (notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text;
+        current = notice; messageText = UiLanguage.T((notice.Error ? "未完成 · " : notice.Busy ? "处理中 · " : "✓ ") + notice.Text);
         int width=messageText.Length>90?320:270;
         int textWidth=width-54;
         int textHeight=Math.Max(25,TextRenderer.MeasureText(messageText,noticeFont,new Size(textWidth,int.MaxValue),NoticeFlags).Height+6);
@@ -52,7 +52,7 @@ sealed class LeoToast : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        TextRenderer.DrawText(e.Graphics,messageText,noticeFont,messageBounds,current?.Error==true?Color.LightSalmon:BarcaUi.Text,NoticeFlags);
+        UiLanguage.DrawText(e.Graphics,messageText,noticeFont,messageBounds,current?.Error==true?Color.LightSalmon:BarcaUi.Text,NoticeFlags);
         e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
         using var path=Appearance.Path(new Rectangle(1,1,Width-3,Height-3),12);
         using var border=new Pen(UiTheme.Color(82,67,82));e.Graphics.DrawPath(border,path);

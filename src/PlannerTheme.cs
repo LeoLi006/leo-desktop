@@ -5,7 +5,7 @@ static class BarcaMenus
     public static void Apply(ContextMenuStrip menu){var font=BarcaUi.Font(9.5f);menu.Renderer=new BarcaMenuRenderer();menu.Font=font;menu.BackColor=BarcaUi.Surface;menu.ForeColor=BarcaUi.Text;menu.ShowImageMargin=false;menu.ShowCheckMargin=false;menu.DropShadowEnabled=true;menu.Opening+=(_,_)=>Fit(menu);menu.Disposed+=(_,_)=>font.Dispose();}
     public static void Fit(ToolStripDropDown menu)
     {
-        menu.AutoSize=false;menu.Padding=new Padding(4,5,4,5);int width=96;
+        UiLanguage.Attach(menu);menu.AutoSize=false;menu.Padding=new Padding(4,5,4,5);int width=96;
         foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;int text=TextRenderer.MeasureText(item.Text??"",menu.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;int extra=0;if(item is ToolStripMenuItem entry){if(entry.HasDropDownItems)extra+=15;if(!string.IsNullOrEmpty(entry.ShortcutKeyDisplayString))extra+=TextRenderer.MeasureText(entry.ShortcutKeyDisplayString,menu.Font).Width+14;}width=Math.Max(width,text+extra+32);}
         foreach(ToolStripItem item in menu.Items){if(item is ToolStripSeparator)continue;item.AutoSize=false;item.Size=new Size(width,34);item.Padding=new Padding(9,0,20,0);}
         menu.Size=new Size(width+menu.Padding.Horizontal,menu.Padding.Vertical+menu.Items.Cast<ToolStripItem>().Sum(i=>i.Height)+2);menu.PerformLayout();
@@ -55,7 +55,7 @@ sealed class PlannerIdentity:Control
 {
     readonly Font title=BarcaUi.Font(10,true),small=BarcaUi.Font(8);
     readonly System.Windows.Forms.Timer timer=new(){Interval=8000};
-    readonly ToolTip tip=new();readonly QuoteDeck deck=new();
+    readonly UiToolTip tip=new();readonly QuoteDeck deck=new();
     string quote,next="";bool transitioning,hover,closing;long started;Form? owner;
     public string CurrentQuote=>quote;
     public bool QuoteTimerRunning=>timer.Enabled;

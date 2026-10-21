@@ -12,7 +12,7 @@ static class ModuleEntryRendering
         var entries=EntryContributions.ReadModules(prefs).Menu;if(entries.Length==0)return;
         var root=new ToolStripMenuItem("模块入口"){Tag="optional-entry"};
         foreach(var entry in entries){
-            ToolStripMenuItem Item(string title,int? index){var item=new ToolStripMenuItem(title){Tag=entry.Id};item.Click+=async(_,_)=>await Run(prefs,entry.Id,"menu",alive,menuIndex:index);return item;}
+            ToolStripMenuItem Item(string title,int? index){var item=new ToolStripMenuItem(title){Tag=entry.Id};if(entry.ModuleId is not("system-monitor" or "mail-client"))UiLanguage.Preserve(item);item.Click+=async(_,_)=>await Run(prefs,entry.Id,"menu",alive,menuIndex:index);return item;}
             if(entry.MenuActions.Length<=1)root.DropDownItems.Add(Item(entry.MenuName,entry.MenuActions.Length==0?null:0));
             else{var group=new ToolStripMenuItem(entry.MenuName);for(int i=0;i<entry.MenuActions.Length;i++)group.DropDownItems.Add(Item(entry.MenuActions[i].Name,i));BarcaMenus.StyleSubmenu(group,font);root.DropDownItems.Add(group);}
         }

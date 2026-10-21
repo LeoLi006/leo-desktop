@@ -10,6 +10,7 @@ record AppEntry(string Name, string Target, string Hint = "应用", string ExePa
 
 sealed class Preferences
 {
+    public string InterfaceLanguage {get;set;}="zh-CN";
     public Dictionary<string,string> ModuleExecutables {get;set;}=new();
     public List<LocalApplication> ApplicationModules {get;set;}=[];
     public Dictionary<string,InstalledApplicationPackage> ApplicationPackages {get;set;}=new();
@@ -94,7 +95,7 @@ static class Store
     public static void Save(Preferences p)
     {
         try { AtomicJson.Write(FilePath, JsonSerializer.Serialize(p, new JsonSerializerOptions { WriteIndented = true })); }
-        catch (Exception e) { MessageBox.Show("无法保存设置：" + e.Message, "Leo"); }
+        catch (Exception e) { UiDialogs.Show("无法保存设置：" + e.Message, "Leo"); }
     }
 }
 
@@ -213,7 +214,7 @@ static class Program
         if(args.Length>0&&args[0]=="--dock-animation-test")Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         FeatureFaults.IsTestMode=args.Any(a=>a.EndsWith("-test",StringComparison.Ordinal))||args.Contains("--package-verify");
         if(!FeatureFaults.IsTestMode){Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);FeatureFaults.Start();}
-        BarcaScrollTheme.Start(); UiTheme.Start();
+        BarcaScrollTheme.Start(); UiTheme.Start();UiLanguage.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
         if(args.Length==2&&args[0]=="--m05-conversation-test"){ConversationTests.Run(args[1]);return;}
@@ -244,6 +245,7 @@ static class Program
         if(args.Length==2&&args[0]=="--feedback-pointer-test"){FeedbackPointerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--ui-language-test"){UiLanguageTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--chat-resize-test"){ChatResizeTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--desktop-tools-test"){DesktopToolsTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--delivery-recovery-test"){DeliveryRecoveryTests.Run(args[1]);return;}
@@ -490,7 +492,7 @@ static class Program
         bool isPreview = args.Length == 2 && args[0].StartsWith("--preview");
         using var mutex = new Mutex(true, isPreview ? "Local\\LeoLauncherPreview" + Environment.ProcessId : "Local\\LeoLauncherOriginalGoat", out bool created);
         if (!created && args.Contains("--startup")) return;
-        if (!created) { MessageBox.Show("Leo 已在运行。请先右键旧版小羊并退出，再启动新版。", "Leo"); return; }
+        if (!created) { UiDialogs.Show("Leo 已在运行。请先右键旧版小羊并退出，再启动新版。", "Leo"); return; }
         try
         {
             var current=isPreview?new Preferences():Store.Load();
@@ -512,7 +514,7 @@ static class Program
             if(args.Contains("--startup"))pet.Shown+=(_,_)=>LeoStartup.Log("登录启动成功，Leo 已显示");
             Application.Run(pet);
         }
-        catch (Exception e) { if(args.Contains("--startup"))LeoStartup.Log("启动失败："+e.GetType().Name+" · "+e.Message);else MessageBox.Show("Leo 无法启动：" + e.Message, "Leo"); }
+        catch (Exception e) { if(args.Contains("--startup"))LeoStartup.Log("启动失败："+e.GetType().Name+" · "+e.Message);else UiDialogs.Show("Leo 无法启动：" + e.Message, "Leo"); }
     }
 }
 
@@ -549,7 +551,7 @@ sealed partial class PetForm : Form
         constructionProbe?.Invoke("body_enter");
         if(!preview)Modules.SetFootball(p.FootballModule);
         notices=new(preview?null:Path.Combine(Store.Root,"leo-notices.json"));focus=new(preview?null:Path.Combine(Store.Root,"leo-focus.json"));
-        PlannerPhrases.Configure(p.PlannerQuotes);prefs = p;p.EntryDisplayModes??=new();p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
+        p.InterfaceLanguage=p.InterfaceLanguage=="en"?"en":"zh-CN";UiLanguage.Configure(p.InterfaceLanguage);PlannerPhrases.Configure(p.PlannerQuotes);prefs = p;p.EntryDisplayModes??=new();p.ApplicationModules??=[];p.ModuleIcons??=new();p.ShortcutOrder??=[];p.SkinThemes??=new();p.DisabledExtensions??=[]; UiTheme.Configure(SkinSelection.Id(p),p.DisplayName,p.SkinThemes.GetValueOrDefault(SkinSelection.Id(p)));p.DisplayName=UiTheme.Name; if(!preview)ModulePaths.Configure(p.ModuleExecutables);previewMode = preview;todoStore=new(preview?null:Path.Combine(Store.Root,"leo-todos.json"));
         atlas = new Bitmap(Path.Combine(Store.Root, "assets", "leo.png"));
         verticalAtlas = new Bitmap(Path.Combine(Store.Root, "assets", "vertical-drag.png"));
         FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
@@ -594,13 +596,13 @@ sealed partial class PetForm : Form
         constructionProbe?.Invoke("input_surfaces_ready");
         WireMusicMenu(menu);WireComboMenu(menu);WireCompanionMenu(menu);WireSkinMenu(menu);
         PetMenuHierarchy.Organize(menu,()=>{try{ShowNotes();}catch(Exception e){OperationFeedback.Error(e.Message);}},ShowChat,ShowVoice,ShowLauncher,()=>{launcher.Hide();using var editor=new ThemeEditor(prefs,next=>ApplySettings(next,!previewMode&&LeoStartup.Enabled),previewMode);WindowPositions.Prepare(editor,"theme",Bounds,previewMode);editor.ShowDialog();});
-        var quickNoteItem=new ToolStripMenuItem("一句话速记…");quickNoteItem.Click+=(_,_)=>ShowQuickNote();menu.Items.OfType<ToolStripMenuItem>().Single(i=>i.Text=="清单与记录").DropDownItems.Insert(0,quickNoteItem);
+        var quickNoteItem=new ToolStripMenuItem("一句话速记…");quickNoteItem.Click+=(_,_)=>ShowQuickNote();menu.Items.OfType<ToolStripMenuItem>().Single(i=>UiLanguage.Source(i)=="清单与记录").DropDownItems.Insert(0,quickNoteItem);
         WireOptionalEntryMenus(menu);
         menu.Opening+=(_,_)=>{CancelPetPress();hit.Capture=false;launcher.Hide();};
         ContextMenuStrip = menu;
         hit.ContextMenuStrip = menu;
         tray = new NotifyIcon { Text = "Leo · 桌面伙伴", Icon = LeoBrand.Icon, Visible = true, ContextMenuStrip = menu };
-        tray.DoubleClick += (_, _) => ShowLauncher();
+        UiLanguage.RefreshOnChange(this,()=>tray.Text=UiLanguage.T(UiTheme.Name+" · 桌面伙伴"));tray.Text=UiLanguage.T(UiTheme.Name+" · 桌面伙伴");tray.DoubleClick += (_, _) => ShowLauncher();
         // Dock hover is handled by the animation timer so shrinking hit bounds cannot cancel tucking.
         hit.MouseDown += (_, e) => { if (e.Button == MouseButtons.Left) BeginPetPress(hit.PointToScreen(e.Location)); };
         hit.MouseMove += (_, e) => {

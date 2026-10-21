@@ -151,10 +151,10 @@ sealed partial class PetForm
         {
             foreach(ToolStripItem old in root.DropDownItems.Cast<ToolStripItem>().ToArray())old.Dispose();root.DropDownItems.Clear();
             var store=new ComboStore(previewMode?null:ComboStore.FilePath);
-            foreach(var combo in store.Items){string id=combo.Id;root.DropDownItems.Add(combo.Name,null,async(_,_)=>await RunCombo(id));}
+            foreach(var combo in store.Items){string id=combo.Id;var choice=new ToolStripMenuItem(combo.Name);UiLanguage.Preserve(choice);choice.Click+=async(_,_)=>await RunCombo(id);root.DropDownItems.Add(choice);}
             if(store.Items.Count==0)root.DropDownItems.Add(new ToolStripMenuItem(store.Error??"暂无自定义组合"){Enabled=false});
             root.DropDownItems.Add(new ToolStripSeparator());root.DropDownItems.Add("＋ 新建自定义…",null,(_,_)=>EditCombo(null,root.DropDown.Bounds));
-            var edit=new ToolStripMenuItem("编辑 / 删除");foreach(var combo in store.Items){string id=combo.Id;edit.DropDownItems.Add(combo.Name,null,(_,_)=>EditCombo(id,edit.DropDown.Bounds));}edit.Enabled=store.Items.Count>0;root.DropDownItems.Add(edit);BarcaMenus.StyleSubmenu(edit,menu.Font);
+            var edit=new ToolStripMenuItem("编辑 / 删除");foreach(var combo in store.Items){string id=combo.Id;var choice=new ToolStripMenuItem(combo.Name);UiLanguage.Preserve(choice);choice.Click+=(_,_)=>EditCombo(id,edit.DropDown.Bounds);edit.DropDownItems.Add(choice);}edit.Enabled=store.Items.Count>0;root.DropDownItems.Add(edit);BarcaMenus.StyleSubmenu(edit,menu.Font);
         };
     }
 }

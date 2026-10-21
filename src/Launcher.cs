@@ -123,7 +123,7 @@ sealed partial class LauncherForm : Form
         StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 248);
         BackColor = Appearance.Background; ForeColor = Appearance.Ink; Font = Appearance.Body();
         Appearance.Round(this, 16);
-        var brand=new Label { Text = "LEO", Left = 22, Top = 9, Width = 43, Height = 22, AutoEllipsis=true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Appearance.Accent };Controls.Add(brand);
+        var brand=new Label { Tag="pet-brand",Text = "LEO", Left = 22, Top = 9, Width = 43, Height = 22, AutoEllipsis=true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Appearance.Accent };Controls.Add(brand);
         var footballButton = new GlyphButton("football") { Bounds = new Rectangle(69, 7, 28, 24), AccessibleName = "足球赛程", FlatStyle = FlatStyle.Flat };
         footballButton.FlatAppearance.BorderSize = 0;
         openFootball = () => {
@@ -144,14 +144,14 @@ sealed partial class LauncherForm : Form
         var size = new MsnSlider { Value = Math.Clamp(p.PetSize, 80, 230) };
         size.AutoSize = false; size.SetBounds(390, 6, 145, 28);
         size.AccessibleName = "Leo 大小";
-        var sizeTip = new ToolTip(); sizeTip.SetToolTip(size, "拖动调整 Leo 大小");
+        var sizeTip = new UiToolTip(); sizeTip.SetToolTip(size, "拖动调整 Leo 大小");
         size.ValueChanged += (_, _) => { prefs.PetSize = size.Value; resizePet(); };
         size.MouseUp += (_, _) => { if (!preview) Store.Save(prefs); };
         size.KeyUp += (_, _) => { if (!preview) Store.Save(prefs); };
         Controls.Add(size);
         AddButton("×", 548, 6, 30, Hide);
         var field = new SoftPanel { Bounds = new Rectangle(16, 38, 568, 32) }; Appearance.Round(field, 11); Controls.Add(field);
-        query.SetBounds(38, 5, 520, 24); query.PlaceholderText = "搜索应用、文件路径或指令";
+        query.SetBounds(38, 5, 520, 24); query.PlaceholderText = UiLanguage.T("搜索应用、文件路径或指令");
         query.BorderStyle = BorderStyle.None; query.Font = Appearance.Body(10.5f);
         query.BackColor = Appearance.Field; query.ForeColor = Appearance.Ink; field.Controls.Add(query);
         recent.SetBounds(18, 76, 564, 166); recent.WrapContents = true; Controls.Add(recent);
@@ -306,7 +306,7 @@ sealed partial class LauncherForm : Form
                 RememberFavoriteUndo();
                 if (pinned) prefs.Favorites.RemoveAll(x => x.Equals(app.Target, StringComparison.OrdinalIgnoreCase));
                 else if (prefs.Favorites.Count < 14) prefs.Favorites.Add(app.Target);
-                else MessageBox.Show("最多置顶 14 个图标，请先取消一个收藏。", "Leo");
+                else UiDialogs.Show("最多置顶 14 个图标，请先取消一个收藏。", "Leo");
                 FinishFavoriteUndo();if (!preview) Store.Save(prefs);
                 BeginInvoke((Action)(() => { PopulateRecent(); Activate(); query.Focus(); }));
             });
@@ -451,7 +451,7 @@ sealed partial class LauncherForm : Form
             if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);
         }
         catch(OperationCanceledException){}
-        catch (Exception e) { MessageBox.Show("无法打开 " + app.Name + "：" + e.Message, "Leo"); }
+        catch (Exception e) { UiDialogs.Show("无法打开 " + app.Name + "：" + e.Message, "Leo"); }
     }
     void RememberFavoriteUndo(){pendingFavorites=prefs.Favorites.ToList();pendingAliases=prefs.Aliases.ToDictionary(p=>p.Key,p=>p.Value.ToArray());}
     string FavoriteSignature()=>System.Text.Json.JsonSerializer.Serialize(new{prefs.Favorites,prefs.Aliases});

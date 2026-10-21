@@ -20,7 +20,7 @@ sealed class NoticeInbox
 }
 sealed class NoticeInboxForm:BarcaWindow
 {
-    readonly NoticeInbox inbox;readonly Action<string> openTask;readonly FlowLayoutPanel list=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(18,8,14,8)};readonly Label state=new(){Dock=DockStyle.Bottom,Height=32,Padding=new Padding(20,5,0,0),ForeColor=BarcaUi.Muted};readonly ToolTip tips=new(){AutoPopDelay=15000};bool queued;
+    readonly NoticeInbox inbox;readonly Action<string> openTask;readonly FlowLayoutPanel list=new(){Dock=DockStyle.Fill,AutoScroll=true,FlowDirection=FlowDirection.TopDown,WrapContents=false,Padding=new Padding(18,8,14,8)};readonly Label state=new(){Dock=DockStyle.Bottom,Height=32,Padding=new Padding(20,5,0,0),ForeColor=BarcaUi.Muted};readonly UiToolTip tips=new(){AutoPopDelay=15000};bool queued;
     public NoticeInboxForm(NoticeInbox data,Action<string> task)
     {
         inbox=data;openTask=task;Text="Leo · 通知收纳盒";ClientSize=new(620,550);StartPosition=FormStartPosition.CenterParent;var chrome=BarcaUi.Chrome(this,"通知收纳盒","错误与提醒需要关注，普通操作仅作日志。");

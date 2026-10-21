@@ -1,6 +1,6 @@
 namespace LeoLauncher;
 
-sealed record ComboChoice(string Name,string Value) { public override string ToString()=>Name; }
+sealed record ComboChoice(string Name,string Value,bool Localize=false) { public override string ToString()=>Localize?UiLanguage.T(Name):Name; }
 sealed class ComboEditor : BarcaWindow
 {
     readonly List<ComboStep> steps;
@@ -10,7 +10,7 @@ sealed class ComboEditor : BarcaWindow
         var old=store.Items.FirstOrDefault(i=>i.Id==id);steps=old?.Steps.ToList()??[];
         Text=old==null?"Leo · 新建自定义":"Leo · 编辑自定义";ClientSize=new Size(680,640);StartPosition=FormStartPosition.CenterScreen;TopMost=false;
         Controls.Add(BarcaUi.Chrome(this,old==null?"新建自定义":"编辑自定义","选好操作、排好顺序，之后一键执行。无需模型 API。"));
-        var name=new TextBox{Bounds=new Rectangle(112,110,540,30),MaxLength=24,Text=old?.Name??"",PlaceholderText="例如：准备看球、晚上放松",BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle};
+        var name=new TextBox{Bounds=new Rectangle(112,110,540,30),MaxLength=24,Text=old?.Name??"",PlaceholderText=UiLanguage.T("例如：准备看球、晚上放松"),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle};
         Controls.Add(new Label{Text="组合名称",Bounds=new Rectangle(24,113,85,25),ForeColor=BarcaUi.Gold});Controls.Add(name);
         Controls.Add(new Label{Text="执行顺序 · 最多12步",Bounds=new Rectangle(24,151,500,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});Controls.Add(list);
         var status=new Label{Bounds=new Rectangle(24,535,628,46),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9),Text="失败时可重试剩余步骤，已完成的步骤不会重复执行。"};Controls.Add(status);
@@ -19,9 +19,9 @@ sealed class ComboEditor : BarcaWindow
         foreach(var (text,y,action) in new (string,int,Action)[]{("上移",186,()=>Move(-1)),("下移",231,()=>Move(1)),("移除",276,()=>{int index=list.SelectedIndex;if(index<0)return;steps.RemoveAt(index);RefreshSteps(index);})}){var button=new BarcaButton{Text=text,Bounds=new Rectangle(547,y,105,33)};button.Click+=(_,_)=>action();Controls.Add(button);}
         Controls.Add(new Label{Text="选择操作和参数，再点“添加一步”",Bounds=new Rectangle(24,370,628,25),ForeColor=BarcaUi.Gold,Font=BarcaUi.Font(9.5f,true)});
         var kind=new ComboBox{Bounds=new Rectangle(24,407,166,30),DropDownStyle=ComboBoxStyle.DropDownList};
-        var types=new[]{new ComboChoice("统一指令","command"),new("媒体播放/暂停","media_toggle"),new("暂停媒体","media_pause"),new("媒体下一项","media_next"),new("打开应用","app"),new("打开网址","url"),new("打开QQ音乐","qq_client"),new("开启系统代理","proxy_on"),new("关闭系统代理","proxy_off"),new("打开每日清单","todos"),new("打开足球窗口","football"),new("打开聊天窗口","chat"),new("打开观赛入口","watch")};kind.Items.AddRange(types);
+        var types=new[]{new ComboChoice("统一指令","command"),new("媒体播放/暂停","media_toggle"),new("暂停媒体","media_pause"),new("媒体下一项","media_next"),new("打开应用","app"),new("打开网址","url"),new("打开QQ音乐","qq_client"),new("开启系统代理","proxy_on"),new("关闭系统代理","proxy_off"),new("打开每日清单","todos"),new("打开足球窗口","football"),new("打开聊天窗口","chat"),new("打开观赛入口","watch")};kind.Items.AddRange(types.Select(x=>x with{Localize=true}).ToArray());
         var value=new ComboBox{Bounds=new Rectangle(202,407,327,30),DropDownStyle=ComboBoxStyle.DropDown,AutoCompleteMode=AutoCompleteMode.SuggestAppend,AutoCompleteSource=AutoCompleteSource.ListItems};
-        var url=new TextBox{Bounds=value.Bounds,PlaceholderText="填写网址，例如 https://…",BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle,MaxLength=2048};
+        var url=new TextBox{Bounds=value.Bounds,PlaceholderText=UiLanguage.T("填写网址，例如 https://…"),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.FixedSingle,MaxLength=2048};
         var hint=new Label{Bounds=new Rectangle(24,451,505,65),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)};
         Controls.AddRange([kind,value,url,hint]);
         void Choices()
@@ -50,7 +50,7 @@ sealed class ComboEditor : BarcaWindow
         };
         var save=new BarcaButton{Text="保存组合",Bounds=new Rectangle(540,591,112,34),ForeColor=BarcaUi.Gold};save.Click+=(_,_)=>{try{store.Put(new(old?.Id??Guid.NewGuid().ToString("N"),name.Text,steps.ToList()));if(!preview)OperationFeedback.Show("自定义组合已保存");DialogResult=DialogResult.OK;Close();}catch(Exception e){status.Text=e.Message;}};
         var cancel=new BarcaButton{Text="取消",Bounds=new Rectangle(418,591,106,34),DialogResult=DialogResult.Cancel};Controls.AddRange([save,cancel]);CancelButton=cancel;
-        if(old!=null){var delete=new BarcaButton{Text="删除组合",Bounds=new Rectangle(24,591,110,34),ForeColor=Color.LightSalmon};delete.Click+=(_,_)=>{if(MessageBox.Show(this,"删除“"+old.Name+"”？","删除组合",MessageBoxButtons.OKCancel)!=DialogResult.OK)return;try{store.Delete(old.Id);DialogResult=DialogResult.OK;Close();}catch(Exception e){status.Text=e.Message;}};Controls.Add(delete);}
+        if(old!=null){var delete=new BarcaButton{Text="删除组合",Bounds=new Rectangle(24,591,110,34),ForeColor=Color.LightSalmon};delete.Click+=(_,_)=>{if(UiDialogs.Show(this,"删除“"+old.Name+"”？","删除组合",MessageBoxButtons.OKCancel)!=DialogResult.OK)return;try{store.Delete(old.Id);DialogResult=DialogResult.OK;Close();}catch(Exception e){status.Text=e.Message;}};Controls.Add(delete);}
         RefreshSteps();MinimumSize=MaximumSize=Size;
     }
 }

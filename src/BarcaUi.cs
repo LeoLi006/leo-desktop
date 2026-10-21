@@ -51,7 +51,7 @@ sealed class BarcaButton:Button
     public BarcaButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;BackColor=BarcaUi.Surface;ForeColor=BarcaUi.Text;Cursor=Cursors.Hand;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
     protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}
     protected override void OnMouseLeave(EventArgs e){hover=false;Invalidate();base.OnMouseLeave(e);}
-    protected override void OnPaint(PaintEventArgs e){if(Width<2||Height<2)return;e.Graphics.Clear(Parent?.BackColor??BarcaUi.Canvas);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using var path=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),9);using var fill=new SolidBrush(Selected?Appearance.Blue:hover?BarcaUi.Raised:BackColor);e.Graphics.FillPath(fill,path);if(Selected){using var pen=new Pen(BarcaUi.Gold,1);e.Graphics.DrawPath(pen,path);}TextRenderer.DrawText(e.Graphics,Text,Font,ClientRectangle,Enabled?(Selected?BarcaUi.Gold:ForeColor):BarcaUi.Muted,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);}
+    protected override void OnPaint(PaintEventArgs e){if(Width<2||Height<2)return;e.Graphics.Clear(Parent?.BackColor??BarcaUi.Canvas);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using var path=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),9);using var fill=new SolidBrush(Selected?Appearance.Blue:hover?BarcaUi.Raised:BackColor);e.Graphics.FillPath(fill,path);if(Selected){using var pen=new Pen(BarcaUi.Gold,1);e.Graphics.DrawPath(pen,path);}UiLanguage.DrawText(e.Graphics,Text,Font,ClientRectangle,Enabled?(Selected?BarcaUi.Gold:ForeColor):BarcaUi.Muted,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);}
 }
 sealed class MatchCard:Control
 {
@@ -65,14 +65,14 @@ sealed class MatchCard:Control
     {
         var g=e.Graphics;g.Clear(Parent?.BackColor??BarcaUi.Canvas);g.SmoothingMode=SmoothingMode.AntiAlias;using var path=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),13);using var fill=new SolidBrush(BarcaUi.Surface);g.FillPath(fill,path);using var line=new Pen(BarcaUi.Line);g.DrawPath(line,path);
         TextRenderer.DrawText(g,FootballFeed.Name(match.League),small,new Rectangle(16,11,Width-180,22),BarcaUi.Muted,TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g,match.Kickoff.ToLocalTime().ToString("MM-dd ddd ")+(match.TimeKnown?match.Kickoff.ToLocalTime().ToString("HH:mm"):"时间待定"),small,new Rectangle(Width-185,11,170,22),BarcaUi.Muted,TextFormatFlags.Right);
+        TextRenderer.DrawText(g,match.Kickoff.ToLocalTime().ToString("MM-dd ddd ",UiLanguage.Culture)+(match.TimeKnown?match.Kickoff.ToLocalTime().ToString("HH:mm"):UiLanguage.T("时间待定")),small,new Rectangle(Width-185,11,170,22),BarcaUi.Muted,TextFormatFlags.Right);
         int center=Width/2;
         BarcaUi.DrawBadge(g,match.HomeId,new Rectangle(16,42,27,27));
         TextRenderer.DrawText(g,FootballFeed.Name(match.Home),body,new Rectangle(52,45,center-110,25),BarcaUi.Text,TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(g,match.Score,score,new Rectangle(center-54,37,108,35),BarcaUi.Text,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(g,FootballFeed.Name(match.Away),body,new Rectangle(center+64,45,center-112,25),BarcaUi.Text,TextFormatFlags.Right|TextFormatFlags.EndEllipsis);
         BarcaUi.DrawBadge(g,match.AwayId,new Rectangle(Width-42,42,27,27));
-        TextRenderer.DrawText(g,FootballFeed.Status(match),small,new Rectangle(center-50,68,100,16),match.State=="in"?UiTheme.Color(97,219,157):BarcaUi.Muted,TextFormatFlags.HorizontalCenter);
+        UiLanguage.DrawText(g,FootballFeed.Status(match),small,new Rectangle(center-50,68,100,16),match.State=="in"?UiTheme.Color(97,219,157):BarcaUi.Muted,TextFormatFlags.HorizontalCenter);
     }
     protected override void Dispose(bool disposing){if(disposing){body.Dispose();small.Dispose();score.Dispose();}base.Dispose(disposing);}
 }
@@ -85,7 +85,7 @@ class BarcaFollowBase:Control
     readonly string name,id;
     readonly Font font=BarcaUi.Font(10,true),small=BarcaUi.Font(8.5f);
     public BarcaFollowBase(string label,string badge){name=label;id=badge;Width=174;Height=66;Margin=new Padding(0,0,0,10);Cursor=Cursors.Hand;AccessibleName=label;SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);}
-    protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.Clear(Parent?.BackColor??BarcaUi.Canvas);g.SmoothingMode=SmoothingMode.AntiAlias;using var p=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),12);using var b=new SolidBrush(BarcaUi.Surface);g.FillPath(b,p);BarcaUi.DrawBadge(g,id,new Rectangle(12,17,31,31),"M");TextRenderer.DrawText(g,name,font,new Rectangle(53,13,115,24),BarcaUi.Text,TextFormatFlags.EndEllipsis);TextRenderer.DrawText(g,"比赛与积分榜  ›",small,new Rectangle(54,39,Math.Max(30,Width-60),18),BarcaUi.Muted);}
+    protected override void OnPaint(PaintEventArgs e){var g=e.Graphics;g.Clear(Parent?.BackColor??BarcaUi.Canvas);g.SmoothingMode=SmoothingMode.AntiAlias;using var p=Appearance.Path(new Rectangle(0,0,Width-1,Height-1),12);using var b=new SolidBrush(BarcaUi.Surface);g.FillPath(b,p);BarcaUi.DrawBadge(g,id,new Rectangle(12,17,31,31),"M");TextRenderer.DrawText(g,name,font,new Rectangle(53,13,115,24),BarcaUi.Text,TextFormatFlags.EndEllipsis);UiLanguage.DrawText(g,"比赛与积分榜  ›",small,new Rectangle(54,39,Math.Max(30,Width-60),18),BarcaUi.Muted);}
     protected override void Dispose(bool disposing){if(disposing){font.Dispose();small.Dispose();}base.Dispose(disposing);}
 }
 sealed class ConversationView:Panel
@@ -106,7 +106,7 @@ sealed class ConversationView:Panel
         try {
         history=turns.ToList();var data=new List<(string Name,string Text,bool User)>();
         if(history.Count==0){data.Add(("LEO",UiTheme.Rename("你好，我是 Leo。\n\n有什么想聊的？也可以让我打开应用，或点击麦克风直接说话。"),false));}
-        foreach(var turn in history.TakeLast(40)){data.Add(("你",turn.User,true));string details=turn.ToolLog.Count>0?string.Join("\n",turn.ToolLog)+"\n\n":"";data.Add(("LEO",details+(turn.Assistant.Length>0?turn.Assistant:"正在思考…")+(turn.Status=="完成"?"":"\n["+turn.Status+"]"),false));}
+        foreach(var turn in history.TakeLast(40)){data.Add(("你",turn.User,true));string details=turn.ToolLog.Count>0?string.Join("\n",turn.ToolLog)+"\n\n":"";data.Add(("LEO",details+(turn.Assistant.Length>0?turn.Assistant:UiLanguage.T("正在思考…"))+(turn.Status=="完成"?"":"\n["+UiLanguage.T(turn.Status)+"]"),false));}
         bool follow=VerticalScroll.Value+ClientSize.Height>=DisplayRectangle.Height-70;
         int savedScroll=-AutoScrollPosition.Y;
         AutoScrollPosition=Point.Empty;
@@ -118,7 +118,7 @@ sealed class ConversationView:Panel
             if(i==rows.Count){var row=new SpeechSurface{BackColor=BarcaUi.Surface};var label=new Label{Font=labelFont,ForeColor=BarcaUi.Gold,Bounds=new Rectangle(17,11,500,20)};var rich=new RichTextBox{ReadOnly=true,BorderStyle=BorderStyle.None,DetectUrls=false,Font=bodyFont,ForeColor=BarcaUi.Text,ScrollBars=RichTextBoxScrollBars.None};row.Controls.Add(label);row.Controls.Add(rich);Controls.Add(row);rows.Add(row);texts.Add(rich);signatures.Add("");}
             var panel=rows[i];var text=texts[i];int width=item.User?Math.Max(260,(int)(available*.82)):available;
             ((SpeechSurface)panel).IsUser=item.User;panel.BackColor=item.User?UiTheme.Color(27,48,79):UiTheme.Color(32,27,48);text.BackColor=panel.BackColor;
-            ((Label)panel.Controls[0]).Text=item.User?"你":UiTheme.Name+"  ·  随时在你身边";((Label)panel.Controls[0]).Width=width-34;
+            ((Label)panel.Controls[0]).Text=item.User?UiLanguage.T("你"):UiTheme.Name+UiLanguage.T("  ·  随时在你身边");((Label)panel.Controls[0]).Width=width-34;
             text.SetBounds(17,38,width-34,50);
             if(signatures[i]!=item.Text){text.Text=item.Text;signatures[i]=item.Text;}
             text.SelectionStart=0;text.ScrollToCaret();

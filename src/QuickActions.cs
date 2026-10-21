@@ -19,7 +19,7 @@ sealed partial class ChatForm
     void ResizeResults(){int width=ResultWidth;foreach(Control c in results.Controls){if(c is Label label){if(label.MaximumSize.Width!=width){label.MaximumSize=new(width,0);label.MinimumSize=new(width,0);}}else c.Width=width;}}
     void ResultText(string text,bool heading=false){if(IsDisposed||Disposing)return;results.Controls.Add(new Label{Text=text,AutoSize=true,MaximumSize=new(ResultWidth,0),MinimumSize=new(ResultWidth,heading?39:35),Padding=new Padding(4,heading?8:4,4,3),ForeColor=heading?BarcaUi.Text:BarcaUi.Muted,Font=heading?BarcaUi.Font(13,true):Font});}
 
-    void Choice(string text,Action action){if(IsDisposed||Disposing)return;var button=new BarcaButton{Text=text,Width=ResultWidth,Height=41,Margin=new Padding(0,2,0,6)};button.Click+=(_,_)=>{try{action();}catch(Exception e){state.Text=e.Message;}};results.Controls.Add(button);}
+    void Choice(string text,Action action,bool localize=true){if(IsDisposed||Disposing)return;var button=new BarcaButton{Text=text,Width=ResultWidth,Height=41,Margin=new Padding(0,2,0,6)};if(!localize)UiLanguage.Preserve(button);button.Click+=(_,_)=>{try{action();}catch(Exception e){state.Text=e.Message;}};results.Controls.Add(button);}
     void ShowHome(){ClearResults();ResultText("有什么交给我？",true);ResultText("打开应用、安排清单、查比赛，直接说就好。");Choice("看看今晚的比赛",()=>{input.Text="今晚看球";_=SendAsync();});Choice("看看今天的清单",()=>{input.Text="看看今天的清单";_=SendAsync();});Choice("准备看球",()=>{input.Text="准备看球";_=SendAsync();});if(turns.Count>0)Choice("继续刚才的话题",()=>ShowView(transcript));lastAnswer="";}
     void ShowTeamChoices(){ClearResults();ResultText("想看看哪支球队？",true);if(FootballForm.FollowingNames.Length==0)ResultText("还没有关注球队，可在足球窗口的管理关注中添加。");foreach(string name in FootballForm.FollowingNames)Choice(name,()=>{input.Text=name+"近况";_=SendAsync();});}
     void LocalDone(string text){if(IsDisposed||Disposing)return;lastAnswer=text;state.Text="本地完成 · 无 AI 请求";}
@@ -38,7 +38,7 @@ sealed partial class ChatForm
                     if(intent.Value is "应用" or "软件"||string.IsNullOrWhiteSpace(intent.Value)){ResultText("输入或说：打开微信、打开浏览器。");break;}
                     if(appTools==null)throw new InvalidOperationException("本机应用索引尚未就绪");var apps=appTools.FindLocal(intent.Value);var exact=apps.Where(a=>Catalog.Normalize(a.Name)==Catalog.Normalize(intent.Value)).ToArray();
                     if(intent.Kind==QuickKind.OpenApp&&(apps.Length==1||exact.Length==1)){var app=exact.Length==1?exact[0]:apps[0];string message=await appTools.OpenLocalAsync(app,request.Token);ResultText(message);LocalDone(message);}
-                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,async()=>{try{LocalDone(await appTools.OpenLocalAsync(app,chatLife.Token));}catch(Exception e){if(!chatReleased&&!IsDisposed)state.Text=e.Message;}});}break;
+                    else {ResultText(apps.Length>0?"点选要打开的应用":"未找到应用，索引可能尚未完成，也可以试试完整名称。");foreach(var app in apps)Choice(app.Name,async()=>{try{LocalDone(await appTools.OpenLocalAsync(app,chatLife.Token));}catch(Exception e){if(!chatReleased&&!IsDisposed)state.Text=e.Message;}},false);}break;
                 case QuickKind.Football:Modules.RequireFootball();await ShowFootball(intent,request.Token);break;
             }
         }catch(OperationCanceledException){if(!chatReleased&&!IsDisposed)state.Text="已停止";}catch(Exception e){if(!chatReleased&&!IsDisposed)state.Text=e.Message.Length>180?e.Message[..180]:e.Message;}

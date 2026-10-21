@@ -132,7 +132,7 @@ static class ClipboardTool
         var client=shared??ClipboardClient.Standalone(service,service.Preferences,()=>{});
         var window = new Form { Name="clipboard",FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false, Text = "Leo · 剪切板历史", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(740, 470), MinimumSize = new Size(640, 400), Font = new Font("Microsoft YaHei UI", 9.5f), BackColor = UiTheme.Color(24, 29, 44), ForeColor = Color.White };
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 112, Padding = new Padding(8), WrapContents = true };
-        var search = new TextBox { Width = 190, PlaceholderText = "搜索剪切板历史", BackColor = Appearance.Field, ForeColor = Appearance.Ink, BorderStyle = BorderStyle.FixedSingle };
+        var search = new TextBox { Width = 190, PlaceholderText = UiLanguage.T("搜索剪切板历史"), BackColor = Appearance.Field, ForeColor = Appearance.Ink, BorderStyle = BorderStyle.FixedSingle };
         var enabled = new CheckBox { Text = "记录历史", Checked = service.Enabled, AutoSize = true, Padding = new Padding(0, 4, 0, 0) };
         var copy = new Button { Text = "复制", Width = 65, Height = 28 };
         var delete = new Button { Text = "删除", Width = 65, Height = 28 };

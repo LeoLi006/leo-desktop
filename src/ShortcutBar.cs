@@ -6,7 +6,7 @@ static class ShortcutOrder
 }
 sealed partial class LauncherForm
 {
-    readonly ToolTip shortcutTips=new();readonly GlyphButton shortcutMore=new("more");readonly ContextMenuStrip shortcutOverflowMenu=new();
+    readonly UiToolTip shortcutTips=new();readonly GlyphButton shortcutMore=new("more");readonly ContextMenuStrip shortcutOverflowMenu=new();
     readonly Dictionary<string,(string Title,Action Run)> shortcutActions=new();bool shortcutDragging,ignoreShortcutClick;Point shortcutDown;string? draggedShortcut;
     const string ShortcutFormat="LeoShortcut53";
     void InitializeShortcutBar(Panel viewport)

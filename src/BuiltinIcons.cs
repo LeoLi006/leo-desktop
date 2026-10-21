@@ -20,7 +20,7 @@ sealed class BuiltinIconPicker:BarcaWindow
         Text="选择快捷图标";ClientSize=new(584,434);StartPosition=FormStartPosition.CenterParent;
         Controls.Add(BarcaUi.Chrome(this,"选择快捷图标","统一线条图标 · 可用于自定义应用，也可选择自己的图片"));
         var grid=new FlowLayoutPanel{Bounds=new(20,104,548,312),WrapContents=true};
-        foreach(var entry in BuiltinIcons.Entries){var cell=new Panel{Size=new(86,94),Margin=new Padding(2)};var button=new GlyphButton(entry.Id){Bounds=new(19,4,48,48),AccessibleName=entry.Name};var caption=new Label{Text=entry.Name,TextAlign=ContentAlignment.MiddleCenter,Bounds=new(0,56,86,26),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(9)};button.Click+=(_,_)=>{Selected=BuiltinIcons.Prefix+entry.Id;DialogResult=DialogResult.OK;};cell.Controls.AddRange([button,caption]);grid.Controls.Add(cell);}Controls.Add(grid);theme=new(this);MinimumSize=MaximumSize=Size;
+        foreach(var entry in BuiltinIcons.Entries){var cell=new Panel{Size=new(86,94),Margin=new Padding(2)};var button=new GlyphButton(entry.Id){Bounds=new(19,4,48,48),AccessibleName=entry.Name};var caption=new Label{Text=entry.Name,TextAlign=ContentAlignment.MiddleCenter,Bounds=new(0,56,86,36),ForeColor=BarcaUi.Text,Font=BarcaUi.Font(9)};button.Click+=(_,_)=>{Selected=BuiltinIcons.Prefix+entry.Id;DialogResult=DialogResult.OK;};cell.Controls.AddRange([button,caption]);grid.Controls.Add(cell);}Controls.Add(grid);theme=new(this);MinimumSize=MaximumSize=Size;
     }
     protected override void Dispose(bool disposing){if(disposing){theme.Dispose();}base.Dispose(disposing);}
 }
