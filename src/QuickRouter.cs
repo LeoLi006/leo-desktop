@@ -6,7 +6,7 @@ static class QuickRouter
 {
     public static bool IsLocalMusic(string text){var intent=Route(text);return intent.Kind==QuickKind.LeoCommand&&(intent.Value.StartsWith("media_")||intent.Value is "music_step" or "scene_watch" or "combo_name" or "music_pause"||intent.Value=="music_open"&&intent.Argument.Length>0);}
     public static string Team(string text)=>ClubCatalog.Mention(text);
-    public static QuickIntent Route(string text){if(LocalPath.LooksLike(text))return new(QuickKind.LeoCommand,"path_open",Argument:text);text=text.Trim().TrimEnd('。','！','？','?','!');string team=Team(text);
+    public static QuickIntent Route(string text){if(LocalPath.LooksLike(text))return new(QuickKind.LeoCommand,"path_open",Argument:text);text=text.Trim().TrimEnd('。','！','？','?','!');string team=Team(text);if(text is "电脑状态" or "系统监测" or "内存" or "CPU" or "看看电脑状态" or "打开电脑状态")return new(QuickKind.LeoCommand,"system_open");if(text is "邮箱" or "邮件客户端" or "打开邮箱")return new(QuickKind.LeoCommand,"mail_client_open");if(text=="打开任务管理器")return new(QuickKind.LeoCommand,"system_taskmanager");
         if(text is "便签" or "临时便签" or "打开便签")return new(QuickKind.LeoCommand,"notes_open");
         var note=Regex.Match(text,@"^(?:记一下|记下来|新便签|便签)[：:\s]*(.+)$",RegexOptions.Singleline);if(note.Success)return new(QuickKind.LeoCommand,"note_add",Argument:note.Groups[1].Value.Trim());
         if(text is "媒体控制" or "打开媒体控制" or "打开播放器控制")return new(QuickKind.LeoCommand,"media_open");

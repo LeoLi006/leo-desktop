@@ -25,6 +25,7 @@ static partial class ModuleStatuses
         var active=ModuleActivity.Get(id);if(active is {} a&&a.State is ModuleState.Waiting or ModuleState.Failed)return new(id,name,a.State,a.Detail,a.State==ModuleState.Failed?"重新检测":"刷新状态");
         return new(id,name,ModuleState.Ready,"依赖检查通过；不代表外部软件已启动。","查看配置");
     }
+    static ModuleStatus DesktopStatus(string id,string name,string action,Preferences p){try{if(id=="mail-client"&&DesktopClients.Resolve(p.MailClientPath,true)==null)return new(id,name,!string.IsNullOrWhiteSpace(p.MailClientPath)?ModuleState.Invalid:ModuleState.NotConfigured,"从邮箱入口选择现有客户端；Leo不读取账户和邮件。","功能设置");return FromContract(id,name,"内置可选模块","功能设置",EntryContributions.ReadStatusContract(p,action));}catch(Exception e)when(FeatureFaults.Recoverable(e)){return new(id,name,ModuleState.Unknown,"当前契约未连接，请重新打开设置检查。","功能设置");}}
     public static ModuleStatus[] Read(Preferences p)
     {
         using var passive=ModulePaths.PassiveRead();var list=new List<ModuleStatus>();
@@ -34,6 +35,7 @@ static partial class ModuleStatuses
             list.Add(Resolve(entry.Id,entry.Name,entry.Enabled,configured,Installed,()=>ModulePaths.Validate(entry.Id,configured??"").Length>0));
         }
         list.AddRange(ReadConfigured(p,new ExtensionStore(Path.Combine(Store.Root,"modules")){Preferences=p},(action,expected)=>EntryContributions.ReadStatusContract(p,action,expected)));
+        foreach(var tool in new[]{("system-monitor","电脑状态","system_open",p.SystemMonitorModule),("mail-client","邮箱客户端","mail_client_open",p.DesktopMailModule)}){var row=!tool.Item4?new ModuleStatus(tool.Item1,tool.Item2,ModuleState.Disabled,"在设置 → 功能开启后使用。","功能设置"):DesktopStatus(tool.Item1,tool.Item2,tool.Item3,p);list.Add(row);}
         var config=ChatSettings.Load();bool api=config.ReadKey().Length>0&&config.Model.Length>0;
         list.Add(new("api","模型 API",api?ModuleState.Ready:ModuleState.NotConfigured,api?"配置已填写，连接需手动检测。":"请填写接口、模型及 Key；本地功能不依赖它。","API 配置"));
         return list.ToArray();

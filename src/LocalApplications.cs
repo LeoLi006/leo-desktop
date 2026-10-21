@@ -53,7 +53,7 @@ static class LocalApplications
     public static LocalApplication WithRepairedPath(LocalApplication a,string path)=>a with{Path=path,WorkingDirectory=a.WorkingDirectory.Length>0&&a.WorkingDirectory.Equals(System.IO.Path.GetDirectoryName(a.Path),StringComparison.OrdinalIgnoreCase)?System.IO.Path.GetDirectoryName(path)!:a.WorkingDirectory};
     public static ProcessStartInfo Start(LocalApplication a){Validate(a);return new(a.Path){UseShellExecute=true,Arguments=a.Arguments,WorkingDirectory=a.WorkingDirectory,Verb=a.Administrator?"runas":""};}
     public static Bitmap? Icon(string? path){if(string.IsNullOrWhiteSpace(path)||!File.Exists(path))return null;try{if(new FileInfo(path).Length>10_000_000)return null;if(new[]{".exe",".lnk"}.Contains(System.IO.Path.GetExtension(path),StringComparer.OrdinalIgnoreCase)){using var icon=System.Drawing.Icon.ExtractAssociatedIcon(path);return icon?.ToBitmap();}using var image=Image.FromFile(path);return new Bitmap(image,new Size(32,32));}catch{return null;}}
-    public static void SetEnabled(Preferences p,string id,bool value){switch(id){case "terminal":p.TerminalModule=value;break;case "clash":p.ClashModule=value;break;case "music":p.MusicModule=value;break;case "edge":p.EdgeModule=value;break;case "media":p.MediaModule=value;break;}}
+    public static void SetEnabled(Preferences p,string id,bool value){switch(id){case "system-monitor":p.SystemMonitorModule=value;break;case "mail-client":p.DesktopMailModule=value;break;case "terminal":p.TerminalModule=value;break;case "clash":p.ClashModule=value;break;case "music":p.MusicModule=value;break;case "edge":p.EdgeModule=value;break;case "media":p.MediaModule=value;break;}}
 }
 sealed partial class LocalApplicationsForm:BarcaWindow
 {

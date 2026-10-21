@@ -8,7 +8,7 @@ static class Modules
     public static CancellationTokenSource FootballRequest(CancellationToken caller){lock(footballGate){RequireFootball();return CancellationTokenSource.CreateLinkedTokenSource(caller,footballLife.Token);}}
 
     public static string? ForAction(string action)=>ModuleCatalog.Owner(action)=="core"?null:ModuleCatalog.Owner(action);
-    public static bool Enabled(Preferences p,string module)=>module switch{"terminal"=>p.TerminalModule,"clash"=>p.ClashModule,"music"=>p.MusicModule,"football"=>p.FootballModule,"edge"=>p.EdgeModule,"media"=>p.MediaModule,_=>true};
+    public static bool Enabled(Preferences p,string module)=>module switch{"system-monitor"=>p.SystemMonitorModule,"mail-client"=>p.DesktopMailModule,"terminal"=>p.TerminalModule,"clash"=>p.ClashModule,"music"=>p.MusicModule,"football"=>p.FootballModule,"edge"=>p.EdgeModule,"media"=>p.MediaModule,_=>true};
     public static void Require(Preferences p,string? module){if(module!=null&&!Enabled(p,module))throw new InvalidOperationException("此功能已停用，请在设置 → 功能中开启。");}
 }
 
