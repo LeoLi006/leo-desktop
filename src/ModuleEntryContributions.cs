@@ -3,9 +3,18 @@ namespace LeoLauncher;
 
 // Optional internal contract. Entries contain data only and grant no execution rights.
 interface IModuleEntryContributor:ILeoModule { EntryContribution[] DescribeEntries(); }
-sealed record ModuleEntrySnapshot(EntryContribution[] Entries,EntryContribution[] Buttons,EntryContribution[] Menu,EntryContribution[] Search);
+sealed record ModuleEntryFault(string ModuleId,string ErrorType);
+sealed record ModuleEntryDiagnostics(int Available,int Disabled,int Isolated,ModuleEntryFault[] Faults)
+{
+    public static ModuleEntryDiagnostics Empty=>new(0,0,0,[]);
+}
+sealed record ModuleEntrySnapshot(EntryContribution[] Entries,EntryContribution[] Buttons,EntryContribution[] Menu,EntryContribution[] Search)
+{
+    public ModuleEntryDiagnostics Diagnostics{get;init;}=ModuleEntryDiagnostics.Empty;
+}
 static class ModuleEntryContributions
 {
+    internal const int MaximumFaults=64;
     public const string TargetPrefix="leo-module-entry:";
     public static bool IsTarget(string target)=>target.StartsWith(TargetPrefix,StringComparison.OrdinalIgnoreCase);
     static bool Text(string? s,int max)=>!string.IsNullOrWhiteSpace(s)&&s.Length<=max&&!s.Any(char.IsControl);
@@ -22,7 +31,7 @@ static class ModuleEntryContributions
     }
     public static ModuleEntrySnapshot Read(Preferences prefs,CapabilityRegistry registry)
     {
-        var entries=new List<EntryContribution>();
+        var entries=new List<EntryContribution>();var faults=new List<ModuleEntryFault>();int isolated=0;
         foreach(var provider in registry.EntryContributors())try{
             var declared=provider.DescribeEntries();
             if(declared==null||declared.Length>32||declared.Any(e=>e==null)||declared.Select(e=>e.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=declared.Length)throw new ArgumentException("模块入口重复或无效");
@@ -33,8 +42,15 @@ static class ModuleEntryContributions
                 owned.Add(entry with{Enabled=entry.Enabled&&provider.Enabled,Mode=mode,Fault="",Aliases=entry.Aliases.ToArray(),MenuActions=entry.MenuActions.ToArray()});
             }
             entries.AddRange(owned);
-        }catch(Exception e)when(FeatureFaults.Recoverable(e)){/* One provider cannot remove other providers' entries. */}
-        var all=entries.ToArray();return new(all,all.Where(e=>e.Shortcut).ToArray(),all.Where(e=>e.Menu).ToArray(),all.Where(e=>e.Available).ToArray());
+        }catch(Exception e)when(FeatureFaults.Recoverable(e)){
+            isolated++;
+            if(faults.Count<MaximumFaults){
+                string id="invalid-module-id";try{var candidate=provider.Id;if(candidate.Length<=100&&candidate.Length>0&&candidate.All(c=>char.IsAsciiLetterOrDigit(c)||c is ':' or '_' or '-'))id=candidate;}catch(Exception identityError)when(FeatureFaults.Recoverable(identityError)){}
+                // Snapshot only: no exception message, parameters, path, event history or popup.
+                string type=e.GetType().Name;var fault=new ModuleEntryFault(id,type.Length<=80&&type.All(c=>char.IsAsciiLetterOrDigit(c)||c=='_')?type:"Exception");if(!faults.Contains(fault))faults.Add(fault);
+            }
+        }
+        var all=entries.ToArray();return new(all,all.Where(e=>e.Shortcut).ToArray(),all.Where(e=>e.Menu).ToArray(),all.Where(e=>e.Available).ToArray()){Diagnostics=new(all.Count(e=>e.Available),all.Count(e=>!e.Enabled),isolated,faults.ToArray())};
     }
     // UI passes identity only; stale descriptors/targets are never executed directly.
     public static Task<ActionResult> Execute(ActionDispatcher dispatcher,Preferences prefs,string id,string source,CancellationToken token=default,int? menuIndex=null)

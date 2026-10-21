@@ -26,3 +26,17 @@
 ## 第十八批：内部模块闭环新证据
 
 `.build/module-entry-closure/closure-final.json`：41项通过（保留20项，新增21项），SHA256 `e7e1a231246120c7fc9a1e26e1d630c4e7d28a7214e0866e96733fd3615108a6`。报告只在本机忽略目录；本批锁定构建零警告，未重跑上方历史业务专项。具体边界见[闭环收尾](MODULE-CLOSURE.md)。只扩充测试与说明，不更新运行程序。
+
+
+## R06：入口诊断新证据
+
+本轮只验证目录与直接相关渲染/宿主诊断，不沿用历史数量冒称本轮全量。
+
+| 本机忽略报告 | 项数 | SHA256 |
+| --- | --- | --- |
+| `entry-diagnostics/module-entry-diagnostics.json` | 24 | `782a15dad40b61c866d4364d6174ea102475f1cfc8f415b223431ccb87f05321` |
+| `entry-diagnostics/module-entry.json` | 27 | `ef3406f3faa25322890bd333247adbe27bc2642646debc183a4ce8b5c72dd50a` |
+| `entry-diagnostics/module-entry-rendering.json` | 41 | `e7e1a231246120c7fc9a1e26e1d630c4e7d28a7214e0866e96733fd3615108a6` |
+| `entry-diagnostics/host-service-cleanup.json` | 22 | `df13195b2e5da132472741213c3a48fccea2dc7de426f1201bc5d1da9cbf7d2e` |
+
+四项均通过，锁定构建零警告；限制及交付见[入口诊断](ENTRY-DIAGNOSTICS.md)。
