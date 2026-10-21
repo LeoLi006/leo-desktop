@@ -89,7 +89,18 @@ sealed class GlyphButton : Button
             e.Graphics.DrawLines(pen, new[] { new PointF(9, 17), new PointF(8, 21), new PointF(14, 17) });
             e.Graphics.DrawLine(pen, 9, 9, 19, 9); e.Graphics.DrawLine(pen, 9, 13, 16, 13);
         }
-        else if(glyph=="play"){e.Graphics.DrawRectangle(pen,4,3,20,17);e.Graphics.DrawPolygon(pen,new[]{new PointF(12,7),new PointF(18,11),new PointF(12,15)});}
+        else if(glyph=="monitor"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,3,20,14),new SizeF(2,2));e.Graphics.DrawLines(pen,[new(7,12),new(10,12),new(12,7),new(15,14),new(18,9),new(21,9)]);e.Graphics.DrawLine(pen,14,17,14,21);e.Graphics.DrawLine(pen,9,21,19,21);}
+        else if(glyph=="mail"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,5,20,15),new SizeF(3,3));e.Graphics.DrawLines(pen,[new(5,7),new(14,13),new(23,7)]);e.Graphics.DrawLine(pen,5,18,10,13);e.Graphics.DrawLine(pen,23,18,18,13);}
+        else if(glyph=="notes"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(6,3,16,19),new SizeF(2,2));for(int y=8;y<19;y+=5)e.Graphics.DrawLine(pen,10,y,18,y);}
+        else if(glyph=="folder"){e.Graphics.DrawLines(pen,[new(4,8),new(4,5),new(11,5),new(14,8),new(24,8),new(22,20),new(5,20),new(4,8),new(24,8)]);}
+        else if(glyph=="globe"){e.Graphics.DrawEllipse(pen,5,3,18,18);e.Graphics.DrawEllipse(pen,10,3,8,18);e.Graphics.DrawLine(pen,5,12,23,12);}
+        else if(glyph=="code"){e.Graphics.DrawLines(pen,[new(9,6),new(4,12),new(9,18)]);e.Graphics.DrawLines(pen,[new(19,6),new(24,12),new(19,18)]);e.Graphics.DrawLine(pen,16,4,12,20);}
+        else if(glyph=="shield"){e.Graphics.DrawLines(pen,[new(14,3),new(23,6),new(21,15),new(14,21),new(7,15),new(5,6),new(14,3)]);e.Graphics.DrawLines(pen,[new(10,11),new(13,14),new(18,8)]);}
+        else if(glyph=="image"){e.Graphics.DrawRectangle(pen,4,4,20,16);e.Graphics.DrawEllipse(pen,8,7,3,3);e.Graphics.DrawLines(pen,[new(5,18),new(11,12),new(15,16),new(19,11),new(24,17)]);}
+        else if(glyph=="game"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(3,7,22,13),new SizeF(5,5));e.Graphics.DrawLine(pen,7,13,13,13);e.Graphics.DrawLine(pen,10,10,10,16);e.Graphics.DrawEllipse(pen,18,11,1,1);e.Graphics.DrawEllipse(pen,21,14,1,1);}
+        else if(glyph=="clock"){e.Graphics.DrawEllipse(pen,5,3,18,18);e.Graphics.DrawLines(pen,[new(14,6),new(14,12),new(19,15)]);}
+        else if(glyph=="star"){e.Graphics.DrawPolygon(pen,Enumerable.Range(0,10).Select(i=>{double a=-Math.PI/2+i*Math.PI/5;float r=i%2==0?10:4.5f;return new PointF(14+r*(float)Math.Cos(a),12+r*(float)Math.Sin(a));}).ToArray());}
+        else if(glyph is "play" or "media"){e.Graphics.DrawRectangle(pen,4,3,20,17);e.Graphics.DrawPolygon(pen,new[]{new PointF(12,7),new PointF(18,11),new PointF(12,15)});}
         else if(glyph=="more"){e.Graphics.DrawLines(pen,ActiveState==true?new[]{new PointF(8,14),new PointF(14,8),new PointF(20,14)}:new[]{new PointF(8,9),new PointF(14,15),new PointF(20,9)});}
         else if(glyph=="todo"){e.Graphics.DrawRectangle(pen,6,3,16,18);for(int y=7;y<=17;y+=5){e.Graphics.DrawLines(pen,new[]{new PointF(9,y),new PointF(10,y+1),new PointF(12,y-1)});e.Graphics.DrawLine(pen,15,y,19,y);}}
         else if(glyph=="music"){e.Graphics.DrawLines(pen,new[]{new PointF(11,17),new PointF(11,5),new PointF(21,3),new PointF(21,15)});e.Graphics.DrawLine(pen,11,9,21,7);e.Graphics.DrawEllipse(pen,6,15,5,4);e.Graphics.DrawEllipse(pen,16,13,5,4);}

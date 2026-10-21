@@ -95,8 +95,10 @@ sealed class ConversationView:Panel
     readonly List<string> signatures=new();
     readonly Font bodyFont=BarcaUi.Font(11),labelFont=BarcaUi.Font(8.5f,true);
     List<ChatTurn> history=new();
-    bool rendering;
-    public ConversationView(){AutoScroll=true;DoubleBuffered=true;BackColor=BarcaUi.Canvas;Resize+=(_,_)=>Display(history);}
+    bool rendering,reflowPending;
+    public ConversationView(){AutoScroll=true;DoubleBuffered=true;BackColor=BarcaUi.Canvas;Resize+=(_,_)=>QueueReflow();VisibleChanged+=(_,_)=>{if(Visible)QueueReflow();};}
+    void QueueReflow(){if(reflowPending||IsDisposed||!IsHandleCreated)return;reflowPending=true;try{BeginInvoke((Action)(()=>{try{if(!IsDisposed){Display(history);PerformLayout();}}finally{reflowPending=false;}}));}catch(InvalidOperationException){reflowPending=false;}}
+    protected override Point ScrollToControl(Control activeControl)=>AutoScrollPosition;
     public void Display(IEnumerable<ChatTurn> turns)
     {
         if(rendering||IsDisposed)return;
@@ -110,7 +112,7 @@ sealed class ConversationView:Panel
         AutoScrollPosition=Point.Empty;
         SuspendLayout();
         while(rows.Count>data.Count){int i=rows.Count-1;rows[i].Dispose();rows.RemoveAt(i);texts.RemoveAt(i);signatures.RemoveAt(i);}
-        int y=12,available=Math.Max(300,ClientSize.Width-32);
+        int y=12,available=Math.Max(300,ClientSize.Width-32-SystemInformation.VerticalScrollBarWidth);
         for(int i=0;i<data.Count;i++){
             var item=data[i];
             if(i==rows.Count){var row=new SpeechSurface{BackColor=BarcaUi.Surface};var label=new Label{Font=labelFont,ForeColor=BarcaUi.Gold,Bounds=new Rectangle(17,11,500,20)};var rich=new RichTextBox{ReadOnly=true,BorderStyle=BorderStyle.None,DetectUrls=false,Font=bodyFont,ForeColor=BarcaUi.Text,ScrollBars=RichTextBoxScrollBars.None};row.Controls.Add(label);row.Controls.Add(rich);Controls.Add(row);rows.Add(row);texts.Add(rich);signatures.Add("");}
@@ -119,9 +121,11 @@ sealed class ConversationView:Panel
             ((Label)panel.Controls[0]).Text=item.User?"你":UiTheme.Name+"  ·  随时在你身边";((Label)panel.Controls[0]).Width=width-34;
             text.SetBounds(17,38,width-34,50);
             if(signatures[i]!=item.Text){text.Text=item.Text;signatures[i]=item.Text;}
-            int height=Math.Clamp(TextRenderer.MeasureText(item.Text,bodyFont,new Size(width-39,int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl).Height+12,35,1400);
+            text.SelectionStart=0;text.ScrollToCaret();
+            var first=text.GetPositionFromCharIndex(0);var last=text.GetPositionFromCharIndex(text.TextLength);
+            int height=Math.Clamp(last.Y-first.Y+text.Font.Height+16,35,1400);
             text.Height=height;text.ScrollBars=height>=1400?RichTextBoxScrollBars.Vertical:RichTextBoxScrollBars.None;
-            panel.SetBounds(item.User?available-width+8:8,y,width,height+54);y+=panel.Height+18;
+            panel.SetBounds(item.User?available-width+8:8,y,width,height+54);text.Invalidate();panel.Invalidate();y+=panel.Height+18;
         }
         AutoScrollMinSize=new Size(0,y+10);ResumeLayout();
         base.Text=string.Join("\n",data.Select(x=>x.Text));

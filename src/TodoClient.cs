@@ -45,7 +45,14 @@ sealed class TodoClient(TodoStore store,ActionDispatcher bus,string source="todo
     public bool Undo()=>Run("todo_undo").Data!.Value.GetBoolean();
     public void FollowMatch(string id)=>Run("todo_follow_match",id);
     public MatchPlan AddMatch(MatchEnvelope input)=>Json("todo_match_add",input).Data!.Value.Deserialize<MatchPlan>()!;
-    public void HydrateMatchMetadata(IEnumerable<FootballMatch> matches,DateTimeOffset observed)=>Json("todo_match_hydrate",new{matches,observed});
+    public void HydrateMatchMetadata(IEnumerable<FootballMatch> matches,DateTimeOffset observed)
+    {
+        // Only legacy tasks without metadata need hydration, not the entire league cache.
+        var ids=Items.Where(t=>t.MatchId!=null&&t.MatchKickoff==null).Select(t=>t.MatchId!).ToHashSet(StringComparer.Ordinal);
+        if(ids.Count==0)return;
+        foreach(var batch in matches.Where(m=>ids.Contains("espn:"+m.Id)).GroupBy(m=>m.Id).Select(g=>g.Last()).Chunk(16))
+            Json("todo_match_hydrate",new{matches=batch,observed});
+    }
     public void SyncMatches(IEnumerable<FootballMatch> matches,DateTimeOffset observed)=>Json("todo_match_sync",new{matches,observed});
     public DailyTask[] Due(DateTimeOffset now)=>Run("todo_due",now.ToString("O")).Data!.Value.Deserialize<DailyTask[]>()!;
     public void Acknowledge(IEnumerable<DailyTask> tasks)=>Json("todo_ack",tasks.Select(t=>new ReminderTicket(t.Id,t.Reminder,t.SnoozedUntil)).ToArray());

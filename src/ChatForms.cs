@@ -169,7 +169,7 @@ sealed partial class ChatForm : BarcaWindow
         input.KeyDown += async (_, e) => { if (!e.Shift && e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await SendAsync(); } };
         renderTimer.Tick += (_, _) => { if (dirty) { dirty = false; Render(); } };
         renderTimer.Start(); Render(); ShowHome(); UpdateState();
-        bodyHost.SizeChanged+=(_,_)=>{foreach(Control c in results.Controls)c.Width=ResultWidth;};
+        bodyHost.SizeChanged+=(_,_)=>ResizeResults();results.ClientSizeChanged+=(_,_)=>ResizeResults();
         Shown += (_, _) => input.Focus();theme=new(this);
     }
     void VoiceChanged(long generation){OnUi(()=>{if(voice.IsCurrent(generation))UpdateVoice();});}
