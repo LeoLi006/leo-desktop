@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -125,6 +125,15 @@ sealed class BrainSession(BrainCatalog catalog,Func<ActionRequest,CancellationTo
         var plan=Pending;if(disposed||plan==null||plan.Id!=planId||plan.Expires<Now)throw new InvalidOperationException("计划已失效，请重新生成预览");
         foreach(var step in plan.Steps){var current=catalog.Require(step.Request.Action);if(plan.Stamps[step.Request.Action]!=current.Stamp)throw new InvalidOperationException("目标配置已改变，请重新生成预览");}
         var latestCombos=combos();foreach(var pair in plan.Stamps.Where(x=>x.Key.StartsWith("combo:")))if(!latestCombos.TryGetValue(pair.Key[6..],out var stamp)||stamp!=pair.Value)throw new InvalidOperationException("组合配置已改变，请重新生成预览");
+        // A match can change while the user reviews a plan. Check the selected
+        // cached fact again; never silently turn an old preview into a different time.
+        foreach(var id in plan.Steps.Where(s=>s.FromStep==null&&s.Request.Action is "match_lookup" or "match_add").Select(s=>s.Request.Value).Distinct()){
+            if(!matchTargets.TryGetValue(id,out var expected))throw new InvalidOperationException("比赛选择已失效，请重新查询并生成预览");
+            var checkedResult=await execute(new("match_lookup",id,"brain-verify:"+Origin),token);checkedResult.ToLegacy(token);
+            var current=checkedResult.Data?.Deserialize<MatchEnvelope>()?.Match??throw new InvalidOperationException("无法核验比赛，请重新查询并生成预览");
+            if(current.Id!=id||current.HomeId!=expected.Home||current.AwayId!=expected.Away||current.Kickoff!=expected.Kickoff||current.Kickoff<=Now||current.State!="pre"||!current.TimeKnown||current.Status.Contains("postpon",StringComparison.OrdinalIgnoreCase)||current.Status.Contains("cancel",StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("比赛时间、对阵或状态已改变，请重新查询并生成预览");
+        }
         var result=await workflow.Run("brain-"+plan.Id,plan.Steps,progress,token,confirmUnknown);Pending=null;return result;
     }
 }

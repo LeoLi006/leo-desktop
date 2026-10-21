@@ -51,3 +51,15 @@
 | `data-boundaries/football-after.json` | 足球相关52项通过 | `6210ab022e233544b897272e99e25daf1d5671d540b5ab11cb8ddb53f794008b` |
 
 复现、修复与边界见[数据清册](DATA-BOUNDARIES.md)。不将历史专项算作本轮测试，不以预取消样本宣称全部提交竞态已验收。
+
+
+## W/B：两条数据链路证据
+
+| 本机忽略报告 | 结果 | SHA256 |
+| --- | --- | --- |
+| `brain-chains/before.json` | 初次19项，1项失败 | `8ec5ea7398b679f59eec2744d2070e28d36cddf5adbe720c15064e0ac3544e72` |
+| `brain-chains/brain-chain-after.json` | 链路23项通过 | `c00abfc530bf7dd15f706237020bf7989e53c7f35aa8ee18f813784bcadcfc27` |
+| `brain-chains/q4-workflow-after.json` | Q4相关40项通过 | `7ef96fcbdde667e9855a0b62edf7996a127e26d53ec58229ee2ccce14187e89d` |
+| `brain-chains/q5-brain-after.json` | Q5相关48项通过 | `a38bc40a4e6d192276fa7e6485e5a74e830fffe520f5eba5255c1406b7de5d0d` |
+
+范围及模型便签转换限制见[链路验收](../Q5/CHAIN-VALIDATION.md)。不把缓存核验描述为实时联网或事务锁。
