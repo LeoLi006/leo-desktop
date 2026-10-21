@@ -35,6 +35,9 @@ New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $root 'src/docs/screenshots') -Filter '*.png' -File | Copy-Item -Destination $screenshotDir
 # Keep all maintained guides; resolve links to packaged docs or tagged source.
 $docFiles=@('USER_GUIDE.md','RELEASE_NOTES.md','ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md','PRODUCT_AND_DEVELOPER_GUIDE.md','ROADMAP.md','RESEARCH.md','Architecture/README.md','Localization/README.md','Assets/MatchDay/Kits/README.md')
+$docFiles=@($docFiles | ForEach-Object { $_; $english=[IO.Path]::ChangeExtension($_,'en.md'); if(Test-Path -LiteralPath (Join-Path $root ('src/'+$english))){$english} })
+$sourceRevision=(& git -C $root rev-parse HEAD)
+if($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch '^[a-f0-9]{40}$'){$sourceRevision='v'+$version}
 $docMap=@{}
 foreach($name in $docFiles){
  $source=[IO.Path]::GetFullPath((Join-Path $root ('src/'+$name)))
@@ -50,7 +53,7 @@ foreach($name in $docFiles){
   $parts=$url.Split('#',2);$anchor=if($parts.Count -gt 1){'#'+$parts[1]}else{''}
   $target=[IO.Path]::GetFullPath((Join-Path (Split-Path $source -Parent) $parts[0]))
   if($docMap.ContainsKey($target)){$link=[IO.Path]::GetRelativePath((Split-Path $destination -Parent),$docMap[$target]).Replace('\','/')}
-  else{$relative=[IO.Path]::GetRelativePath($root,$target).Replace('\','/');$link="https://github.com/LeoLi006/leo-desktop/blob/v$version/$relative"}
+  else{$relative=[IO.Path]::GetRelativePath($root,$target).Replace('\','/');$link="https://github.com/LeoLi006/leo-desktop/blob/$sourceRevision/$relative"}
   return ']('+$link+$anchor+')'
  }
  $content=[regex]::Replace($content,'\]\(([^)]+)\)',$rewrite)

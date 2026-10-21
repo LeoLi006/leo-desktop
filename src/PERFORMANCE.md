@@ -1,5 +1,7 @@
 # Leo v1.03.0 性能与鲁棒性记录
 
+**简体中文** | [English](PERFORMANCE.en.md)
+
 日期：2026-10-19。范围：用户批准的性能基线、按需主题挂接、绘制复用、任务生命周期、原子保存与定向验证。没有增加业务功能，没有引入第三方依赖。
 
 ## 测量方法与限制
@@ -77,37 +79,10 @@
 定向检查合计 **287 项通过**：37 项本轮故障/保存/生命周期，28 项通知交互，44 项吸附，39 项便签与窗口交互，36 项方案，59 项统一动作与扩展进程，6 项客户端队列，17 项清单，17 项透明边缘，4 项聊天和音乐失败恢复。持续检查另有两项资源增长约束通过。没有运行未受影响的全量测试。
 
 
----
+## 后续观察与近期证据
 
-# Verification and performance — English
+后续约五分钟的隔离稳定性检查未能解释私有内存高位，既不能证明泄漏，也不能证明长期没有泄漏；当前选择日常观察，不为降低数字反复优化。
 
-The Chinese table above is historical evidence from the1.03.0 optimization on2026-10-19, not a benchmark of every current build. Both sides used the same .NET9.0.6 isolated host, fake data, disabled app indexing/network work, warmup and six-second samples. The release runtime differed. CPU is process CPU time; allocations are cumulative managed bytes, not resident memory. First-show time is not login/cold startup. The docking stress loop deliberately advanced work roughly every5ms and is not representative idle load.
+42fea41的相关检查为：语言28、聊天缩放9、聊天执行41、桌面工具58、入口显示109、方案36、主题65，共346项；这些是不同阶段的定向证据，不能与上方历史计数相加作为本次全量成绩。真实DPI、驱动、网络和客户端行为仍需日常反馈。
 
-| Six-second scenario | Allocations before→after | CPU time before→after |
-| --- | --- | --- |
-| Normal idle |9.65MB→0.055MB |203ms→219ms |
-| Static docking stress |99.95MB→1.44MB |1438ms→281ms |
-| Fullscreen hidden |0.026MB→0.034MB |16ms→47ms |
-| Planner/log windows open |9.88MB→0.050MB |203ms→203ms |
-
-The credible gains are lower repeated allocations and elimination of duplicate static-docking submissions, not a universal CPU/window-speed claim. Idle remained about42–43 frames/6s. Stress duplicate submissions fell430→0. One idle endpoint private-memory sample was53.0→41.5MB; GDI40→42 reflects retained reusable drawing resources. First show354→316ms is one sample; note opening46→60ms did not establish a speedup. Small hidden CPU values were noisy.
-
-An isolated180.12-second/812-round soak had stable GDI74 and USER24 handles after warmup, managed heap roughly1.32–1.41MB and private memory56.9–59.0MB. Its287 directly related checks covered persistence/recovery, lifecycle, interaction, docking, profiles, execution/worker cancellation, queues, planner and rendering. Two soak bounds also passed. These are historical scoped results, not a newly rerun full suite or proof against long-term leaks.
-
-## Implementation principles
-
-Attach theme/scrollbar hooks on demand rather than traversing entire control trees at every idle event. Reuse bitmap/native DIB/DC/pixel buffers, clear transparent pixels each frame, rebuild on size changes and release on exit. Stop animation while fully hidden; retain interactive transitions. Own/cancel background work and discard stale generations without closing external user applications.
-
-Core settings/API/tasks/notes use unique same-directory temporary files, full writes/flush and atomic replacement with prior complete backups. Recovery preserves corrupt originals. Failed saves do not publish an uncommitted snapshot; a failed view callback does not undo an already committed write. This is not a multi-file transaction or a guarantee against hardware failure/all backups being corrupt.
-
-## Later stability and language evidence
-
-A later approximately five-minute isolated stability check did not resolve a private-memory high-water observation. It is neither proof of leakage nor proof of absence. The agreed next step is everyday observation, not repeated tuning without evidence. No multi-day real client/network qualification is claimed.
-
-At42fea41, related checks passed: language28, chat resize9, conversation41, desktop tools58, entry display109, profiles36, themes65(total346), build0 warnings/errors. These are different scoped runs and must not be added to historical counts as a new full-suite number. Chat checks simulate resizing/reopening/native-child repaint without idle redraw loops; real driver/DPI combinations still need feedback.
-
-## Reproduction and reporting
-
-Use `src/Test-Robustness.ps1`; `-Measure` adds sampling and `-Soak` adds sustained isolated operations. Inspect relevant test scripts before invoking them. Examples for newer work include `--ui-language-test` and `--chat-resize-test`; report paths must be absolute and point inside ignored .build. Do not read real personal data, call paid model APIs or start real clients for default fixture runs.
-
-Run only checks directly affected by a change. Record scenario, commit, runtime, duration, warmup and metrics, and distinguish simulation from real use. Original raw reports stay local/ignored; do not upload them as personal diagnostics. This documentation-only consolidation does not rerun runtime tests or install a new build.
+本次只调整文档语言组织及后续打包清单，不重跑业务测试或安装新版本。报告继续写入忽略的.build目录，不包含真实个人数据。
