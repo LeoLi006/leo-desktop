@@ -1,8 +1,8 @@
 # Leo 产品与扩展开发说明
 
-本文面向想使用、理解或自行扩展 Leo 的读者。实现依据为源码00cb5c2及其之前的阶段交付；本文更新不产生新的Windows发布包。仓库main、工程版本与Release标签可能不同，请用对应提交的文档与源码开发。
+本文面向想使用、理解或自行扩展 Leo 的读者。实现依据为主分支42fea41及其之前的阶段交付；本文更新不产生新的Windows发布包。仓库main、工程版本与Release标签可能不同，请用对应提交的文档与源码开发。
 
-[首页](../README.md) · [日常操作说明](USER_GUIDE.md) · [模块包与stdio协议](MODULES.md) · [路线图](ROADMAP.md) · [阶段验收与限制](Architecture/STAGE-REVIEW.md)
+[首页](../README.md) · [日常操作说明](USER_GUIDE.md) · [模块包与stdio协议](MODULES.md) · [路线图](ROADMAP.md) · [阶段验收与限制](Architecture/README.md)
 
 ## 目录
 
@@ -29,6 +29,8 @@ Leo是Windows桌面伙伴、应用启动器和本地动作入口。桌宠承载�
 - 普通使用：从已有Release下载并完整解压，按其中安装说明操作；该包的功能以其标签为准。无需API也能使用本地功能。
 - 源码开发：Windows、Git、PowerShell及符合[global.json](../global.json)的.NET 9 SDK。主工程目标net9.0-windows；框架依赖构建需匹配的Windows桌面运行时。
 - 外部软件、联网数据、模型服务及语音模型按需配置。停用对应模块不等于卸载或关闭第三方软件。
+
+主分支还提供可选电脑状态监测、现有邮件客户端入口、18种快捷图标和中英文界面。火绒仅提供快速打开，不读取安全状态；邮件不接收账号、密码或邮件正文。
 
 主分支已有内部模块化及现有扩展恢复试点，尚不是任意代码可热插拔的完整插件平台。内部C#接口未发布为稳定外部SDK；独立安装应遵循下述已有包协议。
 
@@ -75,7 +77,7 @@ flowchart TD
 | 配置和数据 | [ApplicationHostServices.cs](ApplicationHostServices.cs)、[ModuleHostServices.cs](ModuleHostServices.cs)、[AtomicJson.cs](AtomicJson.cs) | 限定读取、先保存后发布及已有业务Store；没有重写成一个全局数据库 |
 | 窗口和主题 | [ModulePresentation.cs](ModulePresentation.cs)、[ModuleThemeService.cs](ModuleThemeService.cs) | 固定窗口端口、结构化反馈、UI投递/代次及只读主题订阅；复杂窗口仍需宿主接入 |
 | 生命周期 | [ModuleActivities.cs](ModuleActivities.cs)、[IPeriodicTask.cs](IPeriodicTask.cs) | 已接入后台活动的所有者、启停/取消/计数；非周期索引、动画及输入计时器有各自归属 |
-| 组合与大脑 | [Q4说明](Architecture/Q4/README.md)、[Q5说明](Architecture/Q5/README.md) | 已有顺序执行、恢复核验、有界计划与显式能力授权 |
+| 组合与大脑 | [Q4说明](Architecture/README.md)、[Q5说明](Architecture/README.md) | 已有顺序执行、恢复核验、有界计划与显式能力授权 |
 | 包与状态 | [应用包](ApplicationPackages.cs)、[扩展适配](ExtensionCapability.cs)、[扩展安装](ActionDispatcher.cs)、[状态投影](ModuleStatus.Contracts.cs) | 既有目录及数据格式、兼容检查、异常回退和被动状态 |
 
 实现采用兼容适配与逐批迁移：一个明确动作只保留一套执行策略，各入口收集输入并展示结果，不自行复制启动/保存/重试逻辑。主要执行迁移和内部试点已完成，但部分业务仍持有专用Store或配置，复杂窗口与设置未全部声明化。
@@ -157,7 +159,7 @@ ActionPayload可标记PrivateData与简短DiagnosticMessage；业务Data不能�
 4. 用模块状态检查路径/工作目录，再主动启动验证。路径检查通过不代表程序已运行。
 5. 若要分享，使用“导出所选模块包”核对公开名称；接收者导入后需填写自己的程序路径。不要打包整个运行目录。
 
-数据型应用包是LeoApplicationPackage、协议1，固定八个字段；不支持夹带程序、脚本、启动参数或管理员授权。更新须保持应用及包身份，升级版本并经本机配置确认。详见[应用包实现](ApplicationPackages.cs)和[Q6说明](Architecture/Q6/README.md)。
+数据型应用包是LeoApplicationPackage、协议1，固定八个字段；不支持夹带程序、脚本、启动参数或管理员授权。更新须保持应用及包身份，升级版本并经本机配置确认。详见[应用包实现](ApplicationPackages.cs)和[Q6说明](Architecture/README.md)。
 
 ## 7. 编写声明式动作扩展
 
@@ -223,7 +225,7 @@ ZIP根目录至少包含module.json和可运行的worker.exe；依赖文件按�
 - 发布前在干净Windows环境验证worker可启动。框架依赖程序需接收者已有对应运行时，Leo不会自动下载安装；自包含程序也须满足包限制。
 - 程序权限等同当前用户。Leo不会把响应message作为代码、宿主命令或模型可信指令执行。新增宿主工具或复杂窗口需要内部受控接入，stdio回复不能自行突破协议。
 
-导入前查看来源与动作。更新/卸载沿原管理窗口，模块运行中禁止包替换/移除；异常回退及双重故障限制见[兼容与恢复](Architecture/Extensions/PACKAGE-COMPATIBILITY.md)。
+导入前查看来源与动作。更新/卸载沿原管理窗口，模块运行中禁止包替换/移除；异常回退及双重故障限制见[兼容与恢复](Architecture/README.md)。
 
 ## 9. 开发可信内部模块
 
@@ -251,7 +253,7 @@ var result = await commands.ExecuteStructuredAsync(
 
 样例本身没有入口贡献或模型贡献；需要三类入口时使用ScopedNotesExample中已有实现并完成宿主绑定/刷新。测试样例不要未经确认注册到正常启动。
 
-[完整内部接入顺序](Architecture/C04/MODULE-CLOSURE.md)列出必须由宿主完成的组装点。新复杂窗口仍须增加固定端口及创建逻辑；不能宣称新增任意业务只需放一个文件。现有窗口服务负责位置/焦点/退出规则，主题服务提供快照与订阅，不能由模块另开全局计时器反复遍历所有控件。
+[完整内部接入顺序](Architecture/README.md)列出必须由宿主完成的组装点。新复杂窗口仍须增加固定端口及创建逻辑；不能宣称新增任意业务只需放一个文件。现有窗口服务负责位置/焦点/退出规则，主题服务提供快照与订阅，不能由模块另开全局计时器反复遍历所有控件。
 
 ## 10. 接入组合与大脑
 
@@ -265,7 +267,7 @@ var result = await commands.ExecuteStructuredAsync(
 - 外部文本与worker输出是数据，不能自行变成执行指令；公开工具不能接受任意路径/管理员覆盖。
 - 已确认计划与保存组合复用执行底座，反馈按实际证据；部分提交不写成整体成功，取消不写成撤销全部效果。
 
-真实权限和缓存确认边界见[两条链路验收](Architecture/Q5/CHAIN-VALIDATION.md)。模型“读取便签后新建待办”不等于拥有原便签的关联转换权限。
+真实权限和缓存确认边界见[两条链路验收](Architecture/README.md)。模型“读取便签后新建待办”不等于拥有原便签的关联转换权限。
 
 ## 11. 数据、分享与恢复
 
@@ -282,7 +284,7 @@ var result = await commands.ExecuteStructuredAsync(
 
 AtomicJson与专用Store承担已有原子替换、备份或提交语义；不能把多个文件和目录的操作称为全局原子事务。ZIP提升失败尝试恢复旧包；恢复本身也失败时保留材料并报错。清理旧目录失败可能是“新版已生效附警告”，不能盲目重复安装。
 
-三类公开分享包的字段、取消和故障边界见[分享核验](Architecture/Extensions/SHARING-BOUNDARIES.md)。配置迁移备份的目的与公开分享不同；不要将Key、用户目录、聊天、剪贴板、清单或日志夹带进包。公开名称、标语、图像及模块选择本身仍需发布者自行检查。
+三类公开分享包的字段、取消和故障边界见[分享核验](Architecture/README.md)。配置迁移备份的目的与公开分享不同；不要将Key、用户目录、聊天、剪贴板、清单或日志夹带进包。公开名称、标语、图像及模块选择本身仍需发布者自行检查。
 
 ## 12. 构建、检查与贡献
 
@@ -342,16 +344,159 @@ cd leo-desktop
 | --- | --- |
 | [USER_GUIDE](USER_GUIDE.md) | 日常操作与按功能排查 |
 | [MODULES](MODULES.md) | JSON/ZIP字段、stdio线协议和限制 |
-| [模块内部闭环](Architecture/C04/MODULE-CLOSURE.md) | 可信C#模块真实组装、注册、刷新与释放步骤 |
-| [扩展适配](Architecture/Extensions/README.md) | 旧协议如何进入内部契约和贡献目录 |
-| [兼容与更新](Architecture/Extensions/PACKAGE-COMPATIBILITY.md) | 宿主范围/依赖、更新回退与数据保留 |
-| [状态说明](Architecture/Extensions/MODULE-STATUS.md) | 检查通过与实际运行的区别 |
-| [分享边界](Architecture/Extensions/SHARING-BOUNDARIES.md) | 包中有什么、取消/保存失败如何处理 |
-| [联合恢复](Architecture/Extensions/DELIVERY-RECOVERY.md) | 跨包、方案、入口、状态与重新加载的证据 |
-| [阶段验收](Architecture/STAGE-REVIEW.md)、[ROADMAP](ROADMAP.md) | 已完成子集、未完成边界及后续停止条件 |
+| [架构与接入参考](Architecture/README.md) | 宿主服务、组装顺序、数据和交付限制，及真实源码样例 |
+| [皮肤规范](SKIN_FORMAT.md) | 球衣/标识/独立主题的图片和分享格式 |
+| [验证与性能](PERFORMANCE.md) | 历史测量条件、定向检查和长期验证限制 |
+| [ROADMAP](ROADMAP.md) | 已完成子集、待观察问题及剩余目标 |
 
 文档中的示例不自动注册、不自动执行，也不是安全承诺。发现与实际源码不一致时，先按对应提交的适配器/校验器核实并提交问题，避免凭空补造接口。
 
-## 界面语言（本地后续更新）
+## 界面语言
 
 设置 → 常规提供简体中文和英文切换。展示层资源、动态控件、菜单原始标识、数据排除、日期文化和新增文本要求见[界面多语种开发说明](Localization/README.md)。用户内容与协议值不翻译，界面语言不等于语音识别或模型回复语言；未知扩展和技术细节回退原文，不为翻译发起网络请求。
+
+
+---
+
+# Product and developer guide — English
+
+This reference describes main through source commit `42fea41`. The project version is `1.04.0`; the existing downloadable release remains `v1.00.0`. Documentation publication does not create a new binary release. Use documentation and source from the same commit.
+
+## 1. Product and requirements
+
+Leo is a standalone Windows x64 desktop companion, launcher and local action hub. Optional modules provide capabilities; the host validates requests, owns resources and reports evidence. A separately configured model handles open-ended conversation and bounded planning. Local functionality does not require an API key.
+
+The UI uses .NET 9 WinForms with selected Windows/WPF integrations. Development requires Windows, PowerShell, Git and the SDK specified in `global.json`. Framework-dependent builds need the matching Windows desktop runtime. External applications, network sources and local speech models are configured separately.
+
+Internal interfaces are not a stable external SDK. Built-in modules are shipped with the host; disabling a module does not uninstall or close its external application.
+
+## 2. Features and dependencies
+
+| Capability | Existing behavior and boundary |
+| --- | --- |
+| Companion and appearance | Editable name/size, multi-monitor docking, hover reveal and fullscreen hiding. Barcelona default, Argentina, Spain, Inter Miami, Manchester City and custom skins; windows follow the theme. Some auxiliary windows have fixed sizes. |
+| Launcher and files | Name/pinyin/alias matching, recent apps, pinned ordering, keyboard navigation, path completion, drag/drop choices, custom EXE/LNK arguments, working directory and administrator launch. An EXE entry grants launch behavior only. |
+| Planner and notes | Daily/weekly/overdue views, calendar, local natural input, recurrence/exceptions, rescheduling/undo, reminders/snooze/quiet hours and backups. Quick notes support search, pins and conversion to tasks. Reminders require Leo to be running. |
+| Clipboard | History, pins, expiration and sensitive-content protection. Listening can be disabled; detection is not a guarantee that every secret is recognized. Clipboard text is not sent to a model by default. |
+| Football | Configurable club/national-team following, schedules/results, team fixtures and standings, cached fallback, watch links and match-to-task reminders. Dedicated network sources can fail or change; cached data is not necessarily current. |
+| Music and media | QQ Music single-song search/request, playback controls and lyrics shortcut; PotPlayer and Windows media sessions. Client state, permissions and media availability still apply. Playlist synchronization is not provided. |
+| Application adapters | Optional Clash system proxy, terminal, Edge and custom programs. Launch/wait/execute/verify follows each adapter's existing policy. Accepted requests are not automatically confirmed effects. |
+| Computer status and mail | Optional read-only CPU/memory/network/disk and process view, Task Manager shortcut and optional resource alerts. Huorong personal is a launch shortcut, not a security-state integration. Mail opens an existing client or QQ/Gmail website: no mailbox credentials, email retrieval or unread monitoring. |
+| Chat and speech | Streaming chat, local commands, controlled tool plans and cancellation; local SenseVoice recognition requires its model and microphone. UI language does not change recognition or model reply language. |
+| Management | Sequential custom routines, usage profiles, module status, runtime checks, quiet logs, focus and update checks. Passive dependency readiness does not prove a client is operational. |
+
+Local commands, application launches, explicit task/note operations and fixed routines avoid model calls. Football and song queries use their own network sources. Free conversation, ambiguous intent and temporary planning use the user's configured model endpoint.
+
+## 3. Host structure
+
+| Layer | Source and responsibility |
+| --- | --- |
+| Composition | `Program.cs`, `Settings.cs`: create services/modules, bind entries, apply settings, dispose resources. Explicit composition remains necessary. |
+| Registry and execution | `CapabilityRegistry.cs`, `ActionExecution.cs`, `ActionContracts.cs`: identity, validation, deadlines, cancellation, action-specific merging/serialization and results. |
+| Contracts | `ModuleContracts.cs`, `ModuleContracts.Additional.cs`: descriptions aligned with real adapters, policies, dependencies and result evidence. Descriptions are not full JSON Schema. |
+| UI contributions | `EntryContributions.cs`, `ModuleEntryContributions.cs`, `ModuleEntryRendering.cs`: data-only search/menu/button descriptors and identity-checked clicks. Hiding an entry does not disable its capability. |
+| Scoped services | `ApplicationHostServices.cs`, `ModuleHostServices.cs`, `ModulePresentation.cs`, `ModuleThemeService.cs`: limited configuration/dependencies, fixed window requests, structured feedback and read-only theme subscriptions. |
+| Ownership and storage | `ModuleActivities.cs`, `IPeriodicTask.cs`, `AtomicJson.cs` and existing stores: cancellation, generations, owned periodic work, atomic file replacement and recovery. No global multi-store transaction is claimed. |
+| Delivery | `ApplicationPackages.cs`, `ExtensionCapability.cs`, `ModuleWorker.cs`, `ModuleStatus.Contracts.cs`: existing package formats, compatibility, rollback, worker lifecycle and passive status. |
+
+UI, speech and routine entries reuse the same execution path. Modules should not duplicate persistence, client startup or retry logic. See the [architecture reference](Architecture/README.md) for composition and data boundaries.
+
+## 4. Requests, results and interfaces
+
+Three version spaces are distinct:
+
+| Identifier | Meaning |
+| --- | --- |
+| `LeoModule/1` | Existing external manifest and one-shot stdio worker protocol. |
+| `leo-action/1` | Internal structured action envelope, not an HTTP endpoint or unrestricted worker RPC. |
+| `leo-host-contract/1` | Internal module/action/dependency metadata, not a stable third-party SDK. |
+
+`ActionRequest` retains a legacy string `Value`. `StructuredActionRequest` contains `Protocol`, `ActionId`, object `Parameters`, `Source` and optional `RequestId`, `TraceId`, `Deadline`. Each adapter validates allowed fields and real targets. A local application request uses the configured application identity, not caller-supplied path or privilege overrides:
+
+```json
+{"Protocol":"leo-action/1","ActionId":"local:0123456789abcdef0123456789abcdef","Parameters":{"applicationId":"0123456789abcdef0123456789abcdef"},"Source":"ui"}
+```
+
+Submit through `ActionDispatcher.ExecuteStructuredAsync`. Legacy `local_app_open` maps to the same executor.
+
+`ActionResult` carries request/trace/source/action/module/execution identities, `Status`, `Message`, `ErrorCode`, `Data`, `Evidence` and `Retryable`. Common statuses are succeeded/failed/cancelled; routines additionally track steps and unknown outcomes. `snapshot`/`cached` means a query result, `accepted` means a request was accepted, `committed` means the corresponding local write completed, `window-shown`/`state-observed` records an observed effect. `unknown` must not be presented as success or blindly replayed. Cancellation after commit cannot undo the write. In-flight merging is not a permanent deduplication ledger.
+
+`ActionPayload.PrivateData` and diagnostic summaries separate private results from shareable diagnostics. Never log result bodies by default.
+
+| Internal interface | Purpose |
+| --- | --- |
+| `ILeoModule` | Stable identity, version, enablement, actions and legacy execution. |
+| `IStructuredLeoModule` | Execution policy, configuration generation, limits, structured execution and failure mapping. |
+| `IActionRequestAdapter` | Strict conversion of permitted structured parameters to the existing request. |
+| `IModuleContractSource` | Module description and passive dependency states: ready/missing/unknown/degraded. |
+| `IModuleEntryContributor` | Data-only entry descriptions; no arbitrary controls/delegates. |
+| `IBrainContributor` | Explicit model exposure. Basic registration or an installed extension does not automatically grant model access. |
+| Cancellation/disposal | The host identifies ownership; modules release their subscriptions, streams, timers and helper processes. |
+
+## 5. Choose an extension path
+
+1. **Local application:** configure an EXE/LNK, icon, arguments, working directory and optional administrator launch; no source changes. Share only a data-only application package, with recipient-local path binding.
+2. **Declarative extension:** a `LeoModule/1` JSON manifest wraps existing permitted actions with titles and phrases.
+3. **Worker extension:** a `LeoModule/1` ZIP contains `module.json` and a root worker EXE, invoked only on user action via a one-request stdio exchange.
+4. **Trusted internal module:** modify/rebuild the host for deep service, structured data or window integration. Explicit composition and lifecycle wiring are required.
+5. **Appearance/profile:** `.leoskin` shares clothing/theme; usage profiles share selected behavior/layout. Neither format implements a capability.
+
+For complete external field examples, limits, compatibility and rollback rules, read [MODULES.md](MODULES.md). No arbitrary DLL drop-in loading or automatic dependency downloads are provided. Worker responses are data, not host commands.
+
+## 6. Internal module integration
+
+Start with [MinimalModule.cs](Architecture/Contracts/MinimalModule.cs) and [ScopedNotesExample.cs](Architecture/C04/ScopedNotesExample.cs). Samples are opt-in test examples, not production registrations.
+
+1. Define stable module/action IDs, input/output, effects, dependencies, timeout, serialization/merging and data ownership.
+2. Inject only scoped services. Do not pass all `Preferences`, an arbitrary dispatcher, a raw data path or host `Form` when unnecessary.
+3. Implement strict adaptation, structured execution and contract metadata; reject unknown fields and invalid real targets. Keep configuration reads inside the execution error boundary.
+4. Register the instance through the existing registry; descriptions must match its real actions and policies.
+5. For search/menu/buttons, implement data-only contributions with owned IDs and current parameters. The host binds `EntryContributions.Bind(prefs, registry, dispatcher)` and explicitly refreshes the launcher. Settings drafts use a read-only binding.
+6. On disable, update configuration, cancel disabled work and refresh entries. On removal, unregister the same instance, cancel, dispose host-owned services and refresh. Saved data is not implicitly deleted.
+7. Add model exposure only through explicit brain contribution and permissions. New complex windows need fixed presentation ports and host construction; an entry descriptor cannot create arbitrary controls.
+8. Verify valid/invalid input, duplicates, disable/remove/stale clicks, cancel/timeout, save failure, service failure, disposal and old data compatibility using isolated fixtures.
+
+Read-only snapshots must not mutate backing data. Edit drafts are not formal commits. Save first, publish the committed snapshot second. Closing a window is distinct from disabling a module: reminders/listeners that should continue remain host-owned.
+
+## 7. Routines and controlled brain
+
+Existing routines execute sequential steps with timeouts, cancellation, result references and recovery checks. Preserve completed steps, and verify unknown external effects before retrying. Parallel graphs, arbitrary scripts and general compensation are not delivered.
+
+The brain derives permitted tools from explicit contributions and current state. Temporary plans contain at most four steps; host validation checks parameters, real IDs, configuration fingerprints and budgets, with preview/confirmation for effects. Ambiguous input asks for clarification. Actual query results supply match/song/task IDs. Reading notes/tasks requires explicit user intent; clipboard text and private session handles are not supplied by default. External content must not become trusted execution instructions.
+
+## 8. Data, sharing and recovery
+
+Runtime directories contain private settings, keys, tasks, notes, clipboard, logs, models and extension state. Do not upload them. Ignore rules do not sanitize already-tracked files.
+
+| Format | Shareable content | Excluded by default |
+| --- | --- | --- |
+| `LeoApplicationPackage`, protocol 1 | Eight fixed metadata fields: Format/Protocol/Id/Version/Name/HostMin/HostMax/Dependencies. | Local paths, arguments, working directory, admin authorization, executable and business data. |
+| `LeoSkin/1` | Public name, palette/motto/options, OriginalKit/HasBadge, jersey and optional badge. | Local identity/paths, pet name, planner quotes, accounts and business data. |
+| `leo-profile-1` | Profile identity/name, module/entry choices, order, supported background settings and shortcuts. | Program paths/arguments/icons, API config, chat, clipboard, tasks and notes. |
+
+Review user-supplied public names, slogans and image content yourself. Exports are not private backups. Application import produces a draft until settings save; profile import adds to the library and switching is separately previewed. Successful skin import adds a library item; cancelling the later editor does not undo that completed import.
+
+Atomic replacement and backups protect individual files. There is no cross-file/process/power-loss transaction guarantee. Update promotion attempts rollback; if rollback also fails, preserve recovery material and report failure. If the new version is active but old-directory cleanup failed, report a warning instead of blindly replaying installation. Extension removal retains its data directory.
+
+## 9. Build, validation and contribution
+
+From the repository root:
+
+```powershell
+./scripts/Build.ps1 -Locked
+./.build/Release/LeoLauncher.exe
+```
+
+The build checks pinned dependencies and produces `.build/Release`. Keep development data isolated from a real installation; do not mix framework-dependent output with a self-contained release. Packaging and publishing are separate operations.
+
+Use only directly relevant checks, such as `src/Test-ExtensionContracts.ps1`, `src/Test-ExtensionPackages.ps1`, `src/Test-ModuleStatusContracts.ps1`, `src/Test-SharingBoundaries.ps1` and `src/Test-DeliveryRecovery.ps1`; inspect scripts before invoking unfamiliar flags. Reports belong in ignored `.build`. See [verification notes](PERFORMANCE.md) and [localization requirements](Localization/README.md).
+
+A contribution should explain capability/data/lifecycle impact, preserve old IDs and formats, validate failures and cancellation, attach relevant evidence and disclose limitations. Do not commit credentials, recordings, personal records, models, binaries or temporary reports. Check current repository licensing and third-party notices before redistribution; public source does not automatically license team imagery, trademarks or models.
+
+## 10. Troubleshooting and current limits
+
+Import failures: check exact manifest casing, IDs, numeric versions/ranges, dependencies, archive layout and size/type limits. Missing entries: check enablement, display mode, isolation diagnostics and explicit refresh. Unknown dependency status is not success. Worker failures: test runtime requirements, single-line stdout, exit code, output limits and timeout in isolation. Cancellation after an external submission can leave an actual effect; inspect evidence before retrying.
+
+The delivered subset includes unified execution, internal entries/services and the existing package recovery path. It does not include independent physical delivery of every built-in module, arbitrary-code sandbox/signature trust, full protocol negotiation, all complex windows/settings as descriptors, a global request ledger, general parallel compensation or completed long-term real-world qualification. Short tests cannot prove multi-day leak freedom.
+
+Issue reports should include commit/version, Windows environment, reproduction, expected/actual behavior and sanitized error types. Never attach a whole personal runtime directory.

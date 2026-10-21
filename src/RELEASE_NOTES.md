@@ -1,36 +1,32 @@
-# Leo v1.04.0 · 安静日志、搜索修复与清单个性化
+# 更新记录 / Change log
 
-## 主分支源码与文档同步（2026-10-21，未制作新发布包）
+## 主分支1.04.0 / Main1.04.0 — 2026-10-21
 
-本次上传此前已本地交付的模块化与可靠性改进，并补齐[产品与扩展开发说明](PRODUCT_AND_DEVELOPER_GUIDE.md)。工程版本1.04.0与既有v1.00.0下载标签分开记录；没有创建新Release、安装包或发布截图。
+工程版本用于当前源码，不代表发布了同名安装包。现有下载标签仍为v1.00.0；本次上传不创建Release。
+This is the current source project version, not a newly published binary. The downloadable release remains v1.00.0; this upload creates no Release.
 
-- 统一契约、结构化执行、普通模块的搜索/菜单/快捷栏贡献，以及已接入宿主服务和活动生命周期。
-- 旧LeoModule/1接入契约/入口，补可选宿主范围和被动依赖、更新异常恢复及数据保留。
-- 原状态窗口补来源/版本/启停/依赖；分享包核验修复方案路径元数据、捕获身份及皮肤导入残留。
-- 联合核验修复声明式扩展未核对实际应用目标的状态误报；保留旧格式、执行权限和本地优先规则。
-- 完整验收范围与未完成部分见[阶段说明](Architecture/STAGE-REVIEW.md)和[路线图](ROADMAP.md)。历史定向结果不累计成当前全量成绩；不宣称任意代码独立交付或长期稳定性全部完成。
+### 最近变化 / Recent changes
 
-以下版本条目按原发布历史保留。
+- `48df4ea`：可选只读电脑状态和现有邮件客户端入口，默认关闭；火绒仅快速打开。Optional read-only computer status and existing mail-client launch, off by default; Huorong launch only.
+- `874b78f`：比赛后台元数据按相关事项筛选、去重和分批，避免大缓存超过动作输入上限；聊天文字重排、18种图标及电脑状态布局改进。Filter/deduplicate/chunk relevant match metadata to avoid oversized actions; chat reflow,18 icons and status-window improvements.
+- `6e4bca5`：聊天缩放/还原后合并布局和原生子窗口重绘，避免空闲循环刷新。Coalesced layout/native-child repaint after chat resize/restore without idle polling.
+- `42fea41`：简体中文/英文界面、本地资源、设置入口、动态控件与用户内容保护。Chinese–English UI using local resources, settings, dynamic bindings and user-content protection.
+- 本次文档：归并历史重复报告，更新有用说明并补齐中英文；不修改运行代码。Documentation update: consolidate repeated reports and update useful bilingual guides; no runtime-code change.
 
-本轮按用户明确要求修改，集中交付一次；不上传 GitHub。
+### 此前主分支底座 / Earlier main foundations
 
-## 通知与搜索
+统一执行、契约、入口贡献、限定宿主服务和后台活动归属；清单/足球/便签/媒体等主要能力迁移；有界模型计划和组合恢复；旧扩展兼容检查、更新回退、状态及分享隐私核验。详细边界见[架构](Architecture/README.md)及[路线图](ROADMAP.md)。
+Unified execution/contracts/entry contributions, scoped host services and owned background work; migrated core capabilities; bounded model plans and routine recovery; extension compatibility, rollback, status and sharing checks. See [architecture](Architecture/README.md) and [roadmap](ROADMAP.md) for limits.
 
-- 播放歌曲、开启代理等普通成功消息只作为日志保存，不弹提示、不累计未读，也不点亮桌宠通知按钮；历史成功消息同样按日志处理。
-- 错误、到期提醒、专注结束和新版提醒继续按各自规则提示；等待较久时的取消与明确操作后的撤销入口保留。
-- 收纳盒由每条约117像素改为38像素紧凑日志，时间与内容横排；悬停查看完整文字，失败可重试、提醒可查看清单。
-- 打开右键菜单时收起应用搜索并清理鼠标状态；从菜单打开主题设置、关闭设置后，搜索框可以继续正常打开和关闭。
+通知成功记录使用安静日志；错误和提醒保留必要反馈。修复搜索/右键设置间切换，并提供自定义队徽和清单话语。旧逐轮记录改由Git提交保存，不在当前说明重复累加测试数。
+Routine success uses quiet logs; errors/reminders retain necessary feedback. Earlier changes fixed search/context-settings interactions and added custom badges/planner quotes. Git preserves per-batch history; old check counts are not accumulated into a current full-suite claim.
 
-## 清单标识与话语
+## 已有发布v1.00.0 / Existing releasev1.00.0
 
-在“外观 → 主题与皮肤编辑器 → 清单标识与话语”中：
+[发布页 / Release page](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.00.0)
 
-- 自定义皮肤可以上传队徽或国旗；PNG/JPG，16～2048像素，最多4MB，按原比例留白显示。内置皮肤保留默认标识，可先复制或新建皮肤再上传。
-- 滚动话语每行一句，可添加、删除及恢复默认；清空列表停止滚动，单句静态显示。最多200句，每句最多120字。保存后已打开的清单立即更新。
-- 标识随自定义皮肤复制与皮肤包导入导出；旧版不含标识的皮肤包继续支持。话语属于全局清单设置，随配置迁移，不随球衣包分享。
+当时集中提供统一入口、应用模块与进程扩展、快捷栏排序/溢出、路径补全、媒体控制、独立主题和皮肤分享、拖放动作及便签。以该标签对应源码与安装包为准，不包含所有后续主分支功能。
+That release introduced unified entry routing, app modules/worker extensions, shortcut ordering/overflow, path completion, media controls, independent themes/skin sharing, drop actions and notes. Use its tagged source and binary as the authority; later main changes are not all included.
 
-## 定向验证
-
-25项本轮行为与界面检查、28项提示与通知点击检查、86项既有皮肤包等直接影响检查通过，合计139项。未调用真实模型、系统代理或播放接口。
-
-额外运行旧版清单主题组合检查时，11项通过，1项旧的菜单固定宽度断言未通过；该重复事项菜单未在本轮修改，也没有为通过旧断言改变用户已有的紧凑菜单。新的话语行为使用本轮独立检查验证。
+手动下载选择Leo-v1.00.0-win-x64.zip；v1.0.0同内容兼容附件供旧更新器识别。历史截图使用演示数据，不代表当前比赛。
+For manual downloads choose Leo-v1.00.0-win-x64.zip; the equivalent v1.0.0-named asset supports older updaters. Historical screenshots use demo data, not current fixtures.

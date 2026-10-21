@@ -1,193 +1,102 @@
-# Leo 模块接口与独立进程协议
+# 模块与扩展协议 / Modules and extension protocol
 
-线协议保持 `LeoModule/1`。入口：设置 → 功能 → 管理扩展模块。
+适用主分支1.04.0。公开包协议为`LeoModule/1`；内部`leo-action/1`与`leo-host-contract/1`不是worker可自由调用的服务。
+Applies to main1.04.0. The public package protocol is `LeoModule/1`; internal `leo-action/1` and `leo-host-contract/1` are not unrestricted worker APIs.
 
-首次开发先看[产品与扩展开发说明](PRODUCT_AND_DEVELOPER_GUIDE.md)，区分本机应用配置、声明式模块、stdio程序与可信内部C#模块。内部接口不是公开HTTP服务或稳定外部SDK。
+[产品与开发指南 / Product and developer guide](PRODUCT_AND_DEVELOPER_GUIDE.md) · [架构 / Architecture](Architecture/README.md)
 
-当前内部契约、搜索/菜单/快捷入口、结构化参数和兼容边界见[扩展适配说明](Architecture/Extensions/README.md)。旧包无需改写；扩展不会自动开放给模型。下方仍描述原包格式及进程协议。
+## 选择方式 / Choose a format
 
-## 架构
+| 方式 / Type | 用途与限制 / Purpose and limits |
+| --- | --- |
+| 本机应用 / Local app | EXE/LNK、名称、18种内置或自定义图标、参数、工作目录、管理员启动；只获得启动能力 / Configure EXE/LNK, name, built-in/custom icon, arguments, working directory and elevation; launch only |
+| 数据型应用包 / Data-only app package | 分享元数据，接收者补本机路径 / Share metadata; recipients supply local paths |
+| 声明式JSON / Declarative JSON | 包装已有公开动作及固定值 / Wrap existing permitted actions and fixed values |
+| 独立进程ZIP / Worker ZIP | 一次请求、一次响应的自己的程序 / Your program via a one-shot request/response exchange |
+| 内部C# / Internal C# | 修改宿主、限定服务与重新编译；不是稳定外部SDK / Modify/rebuild the host with scoped services; not a stable external SDK |
 
-`ActionDispatcher` 接收带来源的 `ActionRequest`，通过 `ILeoModule` 查找能力、检查启用状态并执行；按动作策略合并在途请求或串行执行，递归调用拒绝；不是永久请求去重。聊天模型工具、文字、语音、搜索和自定义组合复用此入口。
+添加/停用/移除不会自动卸载或退出用户软件。入口隐藏不等于停用能力；旧入口点击仍须验证当前身份。扩展默认不因安装就获得模型权限。
+Adding/disabling/removing does not uninstall or close user applications. Hidden entries do not disable capabilities; stale clicks revalidate identity. Installation does not automatically grant model access.
 
-内置能力通过统一模块适配器提供；外部能力可以是声明式动作或独立进程。安装和启动时不会自动执行扩展命令。内置模块随主程序发布，当前支持停用；外部模块可以独立安装、更新和移除。
+## 声明式清单 / Declarative manifest
 
-## 声明式模块
-
-导入一个UTF-8 JSON文件。字段大小写如下：
+UTF-8 JSON，字段大小写如下。在设置的扩展管理窗口导入。
+Use UTF-8 JSON with exact field casing; import through the existing extension manager in Settings.
 
 ```json
 {
   "Format": "LeoModule/1",
   "Id": "daily-plan",
-  "Name": "每日计划",
+  "Name": "Daily plan",
   "Version": "1.0.0",
   "Runtime": "actions",
+  "HostMin": "1.4.0",
+  "Dependencies": ["windows", "leo-module/1"],
   "Commands": [
-    {
-      "Id": "today",
-      "Title": "查看今日计划",
-      "Phrases": ["查看今日计划"],
-      "Action": "todos_open",
-      "Value": ""
-    }
+    {"Id":"today","Title":"Open today's plan","Phrases":["open daily plan"],"Action":"todos_open","Value":""}
   ]
 }
 ```
 
-Id为2～40位小写字母、数字、连字符，首位必须是字母。每模块1～16个命令；命令Id为1～40位同类字符。名称不超过40字符，每条口令不超过60字符。Value为字符串，复杂参数以JSON字符串提供，最多4000字符。
+| 字段 / Field | 规则 / Rule |
+| --- | --- |
+| Id | 模块2–40字符、命令1–40字符；小写字母开头，随后字母/数字/连字符 / Module2–40, command1–40 characters; initial lowercase letter, then lowercase letters/digits/hyphens |
+| Name / Commands | 名称最多40字符，每包1–16命令 / Name up to40 characters,1–16 commands |
+| Phrases / Value | 每条口令最多60字符；Value字符串最多4000，复杂参数使用对应动作的JSON字符串 / Each phrase up to60 characters; Value string up to4000; complex values follow the action's JSON-string adapter |
+| HostMin / HostMax | 可选数字版本闭区间，省略无额外限制；不是SemVer表达式 / Optional inclusive numeric bounds; omission adds no range; not SemVer expressions |
+| Dependencies | windows、leo-module/1、leo-host-contract/1、stdio/v1、module:<扩展ID>；只被动核对 / Passive checks for the listed tokens and module:<extension-ID> |
 
-声明式Action只能是当前公开的动作。为避免递归，不允许声明式模块直接调用组合、再次分派文本或运行其他扩展。可以导出示例后修改。
+Action取自实际[LeoActions.cs](LeoActions.cs)，但内部私有句柄或需要额外确认的动作不因名字存在就可用。禁止递归组合、再分派文本或扩展递归。固定声明值不可用非空参数任意覆盖。未知、缺失、循环或停用依赖阻止相应调用，不自动下载。固定local_app_open同时核对真实应用、路径与工作目录。
+Choose Action from actual [LeoActions.cs](LeoActions.cs), respecting private handles and confirmation requirements. Recursive routines, text redispatch and extension recursion are forbidden. Fixed declarative values cannot be arbitrarily overridden with nonempty input. Unknown/missing/cyclic/disabled dependencies are not downloaded automatically. A fixed local_app_open also checks the real application's state, path and working directory.
 
-## 独立进程模块
+动作身份为`ext:daily-plan:today`，贡献身份为`ext:daily-plan/today`，不可混用。默认仅搜索，可在原入口设置选择菜单/快捷栏。
+The action identity is `ext:daily-plan:today`; the contribution identity is `ext:daily-plan/today`. They are distinct. Default visibility is search-only; existing entry settings can add menu/shortcut visibility.
 
-将`module.json`与自己的Windows程序放在ZIP根目录，其他依赖可按原相对目录放入ZIP：
+## 独立进程 / Worker process
 
-```text
-module.json
-worker.exe
-worker.dll             # 可选依赖
-worker.runtimeconfig.json
-```
-
-声明示例：
+ZIP根目录包含module.json和worker.exe；依赖保留相对目录。清单如下：
+Place module.json and worker.exe at the ZIP root; dependencies may use supported relative paths.
 
 ```json
 {
-  "Format": "LeoModule/1",
-  "Id": "my-capability",
-  "Name": "我的新能力",
-  "Version": "1.0.0",
-  "Runtime": "stdio",
-  "Executable": "worker.exe",
-  "TimeoutSeconds": 15,
-  "Commands": [
-    {
-      "Id": "run",
-      "Title": "运行我的能力",
-      "Phrases": ["运行我的能力"],
-      "Action": "worker:run",
-      "Value": ""
-    }
-  ]
+  "Format":"LeoModule/1","Id":"hello-worker","Name":"Hello worker","Version":"1.0.0",
+  "Runtime":"stdio","Executable":"worker.exe","TimeoutSeconds":15,
+  "Commands":[{"Id":"ping","Title":"Ping worker","Phrases":["ping worker"],"Action":"worker:ping","Value":""}]
 }
 ```
 
-Leo以当前用户权限启动包内程序，附加固定参数`--leo-module`，通过标准输入写入一行UTF-8 JSON，随后关闭标准输入。程序不得依赖当前桌面前台或把日志写入标准输出。
-
-请求示例（实际路径和requestId由Leo生成）：
-
-```json
-{"protocol":"LeoModule/1","requestId":"随机id","command":"run","value":"","dataDirectory":"模块专用本地数据目录","origin":"search","theme":{"skin":"83","name":"Leo","accent":"#E7C277","background":"#0B1221","text":"#EDF2FA","radius":14,"opacity":100}}
-```
-
-命令为`worker:`之后的名称。Value默认来自声明；`module_run`可以用JSON字符串`{"id":"ext:my-capability:run","value":"参数"}`覆盖本次参数。主题字段提供当前显示名、基础球队及配色，方便模块自行呈现相同外观。
-
-程序返回一行UTF-8 JSON，并正常退出：
+用户触发后，Leo以当前用户权限启动程序，附加`--leo-module`；stdin写一行UTF-8 JSON并关闭。请求形状（路径仅为占位说明）：
+On user action, Leo starts the program with current-user privileges and `--leo-module`, writes one UTF-8 JSON line to stdin and closes input. Request shape (path is illustrative):
 
 ```json
-{"ok":true,"message":"已完成具体操作"}
+{"protocol":"LeoModule/1","requestId":"generated-id","command":"ping","value":"","dataDirectory":"<host-assigned-local-directory>","origin":"search","theme":{"skin":"83","name":"Leo","accent":"#E7C277","background":"#0B1221","text":"#EDF2FA","radius":14,"opacity":100}}
 ```
 
-失败时使用`ok:false`和具体原因。响应行最多64KB，message最多4000字符；非零退出、无响应、格式错误和超时均视为失败。默认超时15秒，可设置1～120秒；取消或超时结束扩展进程及其子进程。标准错误可以输出诊断日志，Leo只排空流，不上传。退出Leo会取消未完成动作并结束其持有的辅助进程；不将QQ音乐或PotPlayer登记为辅助进程。
+command不含worker:前缀。读取→校验协议/命令/参数→执行有界操作→stdout仅输出一行响应→正常退出；日志只能写stderr。最小响应：
+command excludes the worker: prefix. Read, validate, perform bounded work, write exactly one response line to stdout and exit normally. Send logs to stderr only.
 
-独立进程是协议边界，不是权限沙箱：程序具有当前用户权限。导入会展示运行类型和动作，执行只在用户触发后发生。不要把API Key等私人配置写进发布的模块包；模块自己的状态放在请求提供的数据目录，避免更新覆盖。
+```json
+{"ok":true,"message":"Operation completed"}
+```
 
-## 更新、移除与文件范围
+失败用ok:false；非零退出、无响应、坏格式均失败。默认15秒，可设1–120秒；响应行最多64KB，message最多4000字符。取消/超时结束宿主拥有的worker及子进程，不撤销已经发生的外部效果。私有状态使用dataDirectory，不放包目录；该目录不是权限沙箱。
+Use ok:false for failure. Nonzero exit, no response and invalid JSON fail. Timeout defaults to15 seconds, range1–120; response line up to64KB, message up to4000 characters. Cancellation/timeout reclaims owned worker processes, but does not undo external effects. Store private state in dataDirectory, not the package. This directory is not a sandbox.
 
-- 同Id更新必须提高数字版本号，如1.0.0 → 1.1.0。
-- 运行或排队时不更新、不移除。ZIP先解压并校验暂存内容，提升失败尝试恢复旧模块；恢复再次失败会保留材料并明确报错。提升成功但旧目录清理失败时，新版可能已生效，应按警告处理，不盲目重放。
-- ZIP最多64MB，展开最多256MB、2000文件。拒绝越界路径、重复路径、链接及不支持的脚本文件。
-- 允许的文件类型：exe、dll、json、png、txt、md、dat、bin；可执行文件必须在根目录。
-- 程序目录：`modules/<id>`；状态目录：`module-data/<id>`。移除保留状态目录。
-- 不在主进程内加载第三方DLL；模块可以使用自身进程需要的DLL或运行时。
-- 模块自己的联网/API行为由其实现决定，Leo不自动把本机API Key交给扩展。
+[WorkerFixture.cs.txt](Architecture/Extensions/WorkerFixture.cs.txt)为仓库测试worker，不是生产模板。每次调用是独立进程协议，不是常驻会话；回复只当数据，不执行为宿主命令。
+[WorkerFixture.cs.txt](Architecture/Extensions/WorkerFixture.cs.txt) is a test fixture, not a production template. Each call is a one-shot process exchange, not a persistent session. Responses are data, never host commands.
 
-## 调用
+## ZIP、更新与恢复 / Archive, update and recovery
 
-- 搜索框：`:运行我的能力` 或 `:ext:my-capability:run`。
-- 聊天和语音：说出名字或已登记的口令。
-- 自定义组合：新增“统一指令”步骤。
-- 模型工具：先`module_list`读取可用动作，再用`module_run`传入返回的精确ext动作Id。列表不包含声明中的固定参数值。
+- 压缩最多64MB，展开最多256MB/2000文件；只允许exe/dll/json/png/txt/md/dat/bin；根EXE。拒绝越界、绝对/重复路径、链接及脚本。Maximum64MB archive,256MB/2000 extracted files; only exe/dll/json/png/txt/md/dat/bin, root EXE. Reject traversal, absolute/duplicate paths, links and scripts.
+- 框架依赖worker需要用户已有运行时；不自动下载。程序权限等同用户，不加载第三方DLL到Leo主进程。Framework-dependent workers need an installed runtime; no automatic downloads. Workers have user privileges; third-party DLLs are not loaded into Leo's process.
+- 同Id更新必须提高数字版本；运行/排队时拒绝更新和移除。暂存校验后提升，失败尝试恢复旧版；恢复也失败保留材料。Same-ID updates require a higher numeric version; running/queued modules cannot be replaced or removed. Validate staging before promotion; attempt rollback on failure and preserve material if recovery also fails.
+- 新版已生效但旧目录清理失败属于警告，不盲目重放。移除保留`module-data/<id>`；程序位于`modules/<id>`。Cleanup failure after promotion is a warning, not grounds for blind replay. Removal retains `module-data/<id>`; programs live in `modules/<id>`.
+- 共享应用包严格八字段：Format/Protocol/Id/Version/Name/HostMin/HostMax/Dependencies。不夹带程序、路径、参数、管理员许可或业务记录。Data-only app exports contain exactly these eight fields; no executable, local paths/arguments, elevation grant or business records.
 
-内置明确命令优先；扩展口令相互冲突时拒绝随机执行。当前协议只返回文本结果；需要复杂界面的模块可自行提供界面，并读取主题字段适配外观。
+## 调用与验收 / Calling and acceptance
 
+搜索`:ext:hello-worker:ping`或登记的标题/口令；聊天/语音沿明确指令路由，自定义组合可用统一指令。旧module_list/module_run兼容动作仍受当前启用、参数和确认限制，不是自动模型授权。
+Search `:ext:hello-worker:ping` or a registered title/phrase; chat/speech follow explicit-command routing and routines can use the existing unified-command step. Compatibility module_list/module_run calls remain constrained by current enablement, validation and confirmation; they do not grant automatic model permission.
 
-## 本地应用模块（v0.52.0）
-
-设置中的“应用模块与图标”允许无需编写扩展包就添加本机EXE/LNK。每项拥有独立ID、名称、启用状态和可选图标路径；运行时通过`ILeoModule`暴露`local:<32位ID>`动作，停用和移除即时影响统一动作入口。`module_list`的`applications`返回不含程序路径的ID与名称；`local_app_open`接受该ID。快捷栏和聊天工具均调用同一动作分发器。
-
-`path_open`接收用户提供的本机绝对文件/目录路径，通过Windows默认关联打开；支持引号和环境变量，拒绝不存在路径。此动作可能执行程序，调用方须遵守用户明确意图。
-
-普通自定义应用只启动程序。需要专用控制或复杂逻辑时，仍使用独立ZIP进程扩展。内置应用适配器使用同一设置管理入口，停用不卸载外部程序。
-
-
-## v0.53.0 补充
-
-本地应用记录增加`Arguments`、`WorkingDirectory`、`Administrator`，均随本机设置保存。通过`ProcessStartInfo`直接交给所选EXE/LNK，参数不通过额外shell拼接。管理员启动使用Windows `runas`确认。失效程序路径由同名候选与用户确认修复，参数保持不变。
-
-快捷顺序单独存为`ShortcutOrder`的模块ID列表，停用模块保留排序记录；新模块追加，拖放排序及溢出入口调用同一动作分发器。
-
-新增动作：`notes_open`（可带便签草稿）、`note_add`（明确要求记下的文字）、`path_reveal`（本地路径）、`media_file`（PotPlayer媒体路径）、`files_with_app`（JSON字符串`{application,paths}`，应用必须为存在的EXE）。`files_open`的文件选择结果进入统一拖放动作面板。
-
-便签、拖放内容及其它个人记录不包含在皮肤包或源码发布包中。普通应用模块仍只提供启动能力；复杂控制沿用独立进程扩展协议。
-
-
-## S01：入口显示（v1.00.1）
-
-`Preferences.EntryDisplayModes`独立保存六个内置可选模块及自定义应用的入口选择。键为原模块ID或自定义应用GUID，值为`shortcut`、`menu`、`search`；缺省为`shortcut`，不改变旧配置。未知但格式有效的键保留，便于模块重新加入后恢复。
-
-显示策略只控制通用按钮与菜单，不参与`Modules.Enabled`和动作执行权限判定。隐藏不等于停用：指令仍走原分发器；真正停用仍由原模块开关和自定义应用`Enabled`判断。扩展指令入口沿用现有协议，本轮不增加扩展桌面按钮。
-
-
-## S03：统一状态（v1.00.2）
-
-`ModuleStatuses.Read` 对内置模块、自定义应用与扩展输出统一状态；只读检测使用 `ModulePaths.PassiveRead`，不会触发修复对话或启动软件。停用状态优先，其次校验指定路径，再检测依赖，最后呈现当前会话的执行状态。模型API只读配置完整度，不自动联网测试。
-
-`ActionDispatcher` 与 `ClientOperationHub` 将等待、成功、失败和取消写入 `ModuleActivity`。递增操作票据阻止旧请求完成时覆盖新请求；取消恢复可用状态。已安装只表示依赖有效，不要求软件已运行。状态页提供对应设置入口；重新检测只确认失败记录，不重放动作。
-
-设置字段 `AutoUpdateNotifications` 默认true，`LastNotifiedUpdate` 记录已提醒的版本。自动检查只访问公开正式发布信息，不消费模型API；失败静默，下载和安装仍由手动更新窗口完成。
-
-
-## v1.01.0：使用方案与活动释放
-
-`UsageProfile`使用`leo-profile-1`白名单格式；不复用`Preferences`作为导出载体。`UsageProfiles.Prepare`在当前本机配置副本上只变更能力、布局、快捷键和后台选项，不修改本机路径或个人记录。导入拒绝未知字段并分配新ID，切换经预览确认后调用统一设置路径。`ProfileTransition`保留切换前副本，失败时恢复并报告错误。
-
-`Preferences.ApplicationIndexing`默认true以兼容旧配置。关闭后取消STA扫描、丢弃过期结果并停止上下文观察；`ClipboardHistoryService.ConfigureActivity`根据开关停止轮询；足球开关控制同步定时器和请求生命周期。
-
-`ClientOperationHub.Configure`按资源取消排队与等待中的动作，并在停用时拒绝新请求。它不退出本机软件，也不回滚已完成的代理或播放操作。独立扩展使用`module:<id>`资源名。
-
-`FileDropActions.ConfiguredStart`按模块ID解析当前已启用应用，沿用`LocalApplications.Start`的参数、工作目录和提权设置，通过Windows引号规则追加有效文件路径。拖放请求不接受外部传入的管理员标记或任意启动参数。
-
-
-## v1.02.0：窗口交互与故障边界
-
-`WindowInteraction`集中普通窗口的可见区域、父窗口附近放置、焦点和最小化恢复；伴随浮层与提醒保留各自层级。`SelectionKeys`只给明确的列表动作绑定Enter/双击，不截获正文方向键。
-
-`Preferences.QuickNoteHotkey`添加第四组快捷键，使用统一的注册、冲突回滚及配置迁移校验。`QuickNoteCompatibility`在旧配置省略此字段且原快捷键已占用默认组合时停用新增绑定；不修改旧绑定。方案增加可选的`NoteKey`字段，旧方案默认未启用。
-
-`StickyNote.Pinned`默认false，兼容旧便签文件。`NoteStore.Query`只按分类与关键字筛选，不删除已关联待办的原文；写入采用原子替换，通知订阅者失败不会反过来撤销已保存的数据。
-
-`FeatureFaults`提供可恢复异常边界、定时器熔断、UI兜底和本次运行诊断；不存储异常消息或用户输入。UI连续异常按活动普通窗口隔离，核心附属窗口不销毁；进程级致命异常不伪装成功恢复。独立进程扩展仍是隔离原生崩溃的边界。
-
-吸附绘图通过`HeadGeometry.Bounds`对齐脸部中心，`SpriteBlend`按预乘像素插值相邻姿态，避免透明度凹陷和旧轮廓残留。绘图与命中区域共用同一采样。
-
-## v1.03.0 性能与生命周期约定
-
-主题挂接不重复扫描已接管的控件树，新控件通过 ControlAdded 接管。透明桌宠的绘制缓冲由 PetForm 独占，尺寸变化重建、退出释放；预览截图仍返回独立位图，不允许调用者释放运行中的共享缓冲。
-
-统一动作在模块停用时取消，取消之后的返回结果不记为成功。客户端操作队列在退出时终止后续工作；扩展进程清理有界等待，不把进程隔离误称权限沙箱。关闭或 Dispose 必须都能取消窗口任务，重复 Dispose 不得再次访问已释放的取消源。
-
-AtomicJson 用于完整 JSON 的同目录替换及本地备份恢复；不是多文件事务。恢复只采用通过对应类型校验的副本，损坏主文件单独保存。原始数据和备份均是本地个人数据，不属于模块或程序分发资产。
-
-## 现有扩展包兼容与更新恢复（D02/D03）
-
-LeoModule/1新增可选HostMin、HostMax及Dependencies；旧包省略仍可用。导入前检查，不兼容包在原管理窗口显示原因，缺依赖不自动下载；ZIP暂存、提升失败恢复旧目录，清理失败以已生效附警告报告。独立module-data和用户配置保留。格式、隔离验证及断电/恢复失败边界见[开发说明](Architecture/Extensions/PACKAGE-COMPATIBILITY.md)。不自动开放模型调用。
-
-## 模块状态展示（D04最小接入）
-
-原模块状态窗口通过只读契约快照汇总自定义应用与已安装扩展，显示来源、版本、显式启停及被动依赖；每个模块一行，未检测不推断正常，检查通过不等于程序在运行。原应用编辑器、扩展管理和内置处理入口保留；无新增轮询。实现、35项定向检查及限制见[模块状态说明](Architecture/Extensions/MODULE-STATUS.md)。
-
-## 分享边界核验（D05）
-
-应用模块包、皮肤包和使用方案继续采用原格式及固定字段。已修复方案身份/排序夹带路径、扩展入口误入模块清单导致方案不可导出、皮肤后段保存失败残留；35项隔离检查通过。完整分享字段、取消/提交语义和限制见[分享边界说明](Architecture/Extensions/SHARING-BOUNDARIES.md)。本机配置迁移备份不等同公开分享包，流程包与在线分享未在本批实施。
+相关脚本：Test-ExtensionContracts.ps1、Test-ExtensionPackages.ps1、Test-ModuleStatusContracts.ps1、Test-SharingBoundaries.ps1、Test-DeliveryRecovery.ps1（均在src）。只用隔离数据和可信测试worker验证，不用个人Key和第三方程序做默认测试。
+Relevant scripts in src cover extension contracts/packages, module status, sharing and joint delivery recovery. Use isolated data and trusted fixture workers rather than personal keys or third-party executables.

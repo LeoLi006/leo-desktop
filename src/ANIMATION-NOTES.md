@@ -1,56 +1,29 @@
-# 当前皮肤与动画说明
+# 皮肤与动画维护 / Skin and animation maintenance
 
-适用版本：v1.00.0。历史实现与旧说明通过 Git 标签查阅，本文只描述当前运行方式。
+五套内置皮肤为巴萨默认、阿根廷、西班牙、迈阿密和曼城；自定义皮肤通过球衣纹样与主题创建，不依赖比赛日自动换装。
+The five built-ins are Barcelona(default), Argentina, Spain, Inter Miami and Manchester City. Custom skins use jersey textures and themes, not automatic match-day switching.
 
-## 选择皮肤
+## 素材 / Assets
 
-右键 Leo → **外观 → 皮肤**：巴萨（默认）、阿根廷、西班牙、迈阿密国际、曼城。选择立即生效、跨重启保留；不依赖足球模块、比赛缓存或专注状态，不自动换装。旧手动选择迁移为对应皮肤，旧自动/关闭状态恢复默认巴萨。
-
-内置皮肤之外，可在外观中的主题编辑器新建独立配色、导入1024×1024球衣PNG，并通过`.leoskin`导入或分享。自建皮肤复用完整动作与轮廓；默认巴萨保持原始服装，窗口配色随皮肤同步。详细格式见 [SKIN_FORMAT.md](SKIN_FORMAT.md)。
-
-## 当前有效素材
-
-| 素材 | 用途 |
+| 路径 / Path | 用途 / Purpose |
 | --- | --- |
-| `assets/leo.png` | 默认待机、移动、互动、思考等主动作 |
-| `assets/vertical-drag.png` | 上下拖动动作 |
-| `src/Assets/edge-bridge-v1.png` | 四向起步姿态；每方向八张，前置原始站立帧 |
-| `src/Assets/edge-motion-v1.png` | 收起、只露头部与展开姿态 |
-| `src/Assets/MatchDay/Kits/*-2024.png` | 四套额外球队球衣正面纹样 |
+| assets/leo.png | 主要待机、移动、互动、思考 / Main idle, movement, interaction and thinking |
+| assets/vertical-drag.png | 上下拖动 / Vertical dragging |
+| src/Assets/edge-bridge-v1.png | 四向过渡起步姿态 / Four-direction docking bridge poses |
+| src/Assets/edge-motion-v1.png | 收起、头部隐藏与展开 / Docking, head-only and reveal |
+| src/Assets/MatchDay/Kits/*-2024.png | 额外球队球衣纹样 / Additional team jersey textures |
 
-巴萨直接使用原图。额外皮肤共享相同角色与动作，在球衣区域投影队伍纹样并搭配短裤。完整图案与提示词见 [Kits/README.md](Assets/MatchDay/Kits/README.md)。废弃的独立球队角色图集和单张待机图已删除。
+表中路径从仓库根目录解释，开发输出目录可能使用assets映射。默认巴萨保留原图，额外皮肤投影同一角色的衣服区域。[规范](SKIN_FORMAT.md)与[素材说明](Assets/MatchDay/Kits/README.md)列出图片要求。
+Paths are repository-relative; build output uses asset mapping. Barcelona retains original artwork; other skins project textures onto the same clothing regions. See [format](SKIN_FORMAT.md) and [asset notes](Assets/MatchDay/Kits/README.md).
 
-## 四向停靠
+## 状态与绘制要求 / State and rendering requirements
 
-- 起步段衔接默认站立姿态，逐帧绘制，避免两张不同脸部叠加。
-- 右侧起步和收起统一由左侧角色作水平对称，保证视线朝向屏幕内侧；球衣在角色对称后投影，胸前文字不反向。
-- 头部显示宽度按默认站立耳朵跨度限制，避免突然放大；保持等比绘制和完整耳朵、羊角。
-- 收起后脚下按钮隐藏；悬停展开后恢复。半隐藏可直接拖出，拖动接管后清理吸附状态。
+- 等比绘制，保留耳朵和羊角，头部宽度与站立姿态对齐。Preserve aspect ratio, ears/horns and head scale relative to standing poses.
+- 右侧由左侧角色对称，视线朝内；球衣后投影以避免文字镜像。Mirror the character for the right edge with inward gaze; project clothing afterward so lettering stays forward.
+- 收起隐藏功能键；展开恢复；直接拖出必须清理吸附状态并接管动画。Hide buttons while docked, restore on reveal, and clear docking state when dragging out.
+- Windows逐像素Alpha、预乘提交、仅去除Alpha<8极淡噪点；位图/DC/缓冲由宿主管理释放。Use per-pixel premultiplied alpha, remove only very faint alpha<8 noise, and release host-owned bitmaps/DCs/buffers.
+- 球衣先按原动作格贴合，再缩放一次；小字体受实际显示尺寸限制。Project at original cell resolution then scale once; tiny lettering remains display-size limited.
+- 静止吸附避免相同帧重复提交；尺寸变化重建缓冲，关闭释放。Avoid duplicate static dock submissions; rebuild buffers on size change and release on exit.
 
-## 透明与清晰度
-
-角色窗口采用 Windows 逐像素Alpha，保留毛发轮廓的半透明覆盖率；仅去掉Alpha小于8的极淡噪点，提交像素使用预乘Alpha。绘制后释放原生位图和设备上下文。
-
-球衣先在原动作格分辨率贴合，再一次缩放到桌宠大小。纹样聚焦上方68%的胸前区域，按像素覆盖范围预过滤，减少细织纹噪声与比例压缩。极小字体仍受桌宠实际显示尺寸限制。
-
-原生合成参考：[UpdateLayeredWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-updatelayeredwindow)、[透明模式切换限制](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setlayeredwindowattributes)。
-
-## 定向验证
-
-- `--skin-animation-test`：五项菜单、默认值、旧配置迁移、关闭足球后换肤、全部动作、脸部颜色及右侧对称视线。
-- `--dock-animation-test`：四向起步、收起、展开、点击、拖出、脚下按钮恢复及帧边界。
-- `--pet-transparency-test`：半透明轮廓、粉边回归、不同大小、原生窗口重绘及GDI句柄释放。
-
-报告及预览仅写入 `.build`，不写个人数据目录。
-
-## 界面主题与多屏
-
-`UiTheme` 提供五套球队主题，`Appearance` 与 `BarcaUi` 的绘制色在使用时解析；普通控件保存基础色，切换时同步已经打开的窗口、动态子控件和菜单。原始角色及球衣纹样不经过 UI 颜色映射，保持素材颜色。
-
-`DesktopDock` 根据各显示器物理范围判断边缘是否共享，以工作区决定最终停靠位置。跨屏拖动允许角色横跨接缝；共享边缘不启动收起。显示器变化时取消吸附并恢复可见位置。
-
-## 自定义球衣
-
-`SkinLibrary`校验并保存1024×1024 PNG纹样；`AnimationSkin`与`KitTexture`复用原动作，支持自定义纹样Id。材质加载后复制到内存，不长期占用用户皮肤图片文件。角色图集缓存最多8套，纹样缓存最多12套。
-
-主题参数按皮肤保存，圆角影响共用路径与控件区域；窗口透明度不作用于角色的逐像素透明通道，避免破坏毛发边缘和吸附轮廓。
+只在修改动画后运行定向入口`--dock-animation-test <绝对报告路径>`，检查四向、衔接、拖动接管和多屏工作区，报告写.build。短测不替代不同DPI/显示器实际观察。
+After animation changes, use `--dock-animation-test <absolute-report-path>` for four edges, transitions, drag takeover and monitor work areas; write reports to.build. Short tests do not replace real DPI/monitor observations.
