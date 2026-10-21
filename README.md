@@ -2,11 +2,28 @@
 
 把应用启动、清单、便签、足球、音乐和媒体控制收进一个桌面伙伴。默认巴萨皮肤，也可以换球队、换配色，创建和分享自己的球衣皮肤。
 
-**当前正式版本：v1.00.0**
+**发布包与源码请区分：下方保留 v1.00.0 下载入口；main 已包含后续开发改进，工程版本为 1.04.0。本次同步源码与文档，不新建 Release 或安装包。**
 
-[下载 Windows 安装包](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.00.0) · [完整使用说明](src/USER_GUIDE.md) · [大版本更新日志](src/RELEASE_NOTES.md) · [反馈问题](https://github.com/LeoLi006/leo-desktop/issues)
+[下载 Windows 安装包](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.00.0) · [完整产品与扩展开发说明](src/PRODUCT_AND_DEVELOPER_GUIDE.md) · [日常使用说明](src/USER_GUIDE.md) · [大版本更新日志](src/RELEASE_NOTES.md) · [反馈问题](https://github.com/LeoLi006/leo-desktop/issues)
 
 Leo 是独立运行的 **Windows x64** 桌面应用。应用搜索、文件路径、便签、清单和明确指令优先在本地执行；自由聊天和复杂意图理解使用你自行配置的兼容模型 API。只使用本地功能，无需填写 API Key。
+
+## 想了解架构或自己扩展？
+
+从[产品与扩展开发说明](src/PRODUCT_AND_DEVELOPER_GUIDE.md)开始：包含功能/依赖、底座结构、请求与结果接口、四种扩展路径、内部模块接入步骤、数据/恢复/分享边界、构建与定向验收要求。
+
+| 需求 | 从哪里开始 |
+| --- | --- |
+| 只是使用或配置 Leo | [日常使用说明](src/USER_GUIDE.md) |
+| 添加本机应用、包装已有动作、编写独立程序 | [选择扩展方式](src/PRODUCT_AND_DEVELOPER_GUIDE.md#5-选择扩展方式)、[现有包协议](src/MODULES.md) |
+| 修改源码，新增可信内部模块 | [内部模块接入](src/PRODUCT_AND_DEVELOPER_GUIDE.md#9-开发可信内部模块)、[完整联合样例](src/Architecture/C04/MODULE-CLOSURE.md) |
+| 判断哪些目标已完成 | [阶段验收](src/Architecture/STAGE-REVIEW.md)、[路线图](src/ROADMAP.md) |
+
+主分支已完成主要能力执行迁移、内部普通模块入口闭环，以及现有应用包/扩展的兼容恢复、状态与分享核验。各入口复用注册表、结构化结果及原执行策略，明确操作优先本地完成；模型只在明确授权的工具范围内理解和规划。
+
+当前仍需宿主显式组装服务、注册、刷新与释放。复杂窗口、任意代码独立交付、权限沙箱、完整协议协商和长期真实负载尚未完整验收。**能够导入stdio扩展，不等于能够热加载任意DLL，也不等于第三方代码受到系统权限隔离。**
+
+以下v1.00.0介绍与截图作为既有发布记录保留；主分支后续接口及修复以新指南和对应源码提交为准。
 
 ## v1.00.0 带来了什么
 
@@ -192,10 +209,10 @@ Leo 是独立运行的 **Windows x64** 桌面应用。应用搜索、文件路�
 
 ```powershell
 ./scripts/Build.ps1 -Locked
-./scripts/Install-Local.ps1 -Start
+./.build/Release/LeoLauncher.exe
 ```
 
-按变更运行相关定向检查，不要求每次重跑全部功能。本次发布仅涉及版本命名、更新器兼容与打包；近期功能的定向检查入口是`src/Test-Platform53.ps1`。
+开发时优先在独立的.build输出目录运行；不要将不同发布模式的输出直接混入个人安装。按变更运行相关定向检查，不要求每次重跑全部功能。最新[验证入口表](src/PRODUCT_AND_DEVELOPER_GUIDE.md#12-构建检查与贡献)覆盖扩展、状态、分享及联合恢复；旧发布检查保留为历史证据。
 
 创建包含Windows运行时的干净发布包：
 
@@ -221,7 +238,7 @@ Leo 是独立运行的 **Windows x64** 桌面应用。应用搜索、文件路�
 
 本仓库公开，普通访问者可以下载源码、下载发布包并在 [Issues](https://github.com/LeoLi006/leo-desktop/issues) 提问，**没有直接推送修改本仓库的权限**。Fork是独立副本，外部Pull Request也不会自动合并。
 
-版本通过Git提交、标签及GitHub Releases管理。当前说明只维护首页、使用说明、模块/皮肤协议与更新日志，历史内容通过标签查阅。
+版本通过Git提交、标签及GitHub Releases管理。首页提供产品/开发指南、使用说明、模块协议、阶段验收、路线图与更新日志入口；历史内容通过提交和标签查阅。
 
 ## 项目结构
 
