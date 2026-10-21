@@ -40,3 +40,14 @@
 | `entry-diagnostics/host-service-cleanup.json` | 22 | `df13195b2e5da132472741213c3a48fccea2dc7de426f1201bc5d1da9cbf7d2e` |
 
 四项均通过，锁定构建零警告；限制及交付见[入口诊断](ENTRY-DIAGNOSTICS.md)。
+
+
+## C04-G1：三类数据边界证据
+
+| 本机忽略报告 | 结果 | SHA256 |
+| --- | --- | --- |
+| `data-boundaries/before.json` | 初次24项，5项失败 | `7b2b89f03445ed63687282757f5d0c686c7d790a321dc1e0f6bd35b96f5eff93` |
+| `data-boundaries/boundary-final.json` | 最终28项通过 | `65c5766ded86d6b754940ab2dc6e505598b5dd3c417bb81f638ce18095e4a929` |
+| `data-boundaries/football-after.json` | 足球相关52项通过 | `6210ab022e233544b897272e99e25daf1d5671d540b5ab11cb8ddb53f794008b` |
+
+复现、修复与边界见[数据清册](DATA-BOUNDARIES.md)。不将历史专项算作本轮测试，不以预取消样本宣称全部提交竞态已验收。

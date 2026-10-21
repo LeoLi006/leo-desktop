@@ -14,19 +14,20 @@ sealed class ClipHistory
 {
     readonly string? file;readonly Stack<List<ClipItem>> undo=new();bool blocked;
     public bool CanUndo=>undo.Count>0;
-    public List<ClipItem> Items{get;private set;}=[];
+    List<ClipItem> items=[];
+    public List<ClipItem> Items=>items.ToList();
     public string? Error{get;private set;}
-    public ClipHistory(string? path){file=path;try{if(path!=null&&(File.Exists(path)||File.Exists(path+".bak")))Items=AtomicJson.Read(path,text=>Trim(JsonSerializer.Deserialize<List<ClipItem>>(text)??throw new IOException("剪贴板数据为空")));}catch{blocked=true;Error="剪贴板文件无法读取，原文件已保留；请恢复备份。";}}
+    public ClipHistory(string? path){file=path;try{if(path!=null&&(File.Exists(path)||File.Exists(path+".bak")))items=AtomicJson.Read(path,text=>Trim(JsonSerializer.Deserialize<List<ClipItem>>(text)??throw new IOException("剪贴板数据为空")));}catch{blocked=true;Error="剪贴板文件无法读取，原文件已保留；请恢复备份。";}}
     static List<ClipItem> Trim(IEnumerable<ClipItem> data){var valid=data.Where(x=>x!=null&&x.Content!=null&&x.Label!=null&&x.Content.Length<=4_000_000&&x.Kind is "text" or "image" or "files").DistinctBy(x=>x.Key).ToList();var history=valid.Where(x=>!x.Pinned).Take(50).ToList();while(history.Sum(x=>(long)x.Content.Length)>12_000_000)history.RemoveAt(history.Count-1);return valid.Where(x=>x.Pinned).Concat(history).ToList();}
-    bool Commit(IEnumerable<ClipItem> data,IEnumerable<ClipItem>? touched=null){if(blocked)return false;var next=Trim(data);try{if(file!=null)AtomicJson.Write(file,JsonSerializer.Serialize(next));if(touched!=null){var frame=touched.ToList();if(frame.Count>0){undo.Push(frame);if(undo.Count>20){var keep=undo.Take(20).Reverse().ToArray();undo.Clear();foreach(var item in keep)undo.Push(item);}}}Items=next;Error=null;return true;}catch(Exception e)when(e is IOException or UnauthorizedAccessException){Error="剪贴板保存失败，原文件和当前记录均保留。";return false;}}
-    public void Add(ClipItem item){var old=Items.FirstOrDefault(x=>x.Key==item.Key);if(old?.Pinned==true)item=item with{Pinned=true};Commit(Items.Where(x=>x.Key!=item.Key).Prepend(item));}
-    public bool Pin(ClipItem item,bool value){var old=Items.FirstOrDefault(x=>x.Key==item.Key);if(old==null)return false;if(value&&!old.Pinned&&(Items.Count(x=>x.Pinned)>=50||Items.Where(x=>x.Pinned).Sum(x=>(long)x.Content.Length)+old.Content.Length>12_000_000))return false;return Commit(Items.Select(x=>x.Key==item.Key?x with{Pinned=value}:x),[old]);}
-    public bool AddPinned(ClipItem item){var old=Items.FirstOrDefault(x=>x.Key==item.Key);if(old?.Pinned!=true&&(Items.Count(x=>x.Pinned)>=50||Items.Where(x=>x.Pinned).Sum(x=>(long)x.Content.Length)+item.Content.Length>12_000_000))return false;return Commit(Items.Where(x=>x.Key!=item.Key).Prepend(item with{Pinned=true}),[old??item]);}
-    public void Delete(ClipItem item)=>Commit(Items.Where(x=>x.Key!=item.Key),Items.Where(x=>x.Key==item.Key));
-    public void Clear()=>Commit(Items.Where(x=>x.Pinned),Items.Where(x=>!x.Pinned));
-    public void Undo(){if(undo.Count==0)return;var frame=undo.Peek();var keys=frame.Select(x=>x.Key).ToHashSet();if(Commit(frame.Concat(Items.Where(x=>!keys.Contains(x.Key)))))undo.Pop();}
-    public void Expire(int days,DateTimeOffset now){if(days<=0)return;var next=Items.Where(x=>x.Pinned||x.Time>=now.AddDays(-days)).ToList();if(next.Count!=Items.Count&&Commit(next))undo.Clear();}
-    public List<ClipItem> Search(string query)=>Items.Where(x=>x.Label.Contains(query,StringComparison.OrdinalIgnoreCase)||x.Kind!="image"&&x.Content.Contains(query,StringComparison.OrdinalIgnoreCase)).ToList();
+    bool Commit(IEnumerable<ClipItem> data,IEnumerable<ClipItem>? touched=null){if(blocked)return false;var next=Trim(data);try{if(file!=null)AtomicJson.Write(file,JsonSerializer.Serialize(next));if(touched!=null){var frame=touched.ToList();if(frame.Count>0){undo.Push(frame);if(undo.Count>20){var keep=undo.Take(20).Reverse().ToArray();undo.Clear();foreach(var item in keep)undo.Push(item);}}}items=next;Error=null;return true;}catch(Exception e)when(e is IOException or UnauthorizedAccessException){Error="剪贴板保存失败，原文件和当前记录均保留。";return false;}}
+    public void Add(ClipItem item){var old=items.FirstOrDefault(x=>x.Key==item.Key);if(old?.Pinned==true)item=item with{Pinned=true};Commit(items.Where(x=>x.Key!=item.Key).Prepend(item));}
+    public bool Pin(ClipItem item,bool value){var old=items.FirstOrDefault(x=>x.Key==item.Key);if(old==null)return false;if(value&&!old.Pinned&&(items.Count(x=>x.Pinned)>=50||items.Where(x=>x.Pinned).Sum(x=>(long)x.Content.Length)+old.Content.Length>12_000_000))return false;return Commit(items.Select(x=>x.Key==item.Key?x with{Pinned=value}:x),[old]);}
+    public bool AddPinned(ClipItem item){var old=items.FirstOrDefault(x=>x.Key==item.Key);if(old?.Pinned!=true&&(items.Count(x=>x.Pinned)>=50||items.Where(x=>x.Pinned).Sum(x=>(long)x.Content.Length)+item.Content.Length>12_000_000))return false;return Commit(items.Where(x=>x.Key!=item.Key).Prepend(item with{Pinned=true}),[old??item]);}
+    public void Delete(ClipItem item)=>Commit(items.Where(x=>x.Key!=item.Key),items.Where(x=>x.Key==item.Key));
+    public void Clear()=>Commit(items.Where(x=>x.Pinned),items.Where(x=>!x.Pinned));
+    public void Undo(){if(undo.Count==0)return;var frame=undo.Peek();var keys=frame.Select(x=>x.Key).ToHashSet();if(Commit(frame.Concat(items.Where(x=>!keys.Contains(x.Key)))))undo.Pop();}
+    public void Expire(int days,DateTimeOffset now){if(days<=0)return;var next=items.Where(x=>x.Pinned||x.Time>=now.AddDays(-days)).ToList();if(next.Count!=items.Count&&Commit(next))undo.Clear();}
+    public List<ClipItem> Search(string query)=>items.Where(x=>x.Label.Contains(query,StringComparison.OrdinalIgnoreCase)||x.Kind!="image"&&x.Content.Contains(query,StringComparison.OrdinalIgnoreCase)).ToList();
 }
 
 sealed class ClipboardHistoryService : IDisposable

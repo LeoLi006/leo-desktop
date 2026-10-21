@@ -38,8 +38,8 @@ sealed class FootballQueries:IDisposable
     bool Fresh(DateTimeOffset time)=>time>clock().AddMinutes(-10)&&time<=clock().AddMinutes(1);
     static T Copy<T>(T data)=>JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(data))!;
     static string Key(Club c)=>c.Id+":"+c.League;
-    ScheduleSnapshot ReadSchedule(){if(schedule==null){schedule=new(loadSchedule(),true);scheduleConfig=configuration();}return schedule with{Stale=scheduleConfig!=configuration()||schedule.RefreshFailed||schedule.Cache.FailedSources>0||schedule.Cache.SchemaVersion<2||!Fresh(schedule.Cache.Updated)};}
-    TeamSnapshot ReadTeam(Club c){string key=Key(c);if(!teams.TryGetValue(key,out var data)){data=new(loadTeam(c),false,false,true);teams[key]=data;}return data with{Stale=data.MatchesFailed||data.TableFailed||!Fresh(data.Data.MatchesUpdated)||!Fresh(data.Data.TableUpdated)};}
+    ScheduleSnapshot ReadSchedule(){if(schedule==null){schedule=new(Copy(loadSchedule()),true);scheduleConfig=configuration();}return schedule with{Stale=scheduleConfig!=configuration()||schedule.RefreshFailed||schedule.Cache.FailedSources>0||schedule.Cache.SchemaVersion<2||!Fresh(schedule.Cache.Updated)};}
+    TeamSnapshot ReadTeam(Club c){string key=Key(c);if(!teams.TryGetValue(key,out var data)){data=new(Copy(loadTeam(c)),false,false,true);teams[key]=data;}return data with{Stale=data.MatchesFailed||data.TableFailed||!Fresh(data.Data.MatchesUpdated)||!Fresh(data.Data.TableUpdated)};}
     public FootballCache CachedSchedule(){lock(gate)return Copy(ReadSchedule().Cache);}
     public TeamData CachedTeam(Club club){lock(gate)return Copy(ReadTeam(club).Data);}
     public IEnumerable<(FootballMatch Match,DateTimeOffset Updated)> CachedMatches(IEnumerable<Club> clubs)
@@ -68,10 +68,10 @@ sealed class FootballQueries:IDisposable
         try{
             ScheduleSnapshot old;lock(gate){Current(job.Epoch,job.Config,token);old=ReadSchedule();if(Preview||!force&&!old.Stale||revisions.GetValueOrDefault("schedule")!=job.Revision)return Copy(old);}
             ScheduleSnapshot result;
-            try{var data=await fetchSchedule(Copy(old.Cache),token).ConfigureAwait(false);Validate(data);result=new(data,data.FailedSources>0,data.FailedSources>0);}
+            try{var data=await fetchSchedule(Copy(old.Cache),token).ConfigureAwait(false);Validate(data);data=Copy(data);result=new(data,data.FailedSources>0,data.FailedSources>0);}
             catch(OperationCanceledException)when(token.IsCancellationRequested||!enabled()){throw;}
             catch(Exception e)when(QueryFailure(e)){result=old with{Stale=true,RefreshFailed=true,Error="赛程源暂时无法连接，保留已有缓存"};}
-            lock(gate){Current(job.Epoch,job.Config,token);if(!result.RefreshFailed||result.Cache!=old.Cache){try{saveSchedule(result.Cache);}catch(Exception e)when(QueryFailure(e)){result=result with{CacheSaved=false,Error="本次已取得赛程，但缓存未能保存"};}}schedule=result;if(!result.RefreshFailed)scheduleConfig=job.Config;revisions["schedule"]=revisions.GetValueOrDefault("schedule")+1;return Copy(result);}
+            lock(gate){Current(job.Epoch,job.Config,token);if(!result.RefreshFailed||result.Cache!=old.Cache){try{saveSchedule(Copy(result.Cache));}catch(Exception e)when(QueryFailure(e)){result=result with{CacheSaved=false,Error="本次已取得赛程，但缓存未能保存"};}}schedule=result;if(!result.RefreshFailed)scheduleConfig=job.Config;revisions["schedule"]=revisions.GetValueOrDefault("schedule")+1;return Copy(result);}
         }finally{job.Lane.Release();}
     }
     public async Task<TeamSnapshot> Team(Club club,bool force,CancellationToken token)
@@ -83,7 +83,7 @@ sealed class FootballQueries:IDisposable
             try{var response=await fetchTeam(club,Copy(old.Data),token).ConfigureAwait(false);Validate(response.Data);var data=Copy(response.Data);if(response.MatchesFailed){data.Matches=old.Data.Matches;data.MatchesUpdated=old.Data.MatchesUpdated;}if(response.TableFailed){data.Rows=old.Data.Rows;data.TableUpdated=old.Data.TableUpdated;data.Season=old.Data.Season;}result=new(data,response.MatchesFailed,response.TableFailed,response.MatchesFailed||response.TableFailed);}
             catch(OperationCanceledException)when(token.IsCancellationRequested||!enabled()){throw;}
             catch(Exception e)when(QueryFailure(e)){result=old with{Stale=true,MatchesFailed=true,TableFailed=true,Error="球队数据暂时无法更新，保留已有缓存"};}
-            lock(gate){Current(job.Epoch,job.Config,token);if(!result.MatchesFailed||!result.TableFailed)try{saveTeam(club,result.Data);}catch(Exception e)when(QueryFailure(e)){result=result with{CacheSaved=false,Error="本次已取得球队数据，但缓存未能保存"};}teams[key]=result;revisions[key]=revisions.GetValueOrDefault(key)+1;return Copy(result);}
+            lock(gate){Current(job.Epoch,job.Config,token);if(!result.MatchesFailed||!result.TableFailed)try{saveTeam(club,Copy(result.Data));}catch(Exception e)when(QueryFailure(e)){result=result with{CacheSaved=false,Error="本次已取得球队数据，但缓存未能保存"};}teams[key]=result;revisions[key]=revisions.GetValueOrDefault(key)+1;return Copy(result);}
         }finally{job.Lane.Release();}
     }
     internal static bool QueryFailure(Exception e)=>e is TimeoutException or OperationCanceledException or HttpRequestException or IOException or UnauthorizedAccessException or JsonException or FormatException or InvalidOperationException or ArgumentException;
