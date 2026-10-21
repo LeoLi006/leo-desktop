@@ -54,8 +54,8 @@ sealed partial class LauncherForm : Form
     }
     string lastExternal = "", lastObservedIdentity = "", activationContext = "";
     public bool IsIndexing => loading;
-    IEnumerable<AppEntry> AllApplications=>apps.Concat(EntryContributions.ReadAvailable(prefs).Where(a=>a.Enabled).Select(a=>a.SearchEntry)).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
-    public IEnumerable<AppEntry> FileApplications => AllApplications;
+    IEnumerable<AppEntry> AllApplications=>apps.Concat(EntryContributions.ReadAvailable(prefs).Where(a=>a.Enabled).Select(a=>a.SearchEntry)).Concat(EntryContributions.ReadModules(prefs).Search.Select(e=>new AppEntry(e.Name,e.Target,"模块入口"))).GroupBy(a=>a.Target,StringComparer.OrdinalIgnoreCase).Select(g=>g.Last());
+    public IEnumerable<AppEntry> FileApplications => AllApplications.Where(a=>!ModuleEntryContributions.IsTarget(a.Target));
     public bool HasTextInput => Visible && query.Focused && !string.IsNullOrWhiteSpace(query.Text);
     public void PreviewTyping(string text) { query.Text = text; query.Focus(); }
     public bool VerifyTwoRows()
@@ -258,6 +258,7 @@ sealed partial class LauncherForm : Form
         if(!prefs.FootballModule){football?.Close();football=null;}
         if(!prefs.MusicModule){music?.Dispose();music=null;}
         music?.ConfigureMedia(prefs.MediaModule&&EntryDisplay.ShowShortcut(prefs,"media"));if(football!=null)SetWatchVisibility(football);
+        if(Visible&&(EntryContributions.ReadModules(prefs).Entries.Length>0||filtered.Any(a=>ModuleEntryContributions.IsTarget(a.Target))))Filter();
     }
     void SetWatchVisibility(Control root){foreach(Control c in root.Controls){if(c is WatchLinksPanel)c.Visible=prefs.EdgeModule;else SetWatchVisibility(c);}}
     public void Open()
@@ -277,11 +278,14 @@ sealed partial class LauncherForm : Form
             recent.Controls.Add(new Label { Text = !string.IsNullOrWhiteSpace(query.Text) ? "没有找到应用" : prefs.RememberHistory ? "搜索应用，开始使用" : "搜索应用", Width = 460, Height = 62, Padding = new Padding(5, 15, 0, 0), ForeColor = Appearance.Muted });
             return;
         }
+        var moduleEntries=EntryContributions.ReadModules(prefs).Search.ToDictionary(e=>e.Target,StringComparer.OrdinalIgnoreCase);
         int tileIndex = 0;
         foreach (var app in entries)
         {
             bool selected = tileIndex++ == selection;
             var tile = new Button { Tag = app, AccessibleName = app.Name, Width = 74, Height = 76, Text = "",TabStop=false, FlatStyle = FlatStyle.Flat, Font = Appearance.Body(8.5f), Margin = new Padding(3), ForeColor = Appearance.Ink, BackColor = selected ? Appearance.Blue : Appearance.Background };
+            var moduleIcon=moduleEntries.TryGetValue(app.Target,out var moduleEntry)?ModuleEntryRendering.Icon(moduleEntry):null;
+            if(moduleIcon!=null)tile.Disposed+=(_,_)=>moduleIcon.Dispose();
             Appearance.Round(tile, 12);
             tile.FlatAppearance.MouseOverBackColor = Appearance.Hover;
             tile.FlatAppearance.MouseDownBackColor = Appearance.Red;
@@ -291,7 +295,7 @@ sealed partial class LauncherForm : Form
                 using var shape = Appearance.Path(tile.ClientRectangle, 12);
                 using System.Drawing.Brush fill = selected ? new System.Drawing.Drawing2D.LinearGradientBrush(tile.ClientRectangle, Appearance.Blue, Appearance.Red, 25f) : new SolidBrush(tile.ClientRectangle.Contains(tile.PointToClient(Cursor.Position)) ? Appearance.Hover : tile.BackColor);
                 e.Graphics.FillPath(fill, shape);
-                e.Graphics.DrawImage(icons.Get(app), new Rectangle(21, 8, 32, 32));
+                e.Graphics.DrawImage(moduleIcon??icons.Get(app), new Rectangle(21, 8, 32, 32));
                 if (prefs.Favorites.Contains(app.Target, StringComparer.OrdinalIgnoreCase))
                     TextRenderer.DrawText(e.Graphics, "★", tile.Font, new Point(57, 0), Appearance.Accent);
                 TextRenderer.DrawText(e.Graphics, app.Name, tile.Font, new Rectangle(3, 48, 68, 22), Appearance.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
@@ -348,7 +352,7 @@ sealed partial class LauncherForm : Form
     {
         filteredQuery = query.Text;
         var source = prefs.RememberHistory ? memory : new Memory(null);
-        filtered = source.Search(AllApplications.ToList(), query.Text, activationContext, DateTimeOffset.UtcNow, prefs.ContextAware, prefs.Aliases);
+        filtered = source.Search(AllApplications.ToList(), query.Text, activationContext, DateTimeOffset.UtcNow, prefs.ContextAware, ModuleSearchAliases());
         if (!string.IsNullOrWhiteSpace(query.Text) && ClipboardTool.Matches(query.Text) && !filtered.Any(x => x.Target == ClipboardTool.Target)) filtered.Insert(0, ClipboardTool.Entry);
         filtered = filtered.Take(14).ToList();
         selection = 0;
@@ -357,6 +361,13 @@ sealed partial class LauncherForm : Form
         status.Visible = status.Text.Length > 0;
         ClientSize = new Size(600, status.Visible ? 276 : 248);
         UpdatePathCompletion();
+    }
+    Dictionary<string,string[]> ModuleSearchAliases()
+    {
+        var entries=EntryContributions.ReadModules(prefs).Search;if(entries.Length==0)return prefs.Aliases;
+        var aliases=new Dictionary<string,string[]>(prefs.Aliases,StringComparer.OrdinalIgnoreCase);
+        foreach(var entry in entries)aliases[entry.Target]=(aliases.GetValueOrDefault(entry.Target)??[]).Concat(entry.Aliases).Distinct().ToArray();
+        return aliases;
     }
     List<AppEntry> VisibleEntries() => string.IsNullOrWhiteSpace(query.Text)
         ? FavoriteOrder.Merge(AllApplications.ToList(), prefs.Favorites, prefs.RememberHistory ? memory.Recent(AllApplications.ToList()) : new List<AppEntry>())
@@ -395,6 +406,7 @@ sealed partial class LauncherForm : Form
     }
     public async Task<string> LaunchFromAssistantAsync(AppEntry app,string source,CancellationToken token)
     {
+        if(ModuleEntryContributions.IsTarget(app.Target))return (await EntryContributions.ExecuteModule(prefs,app.Target[ModuleEntryContributions.TargetPrefix.Length..],source,token)).ToLegacy(token);
         if(ConfiguredApplication(app) is {} module){
             if(OriginActionRequested!=null)return await OriginActionRequested("local:"+module.Id,"",source,token);
             if(ActionRequested!=null)return await ActionRequested("local:"+module.Id,"",token);
@@ -405,7 +417,7 @@ sealed partial class LauncherForm : Form
     }
     public void LaunchFromAssistant(AppEntry app)
     {
-        if(ConfiguredApplication(app)!=null){_=LaunchConfigured();return;}
+        if(ModuleEntryContributions.IsTarget(app.Target)||ConfiguredApplication(app)!=null){_=LaunchConfigured();return;}
         launchApplication(app);RememberApplication(app);
         async Task LaunchConfigured(){try{await LaunchFromAssistantAsync(app,"ui",CancellationToken.None);}catch(OperationCanceledException){}catch(Exception e){OperationFeedback.Error(e.Message);}}
     }
@@ -433,6 +445,7 @@ sealed partial class LauncherForm : Form
         Hide();
         try
         {
+            if(ModuleEntryContributions.IsTarget(app.Target)){await ModuleEntryRendering.Run(prefs,app.Target[ModuleEntryContributions.TargetPrefix.Length..],"search",()=>!launcherReleased&&!IsDisposed,commandLife.Token);return;}
             if(ActionRequested!=null){await ActionRequested(app.Target==ClipboardTool.Target?"clipboard_open":"app_open",app.Target==ClipboardTool.Target?"":AppTools.Id(app),CancellationToken.None);return;}
             if (app.Target == ClipboardTool.Target) ClipboardTool.Open(clipboard); else launchApplication(app);
             if (prefs.RememberHistory) memory.Record(app, activationContext, DateTimeOffset.UtcNow);

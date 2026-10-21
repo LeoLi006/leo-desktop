@@ -6,12 +6,15 @@ static class EntryDisplay
     public const string Shortcut="shortcut",Menu="menu",Search="search";
     public static readonly (string Value,string Label)[] Modes=[(Shortcut,"快捷栏显示"),(Menu,"仅菜单显示"),(Search,"仅搜索调用")];
     public static string Mode(Preferences p,string id)=>p.EntryDisplayModes?.TryGetValue(id,out var value)==true&&Modes.Any(m=>m.Value==value)?value:Shortcut;
+    public static string EffectiveMode(Preferences p,string id)=>EntryContributions.ReadModules(p).Entries.FirstOrDefault(e=>e.Id==id)?.Mode??Mode(p,id);
     public static bool ShowShortcut(Preferences p,string id)=>Mode(p,id)==Shortcut;
     public static bool ShowMenu(Preferences p,string id)=>Mode(p,id)!=Search;
-    public static void Validate(Dictionary<string,string>? modes){if(modes==null||modes.Count>512||modes.Any(p=>p.Key.Length is <1 or >100||!Regex.IsMatch(p.Key,@"^[A-Za-z0-9:_-]+$")||!Modes.Any(m=>m.Value==p.Value)))throw new ArgumentException("入口显示配置无效，请重新选择显示方式。");}
+    internal static bool ValidKey(string id)=>id.Length<=100&&Regex.IsMatch(id,@"^[A-Za-z0-9:_-]+$")||id.Length<=160&&Regex.IsMatch(id,@"^[A-Za-z0-9:_-]+/[A-Za-z0-9:_-]+$");
+    public static void Validate(Dictionary<string,string>? modes){if(modes==null||modes.Count>512||modes.Any(p=>!ValidKey(p.Key)||!Modes.Any(m=>m.Value==p.Value)))throw new ArgumentException("入口显示配置无效，请重新选择显示方式。");}
     public static OptionalEntry[] Entries(Preferences p)=>EntryContributions.ReadBuiltins(p).Select(e=>new OptionalEntry(e.Id,e.SettingsName,e.Enabled,e.Hint))
         .OrderBy(e=>Array.IndexOf(new[]{"terminal","clash","music","edge","football","media"},e.Id))
-        .Concat(EntryContributions.ReadAvailable(p).Select(a=>new OptionalEntry(a.Id,a.Name,a.Enabled,"搜索应用名："+a.Name))).ToArray();
+        .Concat(EntryContributions.ReadAvailable(p).Select(a=>new OptionalEntry(a.Id,a.Name,a.Enabled,"搜索应用名："+a.Name)))
+        .Concat(EntryContributions.ReadModules(p).Entries.Select(e=>new OptionalEntry(e.Id,e.SettingsName,e.Enabled,e.Name))).ToArray();
 }
 sealed class EntryDisplayForm:BarcaWindow
 {
@@ -24,7 +27,7 @@ sealed class EntryDisplayForm:BarcaWindow
         foreach(var entry in EntryDisplay.Entries(prefs)){
             var title=new Label{Text=entry.Name,Bounds=new(8,y+4,305,25),AutoEllipsis=true,ForeColor=BarcaUi.Text,Font=BarcaUi.Font(10,true)};
             var enabled=new Label{Text=entry.Enabled?"已启用":"已停用",Bounds=new(320,y+5,77,24),ForeColor=entry.Enabled?BarcaUi.Gold:BarcaUi.Muted,Font=BarcaUi.Font(9)};
-            var field=new ComboBox{Bounds=new(408,y,260,31),DropDownStyle=ComboBoxStyle.DropDownList,AccessibleName=entry.Id+"入口显示"};CompanionUi.ThemeCombo(field);foreach(var mode in EntryDisplay.Modes)field.Items.Add(new ComboChoice(mode.Label,mode.Value));field.SelectedItem=field.Items.Cast<ComboChoice>().First(m=>m.Value==EntryDisplay.Mode(prefs,entry.Id));fields[entry.Id]=field;
+            var field=new ComboBox{Bounds=new(408,y,260,31),DropDownStyle=ComboBoxStyle.DropDownList,AccessibleName=entry.Id+"入口显示"};CompanionUi.ThemeCombo(field);foreach(var mode in EntryDisplay.Modes)field.Items.Add(new ComboChoice(mode.Label,mode.Value));field.SelectedItem=field.Items.Cast<ComboChoice>().First(m=>m.Value==EntryDisplay.EffectiveMode(prefs,entry.Id));fields[entry.Id]=field;
             var hint=new Label{Text="搜索口令："+entry.Hint,Bounds=new(8,y+33,660,23),AutoEllipsis=true,ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};scroll.Controls.AddRange([title,enabled,field,hint]);y+=70;
         }
         scroll.AutoScrollMinSize=new(0,y+4);var note=new Label{Text="快捷栏显示：保留原位置的快捷按钮，也能从右键菜单进入。\n仅菜单显示：隐藏快捷按钮，保留右键入口。仅搜索调用：两种入口都隐藏。\n聊天、语音、组合、已有快捷键和内容操作仍可调用已启用能力。\n停用模块的显示选择会保留，重新启用后恢复。确认后还需保存设置。",Bounds=new(28,468,710,75),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};
@@ -45,6 +48,7 @@ sealed partial class PetForm
                 if(entry.MenuActions.Length==1){var action=entry.MenuActions[0];parent.DropDownItems.Add(Item(entry.MenuName,action.ActionId,action.Value,entry.Id));}
                 else{var group=new ToolStripMenuItem(entry.MenuName){Tag="optional-entry"};foreach(var action in entry.MenuActions)group.DropDownItems.Add(Item(action.Name,action.ActionId,action.Value,entry.Id));BarcaMenus.StyleSubmenu(group,menu.Font);parent.DropDownItems.Add(group);}
             }
+            ModuleEntryRendering.AddMenus(parent,prefs,menu.Font,()=>!IsDisposed);
             var apps=EntryContributions.ReadAvailable(prefs).Where(a=>a.Menu).ToArray();if(apps.Length>0){var root=new ToolStripMenuItem("自定义应用"){Tag="optional-entry"};foreach(var app in apps){var item=Item(app.Name,app.ActionId);root.DropDownItems.Add(item);}BarcaMenus.StyleSubmenu(root,menu.Font);parent.DropDownItems.Add(root);}
         };
     }

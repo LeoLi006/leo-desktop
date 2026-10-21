@@ -23,9 +23,16 @@ sealed record EntryContribution(string Id,string ModuleId,string ActionId,string
 static class EntryContributions
 {
     public const string Protocol="leo-entry/1";
-    sealed record Binding(CapabilityRegistry Registry);
+    sealed record Binding(CapabilityRegistry Registry,ActionDispatcher? Dispatcher);
     static readonly ConditionalWeakTable<Preferences,Binding> bindings=new();
-    public static void Bind(Preferences prefs,CapabilityRegistry registry){bindings.Remove(prefs);bindings.Add(prefs,new(registry));}
+    public static void Bind(Preferences prefs,CapabilityRegistry registry,ActionDispatcher? dispatcher=null){bindings.Remove(prefs);bindings.Add(prefs,new(registry,dispatcher));}
+    public static ModuleEntrySnapshot ReadModules(Preferences prefs)=>bindings.TryGetValue(prefs,out var host)?ModuleEntryContributions.Read(prefs,host.Registry):new([],[],[],[]);
+    public static Task<ActionResult> ExecuteModule(Preferences prefs,string id,string source,CancellationToken token=default,int? menuIndex=null)
+    {
+        token.ThrowIfCancellationRequested();
+        if(!bindings.TryGetValue(prefs,out var host)||host.Dispatcher==null)throw new InvalidOperationException("模块入口执行器未连接");
+        return ModuleEntryContributions.Execute(host.Dispatcher,prefs,id,source,token,menuIndex);
+    }
     public static string Check(EntryContribution entry,Func<string,string?> owner)
     {
         try{

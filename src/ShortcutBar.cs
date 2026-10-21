@@ -44,6 +44,7 @@ sealed partial class LauncherForm
         foreach(var entry in EntryContributions.ReadBuiltins(prefs).Where(e=>e.Id is "music" or "media"))
             Add(entry.Id,entry.Name,entry.Glyph,entry.Shortcut,()=>{EntryContributions.BuiltinAction(prefs,entry.Id);if(entry.Id=="music")OpenMusicFromAssistant();else MediaRequested?.Invoke();},entry.Icon);
         foreach(var app in EntryContributions.ReadAvailable(prefs))Add(app.Id,app.Name,"terminal",app.Shortcut,async()=>{try{if(OriginActionRequested!=null)await OriginActionRequested(EntryContributions.CurrentAction(prefs,app.Id),"","shortcut",CancellationToken.None);else if(ActionRequested!=null)await ActionRequested(EntryContributions.CurrentAction(prefs,app.Id),"",CancellationToken.None);else if(!preview)throw new InvalidOperationException("应用启动入口未连接");}catch(OperationCanceledException){}catch(Exception e){OperationFeedback.Show(e.Message);}},app.Icon);
+        foreach(var entry in EntryContributions.ReadModules(prefs).Buttons)Add(entry.Id,entry.Name,entry.Glyph,true,()=>{_=ModuleEntryRendering.Run(prefs,entry.Id,"shortcut",()=>!launcherReleased&&!IsDisposed,commandLife.Token);},entry.Icon);
         foreach(string id in ShortcutOrder.Arrange(buttons.Keys,prefs.ShortcutOrder))shortcutRow.Controls.Add(buttons[id]);LayoutShortcutOverflow();
     }
 }

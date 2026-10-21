@@ -240,6 +240,7 @@ static class Program
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--module-entry-rendering-test"){ModuleEntryRenderingTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--module-entry-test"){ModuleEntryTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--notes-concurrency-test"){NotesConcurrencyTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--scoped-services-test"){ScopedServicesTests.Run(args[1]);return;}
@@ -554,7 +555,7 @@ sealed partial class PetForm : Form
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
         launcher.WindowClosed=target=>presentation.Invalidate(target);launcher.VisibleChanged+=(_,_)=>{if(!launcher.Visible)presentation.Invalidate(ModuleWindowTarget.Applications);};
         launcher.SharedFootballClient=footballClient;commands.ApplicationAliases=launcher.ResolveApplicationRequest;RegisterMusicCapability();launcher.SharedMusicClient=new MusicClient(musicSession!,commands);RegisterClipboardCapability();
-        EntryContributions.Bind(prefs,commands.Registry);HostServiceDiagnostics.Bind(prefs,commands.Registry,presentation);launcher.RefreshModules();
+        EntryContributions.Bind(prefs,commands.Registry,commands);HostServiceDiagnostics.Bind(prefs,commands.Registry,presentation);launcher.RefreshModules();
         if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}
         constructionProbe?.Invoke("launcher_ready");
         foot = new FootTools(p.PetSize, preview);foot.ProxyAction=(a,t)=>commands.ExecuteAsync(new(a,"","foot-ui"),t);

@@ -72,3 +72,6 @@
 ## 普通模块可选贡献试点
 
 [C04-G2普通模块入口](../C04/MODULE-ENTRIES.md)复用EntryContribution并增加缺省为空对象的Parameters字段，仅供可选模块的结构化点击使用。既有本机应用、内置来源及其参数规则不改。新目录独立提供投影，不混入ReadAvailable的本机应用路径或真实渲染器。
+
+
+后续[C04-G2真实渲染接入](../C04/MODULE-ENTRY-RENDERING.md)复用上述目录显示普通模块贡献；旧应用来源保留，模块URI不进入模型应用候选，点击重新校验当前身份。

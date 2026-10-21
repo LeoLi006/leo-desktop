@@ -39,6 +39,7 @@ sealed class CapabilityRegistry
             return true;
         }
     }
+    internal IModuleEntryContributor[] EntryContributors(){lock(gate)return registered.Values.OfType<IModuleEntryContributor>().ToArray();}
     ILeoModule[] Remaining(ILeoModule[] modules)
     {
         var replaced=modules.SelectMany(m=>m.Actions).ToHashSet();

@@ -17,7 +17,7 @@ sealed class AppTools
     public AppTools(Func<IEnumerable<AppEntry>> apps, Action<AppEntry> open, Func<Dictionary<string, string[]>>? names = null,Func<string,string,CancellationToken,Task<string>>? leoActions=null)
     { catalog = apps; launch = open;leo=leoActions; aliases = names ?? (() => new()); }
     public static string Id(AppEntry app) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(app.Target)))[..24];
-    internal static bool Launchable(AppEntry app) => !app.Target.StartsWith("leo-tool:", StringComparison.OrdinalIgnoreCase)
+    internal static bool Launchable(AppEntry app) => !ModuleEntryContributions.IsTarget(app.Target) && !app.Target.StartsWith("leo-tool:", StringComparison.OrdinalIgnoreCase)
         && !new[] { "卸载", "uninstall", "uninstaller" }.Any(x => app.Name.Contains(x, StringComparison.OrdinalIgnoreCase));
     public AppEntry[] FindLocal(string query)=>catalog().Where(Launchable).Select(app=>(App:app,Rank:AppSearch.Rank(app,query,aliases()))).Where(x=>x.Rank<99).OrderBy(x=>x.Rank).ThenBy(x=>x.App.Name.Length).Take(8).Select(x=>x.App).ToArray();
     public async Task<string> OpenLocalAsync(AppEntry app,CancellationToken token=default){token.ThrowIfCancellationRequested();if(!catalog().Where(Launchable).Any(x=>x.Target==app.Target))throw new InvalidOperationException("应用已不在当前索引，请重新搜索");if(HasLeo)return await ExecuteLeoAsync("app_open",Id(app),token);launch(app);return "已打开 "+app.Name;}
