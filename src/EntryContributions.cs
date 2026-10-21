@@ -28,6 +28,14 @@ static class EntryContributions
     public static void Bind(Preferences prefs,CapabilityRegistry registry,ActionDispatcher? dispatcher=null,Action? refresh=null){bindings.Remove(prefs);bindings.Add(prefs,new(registry,dispatcher,refresh));}
     public static void RefreshExtensions(Preferences prefs){if(bindings.TryGetValue(prefs,out var host)){host.Dispatcher?.CancelDisabled();host.Refresh?.Invoke();}}
     public static void BindReadOnlyView(Preferences source,Preferences view){if(bindings.TryGetValue(source,out var host))Bind(view,host.Registry);}
+    // Read-only status projection; never exposes the executor or mutates configuration.
+    internal static ModuleContractSnapshot? ReadStatusContract(Preferences prefs,string action,LocalApplication? expected=null)
+    {
+        if(!bindings.TryGetValue(prefs,out var host))return null;
+        var module=host.Registry.Resolve(action);
+        if(expected!=null&&(module is not LocalApplicationModule app||app.Configuration!=expected))return null;
+        return module is IModuleContractSource source?ModuleContracts.Snapshot(source):null;
+    }
     public static ModuleEntrySnapshot ReadModules(Preferences prefs)=>bindings.TryGetValue(prefs,out var host)?ModuleEntryContributions.Read(prefs,host.Registry):new([],[],[],[]);
     public static Task<ActionResult> ExecuteModule(Preferences prefs,string id,string source,CancellationToken token=default,int? menuIndex=null)
     {

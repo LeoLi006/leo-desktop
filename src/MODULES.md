@@ -181,3 +181,7 @@ AtomicJson 用于完整 JSON 的同目录替换及本地备份恢复；不是多
 ## 现有扩展包兼容与更新恢复（D02/D03）
 
 LeoModule/1新增可选HostMin、HostMax及Dependencies；旧包省略仍可用。导入前检查，不兼容包在原管理窗口显示原因，缺依赖不自动下载；ZIP暂存、提升失败恢复旧目录，清理失败以已生效附警告报告。独立module-data和用户配置保留。格式、隔离验证及断电/恢复失败边界见[开发说明](Architecture/Extensions/PACKAGE-COMPATIBILITY.md)。不自动开放模型调用。
+
+## 模块状态展示（D04最小接入）
+
+原模块状态窗口通过只读契约快照汇总自定义应用与已安装扩展，显示来源、版本、显式启停及被动依赖；每个模块一行，未检测不推断正常，检查通过不等于程序在运行。原应用编辑器、扩展管理和内置处理入口保留；无新增轮询。实现、35项定向检查及限制见[模块状态说明](Architecture/Extensions/MODULE-STATUS.md)。

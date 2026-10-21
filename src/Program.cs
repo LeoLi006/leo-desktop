@@ -239,6 +239,7 @@ static class Program
         if(args.Length==2&&args[0]=="--feedback-pointer-test"){FeedbackPointerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--module-status-contract-test"){ModuleStatusContractTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--extension-package-test"){ExtensionPackageTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--extension-contract-test"){ExtensionContractTests.Run(args[1]);return;}
