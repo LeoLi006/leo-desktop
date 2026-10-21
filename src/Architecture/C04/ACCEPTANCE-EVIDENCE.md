@@ -63,3 +63,10 @@
 | `brain-chains/q5-brain-after.json` | Q5相关48项通过 | `a38bc40a4e6d192276fa7e6485e5a74e830fffe520f5eba5255c1406b7de5d0d` |
 
 范围及模型便签转换限制见[链路验收](../Q5/CHAIN-VALIDATION.md)。不把缓存核验描述为实时联网或事务锁。
+
+
+## F02/M04：近期五分钟隔离持续运行
+
+`.build/recent-stability/five-minutes.json`：300.84秒、517轮、九项场景/释放检查通过；SHA256 `4f200d8e868ee9d92a2c477c6cc790e4f814ca6114b3058be070246695988fab`。历史报告本轮仅核对哈希，没有重新运行或累加为全量通过数。
+
+托管堆回落不等于私有内存完全回落；最终私有内存仍高于预热，保留未解释边界，详见[本轮方法与资源表](RECENT-STABILITY.md)。只增测试夹具和文档，不安装更新。

@@ -240,6 +240,7 @@ static class Program
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--status-update-test"){StatusUpdateTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--recent-stability-test"){RecentStabilityProbe.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--brain-chain-test"){BrainChainTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--data-boundary-test"){DataBoundaryTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--module-entry-diagnostics-test"){ModuleEntryDiagnosticsTests.Run(args[1]);return;}
