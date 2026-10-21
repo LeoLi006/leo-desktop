@@ -1,0 +1,11 @@
+// Repository-owned fixture. Compile separately; never registered by normal Leo startup.
+class LeoExtensionFixture {
+ static void Main() {
+  string line=System.Console.ReadLine()??"";
+  if(line.Contains("\"command\":\"slow\""))System.Threading.Thread.Sleep(30000);
+  if(line.Contains("\"command\":\"bad\"")){System.Console.WriteLine("not-json");return;}
+  if(line.Contains("\"command\":\"fail\"")){System.Console.WriteLine("{\"ok\":false,\"message\":\"fixture rejected\"}");return;}
+  if(line.Contains("\"command\":\"large\"")){System.Console.WriteLine(new string('x',70000));return;}
+  System.Console.WriteLine("{\"ok\":true,\"message\":\"worker fixture completed\"}");
+ }
+}

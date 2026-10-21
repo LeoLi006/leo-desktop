@@ -70,3 +70,17 @@
 `.build/recent-stability/five-minutes.json`：300.84秒、517轮、九项场景/释放检查通过；SHA256 `4f200d8e868ee9d92a2c477c6cc790e4f814ca6114b3058be070246695988fab`。历史报告本轮仅核对哈希，没有重新运行或累加为全量通过数。
 
 托管堆回落不等于私有内存完全回落；最终私有内存仍高于预热，保留未解释边界，详见[本轮方法与资源表](RECENT-STABILITY.md)。只增测试夹具和文档，不安装更新。
+
+
+## C01/C06/D01：旧扩展契约与入口
+
+| 本机忽略报告 | 结果 | SHA256 |
+| --- | --- | --- |
+| `extension-contracts/first.json` | 首轮菜单夹具超时，已完成12项断言 | `fef36d56784b9ee8e437bfe09d7aa8dbb614eb5348cb945ea804f16cdfd9189d` |
+| `extension-contracts/final.json` | 最终专项30项通过 | `64b1e7dcfed2d22163db31965fdd80949ee8086a0109437954c05f2b88f8ced7` |
+| `extension-contracts/q2-capability.json` | Q2兼容60项通过 | `af3d0216a5f267e8815274156c6cf9caa471c8e3e5f52e3bb2d03e24580d74cf` |
+| `extension-contracts/module-contract.json` | 契约55项通过 | `81b04cd4860d1beab89b53f44df998f20e9335f33b14dfee40733355f9ad8762` |
+| `extension-contracts/module-entry.json` | 入口27项通过 | `ef3406f3faa25322890bd333247adbe27bc2642646debc183a4ce8b5c72dd50a` |
+| `extension-contracts/module-entry-rendering.json` | 真实控件41项通过 | `e7e1a231246120c7fc9a1e26e1d630c4e7d28a7214e0866e96733fd3615108a6` |
+
+复用旧执行机制，验证仅启动仓库worker；首轮夹具修订、权限及未完成范围见[扩展适配](../Extensions/README.md)。不将内存日常观察作为本轮重新验收。

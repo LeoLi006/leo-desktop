@@ -44,12 +44,6 @@ static class CommandTranslation
 
 sealed record ExtensionCommand(string Id,string Title,string[] Phrases,string Action,string Value="");
 sealed record ExtensionManifest(string Format,string Id,string Name,string Version,List<ExtensionCommand> Commands,string Runtime="actions",string? Executable=null,int TimeoutSeconds=15);
-sealed class ExtensionLeoModule(ExtensionManifest manifest,Preferences prefs,ActionDispatcher dispatcher):ILeoModule
-{
-    public string Id=>"ext:"+manifest.Id;public string Name=>manifest.Name;public string Version=>manifest.Version;public bool Enabled=>!prefs.DisabledExtensions.Contains(manifest.Id);public IReadOnlyList<string> Actions=>manifest.Commands.Select(c=>"ext:"+manifest.Id+":"+c.Id).ToArray();
-    public Task<string> ExecuteAsync(ActionRequest request,CancellationToken token){if(!Enabled)throw new InvalidOperationException(Name+"已停用");var command=manifest.Commands.Single(c=>request.Action=="ext:"+manifest.Id+":"+c.Id);if(manifest.Runtime=="stdio")return RunWorker(request,command,token);return dispatcher.ExecuteAsync(new(command.Action,command.Value,"extension:"+manifest.Id),token);}
-    async Task<string> RunWorker(ActionRequest request,ExtensionCommand command,CancellationToken token){using var reservation=ModuleWorker.Reserve(manifest.Id);return await ClientOperations.Hub.Run("module:"+manifest.Id,command.Id+":"+request.Value,op=>{if(!Enabled)throw new InvalidOperationException(Name+"已停用");op.Report("正在运行扩展 · "+Name);return ModuleWorker.ExecuteAsync(dispatcher.Extensions,manifest,request.Value.Length>0?command with{Value=request.Value}:command,op.Token,request.Source);},token);}
-}
 sealed class ExtensionStore(string root)
 {
     public string Root=>root;

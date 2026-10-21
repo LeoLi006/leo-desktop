@@ -39,7 +39,7 @@ sealed class CapabilityRegistry
             return true;
         }
     }
-    internal IModuleEntryContributor[] EntryContributors(){lock(gate)return registered.Values.OfType<IModuleEntryContributor>().ToArray();}
+    internal IModuleEntryContributor[] EntryContributors(){lock(gate){var external=extensions();foreach(var module in external.OfType<IModuleContractSource>())ModuleContracts.Validate(module);return registered.Values.Concat(external).OfType<IModuleEntryContributor>().ToArray();}}
     ILeoModule[] Remaining(ILeoModule[] modules)
     {
         var replaced=modules.SelectMany(m=>m.Actions).ToHashSet();

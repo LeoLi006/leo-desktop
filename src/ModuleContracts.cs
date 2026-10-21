@@ -29,7 +29,7 @@ static partial class ModuleContracts
     static ModuleContract ValidateCore(IModuleContractSource source)
     {
         var d=source.DescribeModule();Require(d!=null);Require(d.Format==Format&&d.Id==source.Id&&Text(d.Id,128)&&Text(d.Name)&&d.Version==source.Version&&Regex.IsMatch(d.Version??"",@"^\d+(?:\.\d+){0,3}$"));
-        Require(Text(d.Kind,60)&&d.Runtime is "in-process" or "application-adapter"&&d.Enablement is "optional" or "host-core"&&d.Configuration=="preserve-existing"&&Text(d.DataOwner));
+        Require(Text(d.Kind,60)&&d.Runtime is "in-process" or "application-adapter" or "stdio"&&d.Enablement is "optional" or "host-core"&&d.Configuration=="preserve-existing"&&Text(d.DataOwner));
         Require(source is IStructuredLeoModule&&d.Actions!=null&&d.Actions.Length is >0 and <=512&&d.Actions.All(a=>a!=null)&&d.Actions.Select(a=>a.Id).Distinct().Count()==d.Actions.Length&&d.Actions.Select(a=>a.Id).Order().SequenceEqual(source.Actions.Order()));
         var structured=(IStructuredLeoModule)source;
         foreach(var action in d.Actions){
