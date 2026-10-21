@@ -21,3 +21,8 @@
 - 应用宿主批的`application-host/q2-capability.json`曾有每订阅期限检查失败；`application-host/q2-recheck.json`复测60项通过。未因此改变业务期限，见[首批说明](README.md)。这仍是应保留的时序波动记录，不能以一次复测消除长期可靠性疑问。
 - 清单主题批的`planner-football-themes/baseline-planner.json`复现旧版菜单固定宽度断言失败；随后按文字和标记空间测量的`planner-theme-test.json`12项通过。未更改菜单宽度，见[该批边界](PLANNER-FOOTBALL-THEMES.md)。
 - 以上索引是历史验证依据，不承诺长时无泄漏、真实冷启动、真实客户端成功率或外部代码隔离。样例编译依据为此前锁定构建；本轮文档编辑不重复构建或重新测试未改代码。
+
+
+## 第十八批：内部模块闭环新证据
+
+`.build/module-entry-closure/closure-final.json`：41项通过（保留20项，新增21项），SHA256 `e7e1a231246120c7fc9a1e26e1d630c4e7d28a7214e0866e96733fd3615108a6`。报告只在本机忽略目录；本批锁定构建零警告，未重跑上方历史业务专项。具体边界见[闭环收尾](MODULE-CLOSURE.md)。只扩充测试与说明，不更新运行程序。

@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 namespace LeoLauncher;
-static class ModuleEntryRenderingTests
+static partial class ModuleEntryRenderingTests
 {
     static T Field<T>(object o,string name)=>(T)o.GetType().GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(o)!;
     static IEnumerable<Control> Walk(Control root){yield return root;foreach(Control child in root.Controls)foreach(var value in Walk(child))yield return value;}
@@ -38,7 +38,7 @@ static class ModuleEntryRenderingTests
                 OpenMenu(menu);item=parent.DropDownItems.OfType<ToolStripMenuItem>().Single(i=>i.Text=="模块入口").DropDownItems.OfType<ToolStripMenuItem>().Single();bus.Registry.Unregister(sample);bus.CancelDisabled();int count=bus.RecentResults.Count;item.PerformClick();await Task.Delay(50);c["removed_cached_menu_does_not_dispatch"]=bus.RecentResults.Count==count;stale();await Task.Delay(100);c["removed_cached_button_does_not_dispatch_or_launch"]=bus.RecentResults.Count==count;
                 bool rejected=false;try{await launcher.LaunchFromAssistantAsync(new AppEntry("stale",target,"模块入口"),"search",CancellationToken.None);}catch(InvalidOperationException){rejected=true;}c["removed_search_target_never_falls_back_to_path"]=rejected;
                 launcher.RefreshModules();c["removed_provider_disappears"]=EntryContributions.ReadModules(prefs).Entries.Length==0&&!Walk(launcher).OfType<Button>().Any(b=>b.Tag as string==id);c["query_did_not_mutate_notes"]=store.Items.Count==1;
-                launcher.Hide();File.WriteAllText(path,JsonSerializer.Serialize(new{ok=c.Values.All(v=>v),checks=c,real_api_requests=0,external_process_starts=0,personal_data_reads=0},new JsonSerializerOptions{WriteIndented=true}));
+                launcher.Hide();await CheckClosure(Path.GetDirectoryName(path)!,c);File.WriteAllText(path,JsonSerializer.Serialize(new{ok=c.Values.All(v=>v),checks=c,real_api_requests=0,external_process_starts=0,personal_data_reads=0},new JsonSerializerOptions{WriteIndented=true}));
             }catch(Exception e){File.WriteAllText(path,JsonSerializer.Serialize(new{ok=false,error=e.ToString(),checks=c}));}finally{host.Close();}
         };Application.Run(host);
     }
