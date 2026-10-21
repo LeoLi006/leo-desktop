@@ -43,14 +43,14 @@ sealed class HealthChecksView:Panel
 
 sealed class ModulesView:Panel
 {
-    readonly Dictionary<string,CheckBox> fields=new();
+    readonly Dictionary<string,CheckBox> fields=new();readonly Preferences entrySource;
     public Action? ShowModuleStatus;
     public readonly CheckBox Docking;
     Dictionary<string,string> selectedPaths;
     Dictionary<string,InstalledApplicationPackage> applicationPackages;List<LocalApplication> applicationModules;Dictionary<string,string> moduleIcons;Dictionary<string,string> entryDisplayModes;
     public ModulesView(Preferences p,bool preview=false)
     {
-        applicationPackages=new(p.ApplicationPackages);entryDisplayModes=new(p.EntryDisplayModes??new());selectedPaths=new(p.ModuleExecutables);applicationModules=(p.ApplicationModules??[]).ToList();moduleIcons=new(p.ModuleIcons??new());
+        entrySource=p;applicationPackages=new(p.ApplicationPackages);entryDisplayModes=new(p.EntryDisplayModes??new());selectedPaths=new(p.ModuleExecutables);applicationModules=(p.ApplicationModules??[]).ToList();moduleIcons=new(p.ModuleIcons??new());
         Dock=DockStyle.Fill;AutoScroll=true;AutoScrollMinSize=new Size(0,585);
         Controls.Add(new Label{Text="按需开启 · 图标、菜单与后台检查同步变化",Bounds=new Rectangle(8,10,550,30),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});
         var statusButton=new BarcaButton{Text="模块状态与处理…",Bounds=new Rectangle(10,542,535,32)};statusButton.Click+=(_,_)=>ShowModuleStatus?.Invoke();Controls.Add(statusButton);
@@ -60,10 +60,11 @@ sealed class ModulesView:Panel
         }
         Docking=new CheckBox{Text="拖到屏幕边缘时自动停靠",Checked=p.EdgeDocking,Bounds=new Rectangle(10,410,330,30),ForeColor=BarcaUi.Text};Controls.Add(Docking);
         var extensions=new BarcaButton{Text="管理扩展模块…",Bounds=new Rectangle(10,455,230,32)};extensions.Click+=(_,_)=>{using var manager=new ExtensionManager(p,preview);manager.ShowDialog(FindForm());};Controls.Add(extensions);
-        var display=new BarcaButton{Text="入口显示…",Bounds=new Rectangle(265,455,280,32)};display.Click+=(_,_)=>{var draft=new Preferences();Apply(draft,false);using var dialog=new EntryDisplayForm(draft);if(dialog.ShowDialog(FindForm())==DialogResult.OK)entryDisplayModes=new(dialog.Result);};Controls.Add(display);
+        var display=new BarcaButton{Text="入口显示…",Bounds=new Rectangle(265,455,280,32)};display.Click+=(_,_)=>{var draft=EntryDisplayDraft();using var dialog=new EntryDisplayForm(draft);if(dialog.ShowDialog(FindForm())==DialogResult.OK)entryDisplayModes=new(dialog.Result);};Controls.Add(display);
         var paths=new BarcaButton{Text="应用模块与图标…",Bounds=new Rectangle(365,410,180,32)};paths.Click+=(_,_)=>EditPaths(FindForm());Controls.Add(paths);
         Controls.Add(new Label{Text="停用模块不会卸载软件，也不会关闭已开启的代理或音乐。",Bounds=new Rectangle(10,503,550,28),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});
     }
+    internal Preferences EntryDisplayDraft(){var draft=new Preferences();Apply(draft,false);EntryContributions.BindReadOnlyView(entrySource,draft);return draft;}
     public bool EditPaths(IWin32Window? owner){var draft=new Preferences();Apply(draft,false);using var dialog=new LocalApplicationsForm(draft);if(dialog.ShowDialog(owner)!=DialogResult.OK)return false;selectedPaths=new(draft.ModuleExecutables);applicationModules=draft.ApplicationModules.ToList();applicationPackages=new(draft.ApplicationPackages);moduleIcons=new(draft.ModuleIcons);foreach(var pair in fields)pair.Value.Checked=Modules.Enabled(draft,pair.Key);return true;}
     public Dictionary<string,string> Paths=>selectedPaths.ToDictionary();
     public void Apply(Preferences next,bool validatePaths=true){next.EntryDisplayModes=new(entryDisplayModes);next.ApplicationModules=applicationModules.ToList();next.ApplicationPackages=new(applicationPackages);next.ModuleIcons=new(moduleIcons);next.MediaModule=fields["media"].Checked;next.TerminalModule=fields["terminal"].Checked;next.ClashModule=fields["clash"].Checked;next.MusicModule=fields["music"].Checked;next.EdgeModule=fields["edge"].Checked;next.FootballModule=fields["football"].Checked;next.EdgeDocking=Docking.Checked;next.ModuleExecutables=selectedPaths.ToDictionary();foreach(var pair in selectedPaths)if(validatePaths&&Modules.Enabled(next,pair.Key))ModulePaths.Validate(pair.Key,pair.Value);}

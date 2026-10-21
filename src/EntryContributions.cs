@@ -26,6 +26,7 @@ static class EntryContributions
     sealed record Binding(CapabilityRegistry Registry,ActionDispatcher? Dispatcher);
     static readonly ConditionalWeakTable<Preferences,Binding> bindings=new();
     public static void Bind(Preferences prefs,CapabilityRegistry registry,ActionDispatcher? dispatcher=null){bindings.Remove(prefs);bindings.Add(prefs,new(registry,dispatcher));}
+    public static void BindReadOnlyView(Preferences source,Preferences view){if(bindings.TryGetValue(source,out var host))Bind(view,host.Registry);}
     public static ModuleEntrySnapshot ReadModules(Preferences prefs)=>bindings.TryGetValue(prefs,out var host)?ModuleEntryContributions.Read(prefs,host.Registry):new([],[],[],[]);
     public static Task<ActionResult> ExecuteModule(Preferences prefs,string id,string source,CancellationToken token=default,int? menuIndex=null)
     {
