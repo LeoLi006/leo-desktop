@@ -113,6 +113,7 @@ sealed partial class ChatForm : BarcaWindow
         todoAction=onTodo;openClipboard=clipboardAction;planStore=planner;
         TopMost = false; ShowInTaskbar = true; Text = "Leo · AI 对话"; StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 610); MinimumSize = new Size(500, 430);
         Font=BarcaUi.Font(10);BackColor=BarcaUi.Canvas;ForeColor=BarcaUi.Text;ClientSize=new Size(620,440);MinimumSize=new Size(600,430);Text="问 Leo";
+        SetStyle(ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
         CanResize=true;FormBorderStyle=FormBorderStyle.None;MaximizeBox=true;MinimizeBox=true;Text="Leo";ClientSize=new Size(720,600);MinimumSize=new Size(490,360);Padding=new Padding(7);
         var chrome=new Panel{Dock=DockStyle.Top,Height=55,Padding=new Padding(18,10,16,8)};
         var brand=new Label{Text="LEO",Dock=DockStyle.Fill,Font=BarcaUi.Font(15,true),ForeColor=BarcaUi.Gold};chrome.Controls.Add(brand);
@@ -170,7 +171,7 @@ sealed partial class ChatForm : BarcaWindow
         renderTimer.Tick += (_, _) => { if (dirty) { dirty = false; Render(); } };
         renderTimer.Start(); Render(); ShowHome(); UpdateState();
         bodyHost.SizeChanged+=(_,_)=>ResizeResults();results.ClientSizeChanged+=(_,_)=>ResizeResults();
-        Shown += (_, _) => input.Focus();theme=new(this);
+        Shown += (_, _) => {input.Focus();QueueChatRepaint();};theme=new(this);chatPaintReady=true;
     }
     void VoiceChanged(long generation){OnUi(()=>{if(voice.IsCurrent(generation))UpdateVoice();});}
     void VoiceStatus(string message,long generation){OnUi(()=>{if(voice.IsCurrent(generation))state.Text=message;});}

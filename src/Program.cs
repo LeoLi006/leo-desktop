@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -244,6 +244,7 @@ static class Program
         if(args.Length==2&&args[0]=="--feedback-pointer-test"){FeedbackPointerTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--interaction-batch-test"){InteractionBatchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--profile-batch-test"){ProfileBatchTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--chat-resize-test"){ChatResizeTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--desktop-tools-test"){DesktopToolsTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--delivery-recovery-test"){DeliveryRecoveryTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--sharing-boundary-test"){SharingBoundaryTests.Run(args[1]);return;}

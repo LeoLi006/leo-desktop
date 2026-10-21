@@ -96,7 +96,7 @@ sealed class ConversationView:Panel
     readonly Font bodyFont=BarcaUi.Font(11),labelFont=BarcaUi.Font(8.5f,true);
     List<ChatTurn> history=new();
     bool rendering,reflowPending;
-    public ConversationView(){AutoScroll=true;DoubleBuffered=true;BackColor=BarcaUi.Canvas;Resize+=(_,_)=>QueueReflow();VisibleChanged+=(_,_)=>{if(Visible)QueueReflow();};}
+    public ConversationView(){SetStyle(ControlStyles.ResizeRedraw,true);AutoScroll=true;DoubleBuffered=true;BackColor=BarcaUi.Canvas;Resize+=(_,_)=>QueueReflow();VisibleChanged+=(_,_)=>{if(Visible)QueueReflow();};}
     void QueueReflow(){if(reflowPending||IsDisposed||!IsHandleCreated)return;reflowPending=true;try{BeginInvoke((Action)(()=>{try{if(!IsDisposed){Display(history);PerformLayout();}}finally{reflowPending=false;}}));}catch(InvalidOperationException){reflowPending=false;}}
     protected override Point ScrollToControl(Control activeControl)=>AutoScrollPosition;
     public void Display(IEnumerable<ChatTurn> turns)
