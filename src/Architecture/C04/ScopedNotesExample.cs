@@ -32,8 +32,10 @@ sealed class ScopedNotesExampleServices: IExampleNotesServices,IDisposable
     public Task<ActionPayload> Save(string text,string requestId,CancellationToken token)=>Execute("note_save",new{text},requestId,token);
     public void Dispose(){if(closed)return;closed=true;life.Dispose();}
 }
-sealed class ScopedNotesExampleModule(IExampleNotesServices services):IStructuredLeoModule,IActionRequestAdapter,IModuleContractSource
+sealed class ScopedNotesExampleModule(IExampleNotesServices services):IStructuredLeoModule,IActionRequestAdapter,IModuleContractSource,IModuleEntryContributor
 {
+    public EntryContribution[] DescribeEntries()=>[new(Id+"/query",Id,"example_notes_query","样例便签查询","",true,EntryDisplay.Shortcut,"leo-module-entry:"+Id+"/query",["示例查询"],"module-action"){
+        Parameters="{\"text\":\"\"}",MenuActions=[new("查询示例便签","example_notes_query","{\"text\":\"\"}")],Glyph="notes"}];
     public string Id=>"example-scoped-notes";public string Name=>"限定服务接入样例";public string Version=>"1";
     public bool Enabled=>services.Configuration.Enabled;public bool ConfigurationIsCurrent=>true;
     public IReadOnlyList<string> Actions=>["example_notes_query","example_notes_save"];

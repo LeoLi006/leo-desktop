@@ -20,13 +20,29 @@ sealed class CapabilityRegistry
     {
         if(module is IModuleContractSource contracted)ModuleContracts.Validate(contracted);
         lock(gate){
+            if(module is IModuleEntryContributor&&(replace||module is not IModuleContractSource source||source.DescribeModule().Enablement!="optional"||module.Actions.Any(builtins.Value.Actions.ContainsKey)))throw new InvalidOperationException("贡献入口的普通模块不得替换宿主动作");
             if(replace&&(!ModuleCatalog.Builtins.Any(m=>m.Id==module.Id)||module.Actions.Any(a=>ModuleCatalog.Owner(a)!=module.Id)||!module.Actions.OrderBy(a=>a).SequenceEqual(LeoActions.Names.Where(a=>ModuleCatalog.Owner(a)==module.Id).OrderBy(a=>a))))throw new InvalidOperationException("只能替换该内置模块拥有的动作");
             var others=registered.Values.Where(m=>!replace||m.Id!=module.Id).ToArray();
             if(string.IsNullOrWhiteSpace(module.Id)||!replace&&(ModuleCatalog.Builtins.Any(m=>m.Id==module.Id)||registered.ContainsKey(module.Id))||module.Actions.Count==0||module.Actions.Any(string.IsNullOrWhiteSpace)||module.Actions.Distinct().Count()!=module.Actions.Count||others.Any(m=>m.Actions.Intersect(module.Actions).Any()))throw new InvalidOperationException("模块或动作重复或无效");
-            var all=others.Append(module).ToArray();var replaced=all.SelectMany(m=>m.Actions).ToHashSet();
-            var next=builtins.Value.Modules.Where(m=>!all.Any(r=>r.Id==m.Id)).Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>m.Enabled,m.Actions.Where(a=>!replaced.Contains(a)).ToArray(),legacy)).ToArray();
+            var all=others.Append(module).ToArray();var next=Remaining(all);
             registered[module.Id]=module;remainingBuiltins=next;
         }
+    }
+    // Limited to opt-in optional contribution modules. The host owns service disposal
+    // and calls CancelDisabled after removing a module with in-flight requests.
+    public bool Unregister(IModuleEntryContributor module)
+    {
+        lock(gate){
+            if(!registered.TryGetValue(module.Id,out var current)||!ReferenceEquals(current,module))return false;
+            var next=Remaining(registered.Values.Where(m=>!ReferenceEquals(m,module)).ToArray());
+            registered.Remove(module.Id);remainingBuiltins=next;
+            return true;
+        }
+    }
+    ILeoModule[] Remaining(ILeoModule[] modules)
+    {
+        var replaced=modules.SelectMany(m=>m.Actions).ToHashSet();
+        return builtins.Value.Modules.Where(m=>!modules.Any(r=>r.Id==m.Id)).Select(m=>(ILeoModule)new BuiltinLeoModule(m.Id,m.Name,()=>m.Enabled,m.Actions.Where(a=>!replaced.Contains(a)).ToArray(),legacy)).ToArray();
     }
     LocalApplication[] applications=[];ILeoModule[] locals=[];Dictionary<string,ILeoModule> localActions=new();
     public CapabilityRegistry(Preferences prefs,Func<string,string,CancellationToken,Task<string>> legacy,Func<ILeoModule[]> extensions,ApplicationCapabilityHost? applicationHost)

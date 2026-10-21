@@ -14,6 +14,7 @@ sealed record EntryContribution(string Id,string ModuleId,string ActionId,string
     // Passive configured-path status; never a second execution permission gate.
     public string Dependency{get;init;}="unknown";
     public string Fault{get;init;}="";
+    public string Parameters{get;init;}="{}";
     public bool Available=>Enabled&&Fault.Length==0;
     public bool Shortcut=>Available&&Mode==EntryDisplay.Shortcut;
     public bool Menu=>Available&&Mode!=EntryDisplay.Search;
