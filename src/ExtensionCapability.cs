@@ -6,7 +6,7 @@ sealed class ExtensionLeoModule:IStructuredLeoModule,IActionRequestAdapter,IModu
     readonly ExtensionManifest manifest;readonly Preferences prefs;readonly ActionDispatcher dispatcher;readonly string definition;
     public ExtensionLeoModule(ExtensionManifest manifest,Preferences prefs,ActionDispatcher dispatcher){ExtensionStore.Validate(manifest);this.manifest=JsonSerializer.Deserialize<ExtensionManifest>(JsonSerializer.Serialize(manifest))!;this.prefs=prefs;this.dispatcher=dispatcher;definition=JsonSerializer.Serialize(this.manifest);}
     public string Id=>"ext:"+manifest.Id;public string Name=>manifest.Name;public string Version=>System.Version.Parse(manifest.Version).ToString();
-    public bool Enabled=>!prefs.DisabledExtensions.Contains(manifest.Id);
+    public bool Enabled=>!prefs.DisabledExtensions.Contains(manifest.Id)&&ExtensionCompatibility.Read(manifest,dispatcher.Extensions).Compatible;
     public IReadOnlyList<string> Actions=>manifest.Commands.Select(c=>"ext:"+manifest.Id+":"+c.Id).ToArray();
     public bool ConfigurationIsCurrent=>dispatcher.Extensions.Load().Any(m=>m.Id==manifest.Id&&JsonSerializer.Serialize(m)==definition);
     public int MaximumInputLength=>16000; // Preserve the old dispatcher limit for explicit worker overrides.
@@ -14,7 +14,7 @@ sealed class ExtensionLeoModule:IStructuredLeoModule,IActionRequestAdapter,IModu
     public ModuleContract DescribeModule()=>ModuleContracts.Build(this,"legacy-extension","旧扩展适配","optional","host.extension-data",[new("extension-target",manifest.Runtime=="stdio"?"local-file":"host-service","required","existing-execution-check",Actions.ToArray())],_ =>("value-wrapper","parameters仅接受可选value字符串；声明式扩展不得覆盖固定参数；旧字符串入口保留原处理。","extension-result","声明式转交真实目标的结构化结果；worker沿用ok/message及退出码，完成响应不证明任意外部效果。",true,["unknown","accepted","snapshot","committed","window-shown","state-observed","completed","released","cached","steps-completed"]));
     public DependencyState[] ReadDependencies()
     {
-        string state="unknown";try{state=manifest.Runtime=="stdio"?(File.Exists(dispatcher.Extensions.ExecutablePath(manifest))?"ready":"missing"):(manifest.Commands.All(c=>dispatcher.Registry.Resolve(c.Action).Enabled)?"ready":"missing");}catch(Exception e)when(FeatureFaults.Recoverable(e)){state="missing";}return [new("extension-target",state)];
+        string state="unknown";try{state=!ExtensionCompatibility.Read(manifest,dispatcher.Extensions).Compatible?"missing":manifest.Runtime=="stdio"?(File.Exists(dispatcher.Extensions.ExecutablePath(manifest))?"ready":"missing"):(manifest.Commands.All(c=>dispatcher.Registry.Resolve(c.Action).Enabled)?"ready":"missing");}catch(Exception e)when(FeatureFaults.Recoverable(e)){state="missing";}return [new("extension-target",state)];
     }
     public EntryContribution[] DescribeEntries()=>manifest.Commands.Select(c=>new EntryContribution(Id+"/"+c.Id,Id,"ext:"+manifest.Id+":"+c.Id,c.Title,"",Enabled,EntryDisplay.Search,ModuleEntryContributions.TargetPrefix+Id+"/"+c.Id,c.Phrases.ToArray(),"module-action"){Parameters="{}",Glyph="terminal",Hint="扩展命令",MenuActions=[new(c.Title,"ext:"+manifest.Id+":"+c.Id,"{}")] }).ToArray();
     public ActionRequest Adapt(StructuredActionRequest request)

@@ -34,7 +34,7 @@ sealed partial class ActionDispatcher
     public ActionDispatcher(Preferences preferences,Func<string,string,CancellationToken,Task<string>> core,ExtensionStore? extensions=null,ApplicationCapabilityHost? applications=null)
     {
         lifetimeToken=lifetime.Token;prefs=preferences;Extensions=extensions??new ExtensionStore(Path.Combine(Store.Root,"modules"));
-        Registry=new(preferences,core,()=>Extensions.Load().Select(m=>(ILeoModule)new ExtensionLeoModule(m,prefs,this)).ToArray(),applications);
+        Extensions.Preferences=preferences;Registry=new(preferences,core,()=>Extensions.Load().Select(m=>(ILeoModule)new ExtensionLeoModule(m,prefs,this)).ToArray(),applications);
     }
     public ILeoModule[] Modules=>Registry.Read();
     public async Task<string> ExecuteAsync(ActionRequest request,CancellationToken token=default)=>(await ExecuteDetailedAsync(request,token)).ToLegacy(token);
