@@ -1,6 +1,8 @@
-# Roadmap: lightweight host and optional agent backend
+# Historical candidate roadmap: external agents — paused
 
 [简体中文](ROADMAP.md) | **English**
+
+> **Positioning update:2026-10-22.** The accepted direction is a configurable companion and capability handoff. R1–R5 below are retained historical proposals: automatic progression is paused, not approved or the default priority. Start with [positioning-led research](RESEARCH.en.md), choose direct use/thin integration/own work for a real frequent scenario, then reprioritize. Hermes is one candidate.
 
 Updated2026-10-22. Source baseline:21fcaf4; published application:v1.05.0. This is an implementation proposal, not approval or a claim of completion. See [renewed research](RESEARCH.en.md) for evidence and limitations.
 
@@ -136,6 +138,6 @@ Deliver a constrained bridge and isolated example. Acceptance: disable/remove re
 - Report local work, remote runs and committed writes separately. No global exactly-once or automatic rollback-on-cancel claim.
 - Approve each batch, commit locally, and update the program once only when behavior changes. Uploads, packages and Releases require explicit requests.
 
-## 7. Suggested next approval
+## 7. Conditions for resuming
 
-**Propose R1 only:** fix scenarios, map minimal run semantics, show task progress inside existing chat, and test cancellation/disconnect/late events. No Hermes installation, real relay calls, MCP service or model-permission expansion. Submit a concrete R2 scope after R1.
+Use the [positioning-led survey](RESEARCH.en.md) to identify a real scenario and current operation path before selecting any task here. Do not default to approving R1 or installing Hermes. Each implementation still requires separate scope/approval.
