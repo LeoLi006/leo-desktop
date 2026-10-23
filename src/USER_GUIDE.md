@@ -2,9 +2,11 @@
 
 **简体中文** | [English](USER_GUIDE.en.md)
 
+**第一次使用，或不知道功能在哪里？先看[快速操作指南](QUICK_START.md)。本页用于进一步查阅。**
+
 适用v1.05.0。旧v1.00.0安装包不包含全部后续变化。
 
-[首页](../README.md) · [开发指南](PRODUCT_AND_DEVELOPER_GUIDE.md)
+[首页](../README.md) · [快速操作指南](QUICK_START.md)
 
 ## 安装与设置
 

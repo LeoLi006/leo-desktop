@@ -2,6 +2,8 @@
 
 [简体中文](PRODUCT_AND_DEVELOPER_GUIDE.md) | **English**
 
+Just using the product? Start with the [quick start](QUICK_START.en.md) or [user guide](USER_GUIDE.en.md); implementation details on this page are optional.
+
 This reference describes main through source commit `42fea41`. The release version is `1.05.0`, consolidating implementation through the stated commit and subsequent packaging revisions. Use documentation and source from the same commit.
 
 ## 1. Product and requirements

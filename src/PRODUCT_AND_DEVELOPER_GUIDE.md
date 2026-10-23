@@ -2,6 +2,8 @@
 
 **简体中文** | [English](PRODUCT_AND_DEVELOPER_GUIDE.en.md)
 
+只想使用产品？请先看[快速操作指南](QUICK_START.md)或[使用手册](USER_GUIDE.md)，不必阅读本页实现说明。
+
 本文面向想使用、理解或自行扩展 Leo 的读者。实现依据为主分支42fea41及其之前的阶段交付；本次以v1.05.0发布Windows安装包，接口实现基于下述提交及后续打包修订。仓库main、工程版本与Release标签可能不同，请用对应提交的文档与源码开发。
 
 [首页](../README.md) · [日常操作说明](USER_GUIDE.md) · [模块包与stdio协议](MODULES.md) · [路线图](ROADMAP.md) · [阶段验收与限制](Architecture/README.md)

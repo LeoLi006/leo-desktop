@@ -34,7 +34,7 @@ $screenshotDir=Join-Path $documentation 'screenshots'
 New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $root 'src/docs/screenshots') -Filter '*.png' -File | Copy-Item -Destination $screenshotDir
 # Keep all maintained guides; resolve links to packaged docs or tagged source.
-$docFiles=@('USER_GUIDE.md','RELEASE_NOTES.md','ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md','PRODUCT_AND_DEVELOPER_GUIDE.md','ROADMAP.md','RESEARCH.md','Architecture/README.md','Localization/README.md','Assets/MatchDay/Kits/README.md')
+$docFiles=@('QUICK_START.md','USER_GUIDE.md','RELEASE_NOTES.md','ANIMATION-NOTES.md','MODULES.md','SKIN_FORMAT.md','PERFORMANCE.md','PRODUCT_AND_DEVELOPER_GUIDE.md','ROADMAP.md','RESEARCH.md','Architecture/README.md','Localization/README.md','Assets/MatchDay/Kits/README.md')
 $docFiles=@($docFiles | ForEach-Object { $_; $english=[IO.Path]::ChangeExtension($_,'en.md'); if(Test-Path -LiteralPath (Join-Path $root ('src/'+$english))){$english} })
 $sourceRevision=(& git -C $root rev-parse HEAD)
 if($LASTEXITCODE -ne 0 -or $sourceRevision -notmatch '^[a-f0-9]{40}$'){$sourceRevision='v'+$version}
@@ -91,11 +91,13 @@ Leo v$version · Windows x64
 4. 需要回退时，重新打开此安装入口并选择“回退上次更新”。当前个人配置保留，更新前配置副本在安装目录 update-backups 中。
 
 包含 Windows 桌面运行时，无需安装开发环境。不含个人数据、API Key、语音模型、QQ 音乐或 Clash 客户端。
+不知道功能在哪里？先打开 payload\assets\docs\QUICK_START.md，或在GitHub首页点击“快速上手”。
 需要本地语音时，按安装目录 USER_GUIDE.md 的语音模型说明配置。
 
 Extract the complete archive, then run Install-Leo.cmd and select a dedicated Leo folder.
 For updates select the existing folder; the installer backs up and supports rollback.
 The Windows desktop runtime is bundled. No personal data, keys, voice models or third-party clients are included.
+Start with payload\assets\docs\QUICK_START.en.md, or choose Quick start on GitHub.
 See USER_GUIDE.md for optional features and voice setup.
 更新仅处理发布清单中的程序文件，清单、缓存、录音、模型和配置不会被覆盖。
 "@ | Set-Content -LiteralPath (Join-Path $stage '使用说明.txt') -Encoding utf8

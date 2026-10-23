@@ -1,67 +1,82 @@
-# Leo · Desktop companion and local action hub
+# Leo · A desktop companion you configure your way
 
 [简体中文](README.md) | **English**
 
-Bring apps, tasks, notes, football, music and local actions into a customizable Windows companion. Enable only what you need.
+Find apps, tasks, notes, football and everyday actions faster, and combine useful steps. Use just the pet if you prefer; every optional feature does not need to be enabled.
 
-**Latest release: v1.05.0 · Windows x64.** Includes Chinese–English UI, the current module foundation and later fixes, with a SHA-256 checksum.
+**Windows x64 · Latest release v1.05.0 · Local features need no model API.**
 
-[Download](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.05.0) · [Issues](https://github.com/LeoLi006/leo-desktop/issues)
+[Download](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.05.0) · **[Three-minute quick start](src/QUICK_START.en.md)** · [Find a feature](src/QUICK_START.en.md#where-do-i-find-it) · [Troubleshooting](src/QUICK_START.en.md#if-something-is-wrong)
 
-## Documentation
+## First time? Do these four things
 
-Each guide has a separate English edition. Use the language link at the top of any page to switch; translations are no longer interleaved.
+1. Download `Leo-v1.05.0-win-x64.zip`, extract everything and run `Install-Leo.cmd`.
+2. Click the sheep, type an app name and open a result. Click again to dismiss search.
+3. Click the planner icon below it and add one task, or right-click→Planner & notes→Quick capture.
+4. Right-click→Settings: General changes name, size and startup; Features enables only wanted tools. Click Save settings.
 
-| Guide | Contents |
+No need to understand modules, interfaces or implementation. API chat, speech models and third-party applications are optional setups.
+
+## Cannot find a feature?
+
+| Entry | What is there |
 | --- | --- |
-| [User guide](src/USER_GUIDE.en.md) | Setup, everyday use, settings and troubleshooting |
-| [Product and developer guide](src/PRODUCT_AND_DEVELOPER_GUIDE.en.md) | Features, architecture, interfaces and extension requirements |
-| [Modules and packages](src/MODULES.en.md) | Local apps, JSON, ZIP, stdio and recovery |
-| [Skin format](src/SKIN_FORMAT.en.md) | Jerseys, badges, themes and sharing |
-| [Architecture](src/Architecture/README.en.md) | Lifecycle, data boundaries, samples and integration |
-| [Roadmap](src/ROADMAP.en.md) | Delivered scope and remaining work |
-| [Change log](src/RELEASE_NOTES.en.md) | Releases and source improvements |
-| [Verification and performance](src/PERFORMANCE.en.md) | Historical evidence, methods and limitations |
-| [Localization](src/Localization/README.en.md) | Resources and new UI text |
-| [Animation maintenance](src/ANIMATION-NOTES.en.md) | Docking, textures, rendering and checks |
-| [Jersey assets](src/Assets/MatchDay/Kits/README.en.md) | Asset provenance and usage limits |
-| [Related work](src/RESEARCH.en.md) | Reuse research and selection principles |
+| **Click the sheep** | Apps, file/folder paths, clipboard and the top shortcut bar |
+| **Chat / planner / expand-tools below it** | Chat, tasks and enabled terminal, Clash and Edge utilities |
+| **Planner & notes context menu** | Daily/weekly planning, capture, notes, notification records and focus |
+| **Apps & media context menu** | Apps, chat, music/media and optional entries |
+| **Routines / Appearance context menus** | Multi-action routines, skins and theme editor |
+| **Settings** | Feature switches, program paths, icons, language, hotkeys, backup and checks |
 
-## Features
+**Enabled but no button?** Check Settings→Features→Entry visibility: it may be menu-only or search-only. Scroll down for lower controls and save changes afterward.
 
-- **Companion and themes:** editable name/size, multi-monitor docking, hover reveal, fullscreen hiding, five team skins and custom clothing/UI themes.
-- **Launcher:** pinyin/aliases, pins, recent apps, path completion, drop actions, custom programs and icons.
-- **Planning and records:** daily/weekly/calendar views, recurrence/exceptions, reminders, notes, protected clipboard history and quiet logs.
-- **Optional capabilities:** football, QQ Music single-song requests, media/PotPlayer, Clash, terminal, Edge, read-only computer status and existing mail-client launch.
-- **Controlled brain:** local commands first, streaming chat, local speech recognition and bounded tool plans with preview/confirmation.
-- **Module foundation:** unified actions, dependencies, results, entries and lifecycle; data-only app packages plus declarative/worker extensions.
+[See all entry points and steps→](src/QUICK_START.en.md)
 
-Local features need no model API. Free chat/complex understanding use your configured provider. Football, songs and updates have separate network sources. Mail does not retrieve accounts/messages; Huorong integration only opens the client.
+## Use what suits you
 
-## Getting started
+- **Pet only:** name, size, skin, docking/hover reveal; disable unneeded tools.
+- **A cleaner desktop:** app search, pins/aliases, file paths and your own app shortcuts.
+- **Quick organization:** daily/weekly/calendar tasks, recurrence/reminders and notes that can become tasks.
+- **Football and music:** followed teams, fixtures/standings, watch links, QQ Music song requests and media controls.
+- **Fewer repeated steps:** combine existing actions; explicit operations run locally first.
+- **Only when needed:** computer status, existing mail-client entry, model chat and local speech.
 
-1. Download `Leo-v1.05.0-win-x64.zip` from the release page, extract everything and run `Install-Leo.cmd`.
-2. Right-click the companion to open settings and configure optional modules/local paths.
-3. Switch between Chinese and English in Settings→General→Interface language.
-4. API chat and the local SenseVoice model are optional, separately configured dependencies.
+Leo complements specialist applications. Email stays in your mail client; music/media need their clients, and Huorong is launch-only. Free chat requires your own provider; speech requires a separate SenseVoice model. Football/song lookup uses separate network sources.
 
-Click to toggle search, drag to move, and press Esc to dismiss the current window. Buttons, menus and shortcuts follow enabled modules.
+## Product users only need these guides
 
-## Development and contribution
+| Guide | Read it when |
+| --- | --- |
+| **[Quick start](src/QUICK_START.en.md)** | New to Leo or cannot find a feature |
+| [Full user guide](src/USER_GUIDE.en.md) | Need settings, limits or further troubleshooting |
+| [Change log](src/RELEASE_NOTES.en.md) | Want to see what changed |
 
-Windows x64, the SDK specified by [global.json](global.json), Git and PowerShell are required.
+Chinese/English pages are separate with a language link at the top. GitHub documentation is current; the original v1.05.0 archive retains its release-time guides and was not repackaged for these documentation changes.
+
+## Updates and feedback
+
+Update to the original installation folder and retain a private backup. Releases include SHA-256 checksums and a bundled Windows desktop runtime, excluding personal settings, keys, speech models and external clients.
+
+Start with Settings→Checks and [troubleshooting](src/QUICK_START.en.md#if-something-is-wrong). If needed [report an issue](https://github.com/LeoLi006/leo-desktop/issues) with version, reproduction and sanitized screenshots; never upload keys or the whole runtime folder.
+
+<details>
+<summary><strong>Developers and extension authors: architecture, interfaces and builds</strong></summary>
+
+Product users can skip this section.
+
+- [Product and developer guide](src/PRODUCT_AND_DEVELOPER_GUIDE.en.md)
+- [Modules/packages](src/MODULES.en.md) · [Architecture](src/Architecture/README.en.md)
+- [Skin format](src/SKIN_FORMAT.en.md) · [Animation maintenance](src/ANIMATION-NOTES.en.md) · [Jersey assets](src/Assets/MatchDay/Kits/README.en.md)
+- [Verification/performance](src/PERFORMANCE.en.md) · [Localization](src/Localization/README.en.md)
+- [Positioning research](src/RESEARCH.en.md) · [Candidate roadmap/status](src/ROADMAP.en.md)
+
+Requires Windows x64, the [global.json](global.json) SDK, Git and PowerShell.
 
 ```powershell
 ./scripts/Build.ps1 -Locked
 ./.build/Release/LeoLauncher.exe
 ```
 
-Read the [developer guide](src/PRODUCT_AND_DEVELOPER_GUIDE.en.md) before extending Leo. Worker processes are not a permission sandbox; internal modules still require host composition. Include relevant checks and exclude personal settings, keys, models, conversations and runtime directories. Review licensing and asset rights before redistribution.
+Internal modules still require host composition; worker extensions are not a permission sandbox. Include relevant checks and exclude personal data, keys, models and runtime folders. Review project/third-party terms, trademarks and asset rights before redistribution.
 
-## UI examples
-
-Historical demo screenshots; fixtures are not current and layouts may differ from main.
-
-| Custom skin | Notes |
-| --- | --- |
-| ![Custom skin](src/docs/screenshots/v0.53-new-skin.png) | ![Notes](src/docs/screenshots/v0.53-notes.png) |
+</details>

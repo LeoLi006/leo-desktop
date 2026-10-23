@@ -2,6 +2,10 @@
 
 [简体中文](RELEASE_NOTES.md) | **English**
 
+## Quick-start documentation
+
+Added a [quick start](QUICK_START.en.md) with three-minute setup, an entry lookup table, expandable task instructions and troubleshooting. The home page prioritizes download/use; developer references are separate. Chinese and English remain independent. Documentation/future packaging inputs only; the v1.05.0 binary is unchanged.
+
 ## Documentation navigation update
 
 Public guides and the GitHub home page now have separate Chinese and English editions, with language links at the top. This changes documentation and future packaging inputs only; it does not change application behavior or replace the published v1.05.0 binary.

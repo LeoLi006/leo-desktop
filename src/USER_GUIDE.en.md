@@ -2,9 +2,11 @@
 
 [简体中文](USER_GUIDE.md) | **English**
 
+**New here, or cannot find a feature? Start with the [quick start](QUICK_START.en.md). Use this page for further reference.**
+
 Applies to v1.05.0. The older v1.00.0 binary does not contain every later change.
 
-[Home](../README.en.md) · [Developer guide](PRODUCT_AND_DEVELOPER_GUIDE.en.md)
+[Home](../README.en.md) · [Quick start](QUICK_START.en.md)
 
 ## Setup
 
