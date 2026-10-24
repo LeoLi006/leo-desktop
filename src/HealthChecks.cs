@@ -55,7 +55,7 @@ sealed class ModulesView:Panel
         Controls.Add(new Label{Text="按需开启 · 图标、菜单与后台检查同步变化",Bounds=new Rectangle(8,10,550,30),Font=BarcaUi.Font(10,true),ForeColor=BarcaUi.Gold});
         var statusButton=new BarcaButton{Text="模块状态与处理…",Bounds=new Rectangle(10,658,535,32)};statusButton.Click+=(_,_)=>ShowModuleStatus?.Invoke();Controls.Add(statusButton);
         int y=50;
-        foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口"),("football","足球","赛程、球队关注、积分榜和赛程后台更新"),("media","统一媒体控制","PotPlayer与Windows媒体会话的播放、暂停和切换"),("system-monitor","电脑状态","只读资源速览，后台提醒在面板中单独开启"),("mail-client","邮箱客户端","直接打开现有客户端，不读取邮件或保存邮箱凭据"),("research-news","AI 动态","Agent / 全双工语音论文与开源项目，窗口打开时按需刷新")}){
+        foreach(var (id,title,note) in new[]{("terminal","管理员终端","打开 Windows 管理员终端"),("clash","Clash Verge","代理开关与状态检查"),("music","QQ 音乐","快速点歌、播放控制和歌词快捷键"),("edge","Edge 搜索与观赛网址","桌宠搜索按钮和浏览器网址入口"),("football","足球","赛程、球队关注、积分榜和赛程后台更新"),("media","统一媒体控制","PotPlayer与Windows媒体会话的播放、暂停和切换"),("system-monitor","电脑状态","只读资源速览，后台提醒在面板中单独开启"),("mail-client","邮箱客户端","直接打开现有客户端，不读取邮件或保存邮箱凭据"),("research-news","AI 动态","AI 新闻、论文与开源项目，选择专业领域按需获取")}){
             var contribution=EntryContributions.ReadBuiltins(p).SingleOrDefault(e=>e.Id==id);var field=new CheckBox{Text=title,Checked=contribution?.Enabled??Modules.Enabled(p,id),Bounds=new Rectangle(10,y,540,28),ForeColor=BarcaUi.Text};fields[id]=field;Controls.Add(field);Controls.Add(new Label{Text=note,Bounds=new Rectangle(32,y+29,520,24),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)});y+=58;
         }
         statusButton.Top=y+144;AutoScrollMinSize=new Size(0,y+187);

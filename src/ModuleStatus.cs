@@ -36,7 +36,7 @@ static partial class ModuleStatuses
         }
         list.AddRange(ReadConfigured(p,new ExtensionStore(Path.Combine(Store.Root,"modules")){Preferences=p},(action,expected)=>EntryContributions.ReadStatusContract(p,action,expected)));
         foreach(var tool in new[]{("system-monitor","电脑状态","system_open",p.SystemMonitorModule),("mail-client","邮箱客户端","mail_client_open",p.DesktopMailModule)}){var row=!tool.Item4?new ModuleStatus(tool.Item1,tool.Item2,ModuleState.Disabled,"在设置 → 功能开启后使用。","功能设置"):DesktopStatus(tool.Item1,tool.Item2,tool.Item3,p);list.Add(row);}
-        list.Add(new("research-news","AI 动态",p.ResearchNewsModule?ModuleState.Unknown:ModuleState.Disabled,p.ResearchNewsModule?"按需获取公开论文与仓库；来源连接状态在动态窗口显示。":"在设置 → 功能开启后使用。","功能设置"));
+        list.Add(new("research-news","AI 动态",p.ResearchNewsModule?ModuleState.Unknown:ModuleState.Disabled,p.ResearchNewsModule?"按需获取 AI 新闻、论文与项目；各来源状态在窗口内显示。":"在设置 → 功能开启后使用。","功能设置"));
         var config=ChatSettings.Load();bool api=config.ReadKey().Length>0&&config.Model.Length>0;
         list.Add(new("api","模型 API",api?ModuleState.Ready:ModuleState.NotConfigured,api?"配置已填写，连接需手动检测。":"请填写接口、模型及 Key；本地功能不依赖它。","API 配置"));
         return list.ToArray();

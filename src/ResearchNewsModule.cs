@@ -8,8 +8,8 @@ sealed class ResearchNewsModule(Func<bool> enabled,Func<CancellationToken,Task> 
     public CapabilityDefinition Describe(string action)=>new(action,Id,"in-process","empty-object","window","coalesce-inflight",10000);
     public ModuleContract DescribeModule()=>ModuleContracts.Build(this,"research-news",Name,"optional","host.public-research",[],_ =>("object","只接受空对象；打开公开研究动态窗口，不授权模型调用或下载。","research-window","仅确认窗口已显示，不代表所有信息源可用。",true,["window-shown"]));
     public DependencyState[] ReadDependencies()=>[];
-    public EntryContribution[] DescribeEntries()=>[new(Id+"/open",Id,"research_open",UiLanguage.T(Name),"",Enabled,EntryDisplay.Shortcut,ModuleEntryContributions.TargetPrefix+Id+"/open",["AI新闻","论文","Agent","全双工","研究动态","arxiv"],"module-action"){
-        Parameters="{}",Glyph="news",Hint="Agent 与实时语音论文、开源项目",MenuActions=[new("AI 动态…","research_open","{}")]}];
+    public EntryContribution[] DescribeEntries()=>[new(Id+"/open",Id,"research_open",UiLanguage.T(Name),"",Enabled,EntryDisplay.Shortcut,ModuleEntryContributions.TargetPrefix+Id+"/open",["AI新闻","AI动态","论文","Agent","全双工","研究动态","arxiv","AI news"],"module-action"){
+        Parameters="{}",Glyph="news",Hint="按领域查看 AI 新闻、论文与开源项目",MenuActions=[new("AI 动态…","research_open","{}")]}];
     public ActionRequest Adapt(StructuredActionRequest r)
     {
         if(r.Protocol!="leo-action/1"||r.ActionId!="research_open"||r.Parameters.ValueKind!=JsonValueKind.Object||r.Parameters.EnumerateObject().Any())throw new ArgumentException("只接受空参数");
