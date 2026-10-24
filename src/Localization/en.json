@@ -1163,5 +1163,6 @@
   "正在搜索…": "Searching…",
   "已到搜索上限，可缩小搜索目录或补全路径": "Search limit reached. Choose a smaller folder or enter a full path.",
   "请选择 VS Code 的 Code.exe": "Select VS Code’s Code.exe",
-  "搜索名称或完整路径": "Search names or enter a full path"
+  "搜索名称或完整路径": "Search names or enter a full path",
+  "搜索文件和文件夹": "Search files and folders"
 }

@@ -16,11 +16,12 @@ static class LauncherFileSearchTests
                 string folder=Path.Combine(root,"项目 workspace");Directory.CreateDirectory(folder);
                 string file=Path.Combine(folder,"计划 notes.txt");File.WriteAllText(file,"fixture");
                 string exe=Path.Combine(root,"Code.exe");File.WriteAllText(exe,"");
-                checks["file_name_recursive"]=LauncherFileSearch.Find(root,"notes",false,default).Items.Single().Path==file;
-                checks["folder_name"]=LauncherFileSearch.Find(root,"workspace",true,default).Items.Single().Path==folder;
-                checks["type_filter"]=LauncherFileSearch.Find(root,"workspace",false,default).Items.Length==0;
-                using(var cancel=new CancellationTokenSource()){cancel.Cancel();try{LauncherFileSearch.Find(root,"x",false,cancel.Token);checks["cancel"]=false;}catch(OperationCanceledException){checks["cancel"]=true;}}
-                checks["missing_directory"]=LauncherFileSearch.Find(Path.Combine(root,"missing"),"x",false,default).Items.Length==0;
+                checks["file_name_recursive"]=LauncherFileSearch.Find(root,"notes",default).Items.Single().Path==file;
+                checks["folder_name"]=LauncherFileSearch.Find(root,"workspace",default).Items.Single().Path==folder;
+                string matchingFolder=Path.Combine(root,"notes folder");Directory.CreateDirectory(matchingFolder);
+                checks["mixed_file_folder_results"]=LauncherFileSearch.Find(root,"notes",default).Items.Select(i=>i.Directory).Distinct().Count()==2;
+                using(var cancel=new CancellationTokenSource()){cancel.Cancel();try{LauncherFileSearch.Find(root,"x",cancel.Token);checks["cancel"]=false;}catch(OperationCanceledException){checks["cancel"]=true;}}
+                checks["missing_directory"]=LauncherFileSearch.Find(Path.Combine(root,"missing"),"x",default).Items.Length==0;
                 foreach(var target in new[]{folder,file}){
                     var start=LauncherFileSearch.CodeStart(exe,target);
                     checks["new_window_"+(target==folder?"folder":"file")]=start.FileName==exe&&start.ArgumentList.SequenceEqual(new[]{"--new-window",target})&&start.UseShellExecute;
@@ -30,22 +31,43 @@ static class LauncherFileSearchTests
                 var prefs=new Preferences{ApplicationIndexing=false,ContextAware=false};
                 using var form=new LauncherForm(prefs,()=>{},true,true,scanner:_=>Enumerable.Range(0,14).Select(i=>new AppEntry("Fixture "+i,@"C:\fixture\app"+i+".exe","fixture",@"C:\fixture\app"+i+".exe")).ToList());
                 form.StartPosition=FormStartPosition.Manual;form.Location=new(-10000,-10000);form.Open();
-                var mode=Read<ComboBox>(form,"searchKind");var list=Read<ListBox>(form,"pathChoices");
-                checks["default_app_mode"]=mode.SelectedIndex==0&&!list.Visible;
+                var apps=Read<SearchModeButton>(form,"appSearchButton");var files=Read<SearchModeButton>(form,"fileSearchButton");var list=Read<ListBox>(form,"pathChoices");
+                checks["default_app_mode"]=!Read<bool>(form,"fileSearchMode")&&!list.Visible;
                 prefs.ApplicationIndexing=true;form.ConfigureActivity();await Task.Delay(350);checks["app_two_rows_preserved"]=form.VerifyTwoRows();
-                Field("fileScope").SetValue(form,root);Read<Button>(form,"searchScope").Text=UiLanguage.T("搜索目录：")+root;mode.SelectedIndex=1;form.PreviewTyping("notes");await Task.Delay(500);
-                checks["real_file_results"]=list.Visible&&list.Items.Cast<PathChoice>().Single().Path==file;
-                mode.SelectedIndex=2;form.PreviewTyping("workspace");await Task.Delay(500);
+                Field("fileScope").SetValue(form,root);Read<Button>(form,"searchScope").Text=UiLanguage.T("搜索目录：")+root;files.PerformClick();form.PreviewTyping("notes");await Task.Delay(500);
+                checks["real_file_results"]=list.Visible&&list.Items.Cast<PathChoice>().Any(i=>i.Path==file)&&list.Items.Cast<PathChoice>().Any(i=>i.Path==matchingFolder);
+                files.PerformClick();form.PreviewTyping("workspace");await Task.Delay(500);
                 checks["real_folder_results"]=list.Items.Cast<PathChoice>().Single().Path==folder;
                 var key=new KeyEventArgs(Keys.Down);typeof(LauncherForm).GetMethod("PathKey",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(form,[key]);checks["keyboard_selection"]=key.SuppressKeyPress&&list.SelectedIndex==0;
                 form.PreviewTyping(folder);await Task.Delay(500);
                 checks["exact_folder_first"]=list.SelectedItem is PathChoice exact&&exact.Path==folder;
                 form.PreviewTyping("notes");form.Hide();await Task.Delay(350);
                 checks["hide_cancels"]=Read<CancellationTokenSource>(form,"pathLookup").IsCancellationRequested;
-                form.Open();checks["reopen_defaults_apps"]=mode.SelectedIndex==0&&!list.Visible;
+                form.Open();checks["reopen_defaults_apps"]=!Read<bool>(form,"fileSearchMode")&&!list.Visible;
                 form.PreviewTyping(file);await Task.Delay(500);
                 checks["app_mode_preserves_paths"]=list.SelectedItem is PathChoice current&&current.Path==file;
-                using var screenshot=new Bitmap(form.Width,form.Height);mode.SelectedIndex=1;form.PreviewTyping("notes");await Task.Delay(500);form.DrawToBitmap(screenshot,form.ClientRectangle);screenshot.Save(Path.Combine(Path.GetDirectoryName(report)!,"file-search.png"));
+                checks["two_icon_switch_no_dropdown"]=apps.Active&&!files.Active&&!form.Controls.OfType<ComboBox>().Any();
+                files.PerformClick();form.PreviewTyping("notes");await Task.Delay(500);var fileSize=form.ClientSize;
+                checks["full_rows"]=list.Height%list.ItemHeight==0;
+                form.PreviewTyping("not-a-match");await Task.Delay(500);checks["empty_layout_stable"]=form.ClientSize==fileSize;
+                form.PreviewTyping("notes");await Task.Delay(500);checks["results_layout_stable"]=form.ClientSize==fileSize;
+                var actions=Read<Panel>(form,"pathActions");var status=Read<Label>(form,"status");
+                checks["no_control_overlap"]=actions.Bottom<=list.Top&&list.Bottom<=status.Top&&status.Bottom<=form.ClientSize.Height;
+                // Paint long mixed results and exercise scroll/repaint after result replacement.
+                for(int n=0;n<12;n++)File.WriteAllText(Path.Combine(folder,"notes_长名称_"+new string('a',90)+n+".txt"),"");
+                form.PreviewTyping("notes_");await Task.Delay(500);checks["long_results"]=list.Items.Count==12;
+                list.TopIndex=8;list.Refresh();list.TopIndex=0;
+                using(var redraw=new Bitmap(form.Width,form.Height))form.DrawToBitmap(redraw,form.ClientRectangle);
+                form.PreviewTyping("notes folder");await Task.Delay(500);checks["old_rows_cleared"]=list.Items.Count==1;
+                form.PreviewTyping("notes");await Task.Delay(500);
+                using(var screenshot=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(screenshot,form.ClientRectangle);screenshot.Save(Path.Combine(Path.GetDirectoryName(report)!,"file-search.png"));}
+                form.CommandRequested=(_,_)=>throw new IOException("fixture failure");
+                await (Task)typeof(LauncherForm).GetMethod("OpenChosenPath",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(form,[false])!;
+                checks["failure_message_not_clipped"]=status.Visible&&status.Text=="fixture failure"&&form.ClientSize==fileSize&&status.Bottom<=form.ClientSize.Height;
+                form.CommandRequested=null;form.PreviewTyping("notes");
+                apps.PerformClick();checks["app_icon_restores_layout"]=!list.Visible&&apps.Active&&!files.Active&&form.ClientSize.Height==248;
+                files.PerformClick();form.PreviewTyping("notes");apps.PerformClick();await Task.Delay(500);
+                checks["switch_discards_old_search"]=!list.Visible&&!Read<bool>(form,"fileSearchMode");
                 File.WriteAllText(report,JsonSerializer.Serialize(new{ok=checks.Values.All(v=>v),checks},new JsonSerializerOptions{WriteIndented=true}));
             }catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString(),checks}));}
             finally{host.Close();}

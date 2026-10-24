@@ -5,7 +5,7 @@ sealed record FileSearchResult(PathChoice[] Items, bool Limited);
 static class LauncherFileSearch
 {
     // Search only an explicit directory; never follow junctions into other trees.
-    public static FileSearchResult Find(string root,string text,bool folders,CancellationToken token)
+    public static FileSearchResult Find(string root,string text,CancellationToken token)
     {
         var found=new List<PathChoice>();var pending=new Queue<string>();pending.Enqueue(root);
         int scanned=0;var clock=Stopwatch.StartNew();
@@ -17,11 +17,11 @@ static class LauncherFileSearch
                 var attributes=File.GetAttributes(item);bool directory=(attributes&FileAttributes.Directory)!=0;
                 if((attributes&(FileAttributes.ReparsePoint|FileAttributes.Hidden|FileAttributes.System))!=0)continue;
                 if(directory)pending.Enqueue(item);
-                if(directory==folders&&Path.GetFileName(item).Contains(text,StringComparison.OrdinalIgnoreCase))found.Add(new(item,directory));
+                if(Path.GetFileName(item).Contains(text,StringComparison.OrdinalIgnoreCase))found.Add(new(item,directory));
                 if(found.Count>=80)return new(found.ToArray(),true);
             }}catch(IOException){}catch(UnauthorizedAccessException){}
         }
-        return new(found.OrderBy(p=>p.Path,StringComparer.OrdinalIgnoreCase).ToArray(),false);
+        return new(found.OrderByDescending(p=>p.Directory).ThenBy(p=>p.Path,StringComparer.OrdinalIgnoreCase).ToArray(),false);
     }
     public static ProcessStartInfo CodeStart(string executable,string target)
     {
@@ -34,17 +34,24 @@ static class LauncherFileSearch
 sealed partial class LauncherForm
 {
     static readonly SemaphoreSlim pathReads=new(2);
-    readonly ComboBox searchKind=new(){DropDownStyle=ComboBoxStyle.DropDownList,FlatStyle=FlatStyle.Flat};
-    readonly ListBox pathChoices=new(){Visible=false,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=40};
+    bool fileSearchMode;
+    readonly SearchModeButton appSearchButton=new(false),fileSearchButton=new(true);
+    readonly UiToolTip searchModeTips=new();
+    readonly ListBox pathChoices=new(){Visible=false,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=48};
     readonly Panel pathActions=new(){Bounds=new(18,76,564,32),Visible=false};
     readonly Button searchScope=new BarcaButton{Bounds=new(0,0,240,28),AutoEllipsis=true};
     CancellationTokenSource? pathLookup;bool pathMode;
     string fileScope=Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),codeExecutable="";
     void InitializePathCompletion()
     {
-        searchKind.Items.AddRange(new object[]{UiLanguage.T("应用"),UiLanguage.T("文件"),UiLanguage.T("文件夹")});
-        searchKind.Bounds=new(5,4,103,26);searchKind.SelectedIndex=0;query.Parent!.Controls.Add(searchKind);
-        searchKind.SelectedIndexChanged+=(_,_)=>{query.PlaceholderText=UiLanguage.T(searchKind.SelectedIndex==0?"搜索应用、文件路径或指令":"搜索名称或完整路径");debounce.Stop();Filter();query.Focus();};
+        DoubleBuffered=true;
+        appSearchButton.Bounds=new(4,3,30,26);fileSearchButton.Bounds=new(38,3,30,26);
+        appSearchButton.AccessibleName=UiLanguage.T("搜索应用");fileSearchButton.AccessibleName=UiLanguage.T("搜索文件和文件夹");
+        appSearchButton.Active=true;
+        query.Parent!.Controls.AddRange([appSearchButton,fileSearchButton]);
+        searchModeTips.SetToolTip(appSearchButton,UiLanguage.T("搜索应用")+" (Ctrl+1)");
+        searchModeTips.SetToolTip(fileSearchButton,UiLanguage.T("搜索文件和文件夹")+" (Ctrl+2)");
+        appSearchButton.Click+=(_,_)=>SetFileSearchMode(false);fileSearchButton.Click+=(_,_)=>SetFileSearchMode(true);
         searchScope.Text=UiLanguage.T("搜索目录：")+fileScope;
         searchScope.Click+=(_,_)=>{
             menuOpen=true;try{using var dialog=new FolderBrowserDialog{SelectedPath=fileScope};if(dialog.ShowDialog(this)==DialogResult.OK){fileScope=dialog.SelectedPath;searchScope.Text=UiLanguage.T("搜索目录：")+fileScope;Filter();}}
@@ -53,38 +60,76 @@ sealed partial class LauncherForm
         var open=new BarcaButton{Text=UiLanguage.T("打开"),Bounds=new(248,0,75,28)};open.Click+=async(_,_)=>await OpenChosenPath();
         var code=new BarcaButton{Text=UiLanguage.T("VS Code 新窗口"),Bounds=new(330,0,230,28)};code.Click+=async(_,_)=>await OpenChosenPath(true);
         pathActions.Controls.AddRange([searchScope,open,code]);Controls.Add(pathActions);
-        pathChoices.Bounds=new(22,112,556,128);pathChoices.BackColor=Appearance.Background;pathChoices.ForeColor=Appearance.Ink;Controls.Add(pathChoices);pathChoices.BringToFront();
-        pathChoices.DrawItem+=(_,e)=>{if(e.Index<0)return;var item=(PathChoice)pathChoices.Items[e.Index];using var brush=new SolidBrush((e.State&DrawItemState.Selected)!=0?Appearance.Blue:Appearance.Background);e.Graphics.FillRectangle(brush,e.Bounds);TextRenderer.DrawText(e.Graphics,item.ToString(),Font,new Rectangle(e.Bounds.X+6,e.Bounds.Y,e.Bounds.Width-12,20),Appearance.Ink,TextFormatFlags.EndEllipsis);TextRenderer.DrawText(e.Graphics,item.Path,Font,new Rectangle(e.Bounds.X+12,e.Bounds.Y+20,e.Bounds.Width-18,20),Appearance.Muted,TextFormatFlags.EndEllipsis);};
+        pathChoices.Bounds=new(22,112,556,192);pathChoices.BackColor=Appearance.Background;pathChoices.ForeColor=Appearance.Ink;Controls.Add(pathChoices);pathChoices.BringToFront();
+        pathChoices.DrawItem+=DrawPathResult;
         pathChoices.DoubleClick+=async(_,_)=>await OpenChosenPath();pathChoices.KeyDown+=(_,e)=>PathKey(e);
         VisibleChanged+=(_,_)=>{if(!Visible){debounce.Stop();pathLookup?.Cancel();}};
-        Disposed+=(_,_)=>{pathLookup?.Cancel();pathLookup?.Dispose();pathLookup=null;};
+        Disposed+=(_,_)=>{pathLookup?.Cancel();pathLookup?.Dispose();pathLookup=null;searchModeTips.Dispose();};
+    }
+    void SetFileSearchMode(bool value)
+    {
+        if(fileSearchMode!=value){
+            fileSearchMode=value;appSearchButton.Active=!value;fileSearchButton.Active=value;
+            query.PlaceholderText=UiLanguage.T(value?"搜索名称或完整路径":"搜索应用、文件路径或指令");
+            debounce.Stop();Filter();
+        }
+        query.Focus();
+    }
+    void LayoutSearchResults()
+    {
+        bool files=fileSearchMode||LocalPath.LooksLike(query.Text);
+        SuspendLayout();try{
+            pathChoices.Visible=pathActions.Visible=files;recent.Visible=!files;
+            status.SetBounds(22,files?314:248,556,24);
+            var size=new Size(600,files?348:status.Visible?280:248);
+            if(ClientSize!=size)ClientSize=size;
+        }finally{ResumeLayout(true);}
+        Invalidate();
+    }
+    void DrawPathResult(object? sender,DrawItemEventArgs e)
+    {
+        if(e.Index<0||e.Index>=pathChoices.Items.Count)return;
+        var item=(PathChoice)pathChoices.Items[e.Index];var saved=e.Graphics.Save();
+        try{
+            e.Graphics.SetClip(e.Bounds);
+            using var brush=new SolidBrush((e.State&DrawItemState.Selected)!=0?Appearance.Blue:Appearance.Background);e.Graphics.FillRectangle(brush,e.Bounds);
+            e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using var pen=new Pen(item.Directory?Appearance.Accent:Appearance.Muted,1.5f);
+            int x=e.Bounds.X+9,y=e.Bounds.Y+13;
+            if(item.Directory)e.Graphics.DrawLines(pen,[new(x,y+5),new(x,y),new(x+8,y),new(x+11,y+4),new(x+22,y+4),new(x+20,y+20),new(x,y+20),new(x,y+5),new(x+22,y+5)]);
+            else{e.Graphics.DrawRectangle(pen,x+3,y,16,21);e.Graphics.DrawLine(pen,x+7,y+7,x+15,y+7);e.Graphics.DrawLine(pen,x+7,y+12,x+15,y+12);}
+            var flags=TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.EndEllipsis|TextFormatFlags.VerticalCenter|TextFormatFlags.PreserveGraphicsClipping;
+            string name=Path.GetFileName(item.Path.TrimEnd('\\','/'));if(name.Length==0)name=item.Path;
+            TextRenderer.DrawText(e.Graphics,name,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y+3,e.Bounds.Width-50,22),Appearance.Ink,flags);
+            TextRenderer.DrawText(e.Graphics,item.Path,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y+25,e.Bounds.Width-50,20),Appearance.Muted,flags);
+        }finally{e.Graphics.Restore(saved);}
     }
     async void UpdatePathCompletion()
     {
-        pathLookup?.Cancel();pathLookup?.Dispose();pathLookup=new();var token=pathLookup.Token;string text=query.Text;int mode=searchKind.SelectedIndex;
-        pathMode=mode>0||LocalPath.LooksLike(text);pathChoices.Visible=pathActions.Visible=pathMode;recent.Visible=!pathMode;if(!pathMode)return;
-        searchScope.Visible=mode>0;pathChoices.Items.Clear();status.Visible=false;
-        if(string.IsNullOrWhiteSpace(text)){status.Text=UiLanguage.T("输入名称搜索，或粘贴完整路径");status.Visible=true;ClientSize=new(600,280);return;}
-        status.Text=UiLanguage.T("正在搜索…");status.Visible=true;ClientSize=new(600,280);
+        pathLookup?.Cancel();pathLookup?.Dispose();pathLookup=new();var token=pathLookup.Token;string text=query.Text;bool mode=fileSearchMode;
+        pathMode=mode||LocalPath.LooksLike(text);LayoutSearchResults();if(!pathMode)return;
+        searchScope.Visible=true;pathChoices.Items.Clear();status.Visible=false;
+        if(string.IsNullOrWhiteSpace(text)){status.Text=UiLanguage.T("输入名称搜索，或粘贴完整路径");status.Visible=true;LayoutSearchResults();return;}
+        status.Text=UiLanguage.T("正在搜索…");status.Visible=true;LayoutSearchResults();
         try{
             await pathReads.WaitAsync(token);FileSearchResult result;
             try{result=await Task.Run(()=>{
                 if(LocalPath.LooksLike(text)){
-                    string expanded=LocalPath.Expand(text);var entries=PathCompletion.Find(text,token).Where(p=>mode==0||p.Directory==(mode==2)).ToList();
-                    if((File.Exists(expanded)||Directory.Exists(expanded))&&(mode==0||Directory.Exists(expanded)==(mode==2)))entries.Insert(0,new(expanded,Directory.Exists(expanded)));
+                    string expanded=LocalPath.Expand(text);var entries=PathCompletion.Find(text,token).ToList();
+                    if(File.Exists(expanded)||Directory.Exists(expanded))entries.Insert(0,new(expanded,Directory.Exists(expanded)));
                     return new FileSearchResult(entries.DistinctBy(p=>p.Path,StringComparer.OrdinalIgnoreCase).ToArray(),false);
                 }
-                return LauncherFileSearch.Find(fileScope,text,mode==2,token);
+                return LauncherFileSearch.Find(fileScope,text.Trim(),token);
             },token);}finally{pathReads.Release();}
-            if(IsDisposed||token.IsCancellationRequested||query.Text!=text||searchKind.SelectedIndex!=mode)return;
-            pathChoices.BeginUpdate();try{pathChoices.Items.AddRange(result.Items);pathChoices.SelectedIndex=result.Items.Length>0?0:-1;}finally{pathChoices.EndUpdate();}
+            if(IsDisposed||token.IsCancellationRequested||query.Text!=text||fileSearchMode!=mode)return;
+            pathChoices.BeginUpdate();try{pathChoices.Items.AddRange(result.Items);pathChoices.SelectedIndex=result.Items.Length>0?0:-1;}finally{pathChoices.EndUpdate();pathChoices.Invalidate();}
             status.Text=result.Limited?UiLanguage.T("已到搜索上限，可缩小搜索目录或补全路径"):result.Items.Length==0?UiLanguage.T("没有匹配的文件或文件夹"):"";status.Visible=status.Text.Length>0;
-            ClientSize=new(600,status.Visible?280:248);
-        }catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!IsDisposed&&!token.IsCancellationRequested){status.Text=UiLanguage.T("读取目录失败：")+e.Message;status.Visible=true;ClientSize=new(600,280);}}
+            LayoutSearchResults();
+        }catch(OperationCanceledException){}catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!IsDisposed&&!token.IsCancellationRequested){status.Text=UiLanguage.T("读取目录失败：")+e.Message;status.Visible=true;LayoutSearchResults();}}
     }
     bool PathKey(KeyEventArgs e)
     {
-        if(searchKind.SelectedIndex==0&&!LocalPath.LooksLike(query.Text))return false;
+        if(!fileSearchMode&&!LocalPath.LooksLike(query.Text))return false;
         if(e.KeyCode is Keys.Down or Keys.Up){e.SuppressKeyPress=true;if(pathChoices.Items.Count>0)pathChoices.SelectedIndex=Math.Clamp(pathChoices.SelectedIndex+(e.KeyCode==Keys.Down?1:-1),0,pathChoices.Items.Count-1);return true;}
         if(e.KeyCode==Keys.Escape){e.SuppressKeyPress=true;Hide();return true;}
         if(e.KeyCode==Keys.Tab&&pathChoices.SelectedItem is PathChoice){e.SuppressKeyPress=true;FillChosenPath();return true;}
@@ -104,6 +149,6 @@ sealed partial class LauncherForm
                 var start=LauncherFileSearch.CodeStart(executable,target);if(!preview)Process.Start(start);Hide();
             }else if(CommandRequested!=null){query.Text=target;await RunCommand();}
             else{if(!preview)Process.Start(new ProcessStartInfo(target){UseShellExecute=true});Hide();}
-        }catch(Exception e)when(FeatureFaults.Recoverable(e)){status.Text=e.Message;status.Visible=true;ClientSize=new(600,280);}
+        }catch(Exception e)when(FeatureFaults.Recoverable(e)){status.Text=e.Message;status.Visible=true;LayoutSearchResults();}
     }
 }

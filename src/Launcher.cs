@@ -151,7 +151,7 @@ sealed partial class LauncherForm : Form
         Controls.Add(size);
         AddButton("×", 548, 6, 30, Hide);
         var field = new SoftPanel { Bounds = new Rectangle(16, 38, 568, 32) }; Appearance.Round(field, 11); Controls.Add(field);
-        query.SetBounds(114, 5, 444, 24); query.PlaceholderText = UiLanguage.T("搜索应用、文件路径或指令");
+        query.SetBounds(78, 5, 480, 24); query.PlaceholderText = UiLanguage.T("搜索应用、文件路径或指令");
         query.BorderStyle = BorderStyle.None; query.Font = Appearance.Body(10.5f);
         query.BackColor = Appearance.Field; query.ForeColor = Appearance.Ink; field.Controls.Add(query);
         recent.SetBounds(18, 76, 564, 166); recent.WrapContents = true; Controls.Add(recent);
@@ -264,7 +264,7 @@ sealed partial class LauncherForm : Form
     public void Open()
     {
         ClientSize=new Size(600,248);status.Visible=false;status.Text="";RefreshModules();Observe(); activationContext = prefs.ContextAware ? lastExternal : "";
-        searchKind.SelectedIndex=0; query.Clear(); debounce.Stop(); Filter();
+        SetFileSearchMode(false); query.Clear(); debounce.Stop(); Filter();
         Show(); Activate(); query.Focus();
     }
     void PopulateRecent()
@@ -359,7 +359,7 @@ sealed partial class LauncherForm : Form
         PopulateRecent();
         status.Text = memory.LastSaveError != null ? "历史保存失败，本次记录仅保存在内存" : "";
         status.Visible = status.Text.Length > 0;
-        ClientSize = new Size(600, status.Visible ? 276 : 248);
+        LayoutSearchResults();
         UpdatePathCompletion();
     }
     Dictionary<string,string[]> ModuleSearchAliases()
@@ -383,7 +383,7 @@ sealed partial class LauncherForm : Form
         debounce.Stop();pathLookup?.Cancel();var text=query.Text.Trim().TrimStart(':','：').Trim();
         try{query.Enabled=false;var result=await CommandRequested!(text,token);if(!launcherReleased&&!IsDisposed&&!token.IsCancellationRequested){query.Clear();Hide();OperationFeedback.Show(result);}}
         catch(OperationCanceledException)when(token.IsCancellationRequested){}
-        catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!launcherReleased&&!IsDisposed){status.Visible=true;status.Text=e.Message;ClientSize=new Size(600,280);}}
+        catch(Exception e)when(FeatureFaults.Recoverable(e)){if(!launcherReleased&&!IsDisposed){status.Visible=true;status.Text=e.Message;LayoutSearchResults();}}
         finally{commandRunning=false;if(!launcherReleased&&!IsDisposed){query.Enabled=true;query.Focus();}}
     }
 
@@ -459,6 +459,8 @@ sealed partial class LauncherForm : Form
     protected override bool ProcessCmdKey(ref Message m,Keys key)
     {
         if(key==Keys.Escape){Hide();return true;}
+        if(key==(Keys.Control|Keys.D1)||key==(Keys.Control|Keys.D2)){SetFileSearchMode(key==(Keys.Control|Keys.D2));return true;}
+        if(pathMode&&key==Keys.Tab&&!LocalPath.LooksLike(query.Text)){SelectNextControl(ActiveControl,true,true,true,true);return true;}
         if(key==(Keys.Control|Keys.L)||key==(Keys.Control|Keys.F)){query.Focus();query.SelectAll();return true;}
         if(key==(Keys.Control|Keys.Z)&&query.TextLength==0&&undoFavorite!=null){try{undoFavorite();}catch(Exception e){OperationFeedback.Error(e.Message);}return true;}
         if(key==Keys.Tab&&LocalPath.LooksLike(query.Text)){FillChosenPath();return true;}
