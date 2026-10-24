@@ -120,7 +120,7 @@ sealed partial class LauncherForm : Form
         launchApplication=appLauncher??Catalog.Launch;tasks=planner??new(previewMode?null:Path.Combine(Store.Root,"leo-todos.json"));prefs = p; resizePet = openSettings; preview = previewMode; demo = demoMode;
         memory = new Memory(demo ? null : Path.Combine(Store.Root, "leo-history.json"));
         Text = "Leo · 应用搜索"; FormBorderStyle = FormBorderStyle.None; ShowInTaskbar = false; TopMost = true;
-        StartPosition = FormStartPosition.Manual; ClientSize = new Size(600, 248);
+        StartPosition = FormStartPosition.Manual; ClientSize = SearchWindowSize;
         BackColor = Appearance.Background; ForeColor = Appearance.Ink; Font = Appearance.Body();
         Appearance.Round(this, 16);
         var brand=new Label { Tag="pet-brand",Text = "LEO", Left = 22, Top = 9, Width = 43, Height = 22, AutoEllipsis=true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Appearance.Accent };Controls.Add(brand);
@@ -145,7 +145,11 @@ sealed partial class LauncherForm : Form
         size.AutoSize = false; size.SetBounds(390, 6, 145, 28);
         size.AccessibleName = "Leo 大小";
         var sizeTip = new UiToolTip(); sizeTip.SetToolTip(size, "拖动调整 Leo 大小");
-        size.ValueChanged += (_, _) => { prefs.PetSize = size.Value; resizePet(); };
+        size.ValueChanged += (_, _) => {
+            prefs.PetSize = size.Value; resizePet();
+            // Moving the popup can validate its old paint region; repaint after placement.
+            if(!size.IsDisposed)size.Refresh();
+        };
         size.MouseUp += (_, _) => { if (!preview) Store.Save(prefs); };
         size.KeyUp += (_, _) => { if (!preview) Store.Save(prefs); };
         Controls.Add(size);
@@ -263,7 +267,7 @@ sealed partial class LauncherForm : Form
     void SetWatchVisibility(Control root){foreach(Control c in root.Controls){if(c is WatchLinksPanel)c.Visible=prefs.EdgeModule;else SetWatchVisibility(c);}}
     public void Open()
     {
-        ClientSize=new Size(600,248);status.Visible=false;status.Text="";RefreshModules();Observe(); activationContext = prefs.ContextAware ? lastExternal : "";
+        ClientSize=SearchWindowSize;status.Visible=false;status.Text="";RefreshModules();Observe(); activationContext = prefs.ContextAware ? lastExternal : "";
         SetFileSearchMode(false); query.Clear(); debounce.Stop(); Filter();
         Show(); Activate(); query.Focus();
     }

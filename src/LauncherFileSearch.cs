@@ -34,10 +34,11 @@ static class LauncherFileSearch
 sealed partial class LauncherForm
 {
     static readonly SemaphoreSlim pathReads=new(2);
+    static readonly Size SearchWindowSize=new(600,280);
     bool fileSearchMode;
     readonly SearchModeButton appSearchButton=new(false),fileSearchButton=new(true);
     readonly UiToolTip searchModeTips=new();
-    readonly ListBox pathChoices=new(){Visible=false,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=48};
+    readonly ListBox pathChoices=new(){Visible=false,BorderStyle=BorderStyle.None,IntegralHeight=false,DrawMode=DrawMode.OwnerDrawFixed,ItemHeight=40};
     readonly Panel pathActions=new(){Bounds=new(18,76,564,32),Visible=false};
     readonly Button searchScope=new BarcaButton{Bounds=new(0,0,240,28),AutoEllipsis=true};
     CancellationTokenSource? pathLookup;bool pathMode;
@@ -60,7 +61,7 @@ sealed partial class LauncherForm
         var open=new BarcaButton{Text=UiLanguage.T("打开"),Bounds=new(248,0,75,28)};open.Click+=async(_,_)=>await OpenChosenPath();
         var code=new BarcaButton{Text=UiLanguage.T("VS Code 新窗口"),Bounds=new(330,0,230,28)};code.Click+=async(_,_)=>await OpenChosenPath(true);
         pathActions.Controls.AddRange([searchScope,open,code]);Controls.Add(pathActions);
-        pathChoices.Bounds=new(22,112,556,192);pathChoices.BackColor=Appearance.Background;pathChoices.ForeColor=Appearance.Ink;Controls.Add(pathChoices);pathChoices.BringToFront();
+        pathChoices.Bounds=new(22,112,556,120);pathChoices.BackColor=Appearance.Background;pathChoices.ForeColor=Appearance.Ink;Controls.Add(pathChoices);pathChoices.BringToFront();
         pathChoices.DrawItem+=DrawPathResult;
         pathChoices.DoubleClick+=async(_,_)=>await OpenChosenPath();pathChoices.KeyDown+=(_,e)=>PathKey(e);
         VisibleChanged+=(_,_)=>{if(!Visible){debounce.Stop();pathLookup?.Cancel();}};
@@ -80,9 +81,8 @@ sealed partial class LauncherForm
         bool files=fileSearchMode||LocalPath.LooksLike(query.Text);
         SuspendLayout();try{
             pathChoices.Visible=pathActions.Visible=files;recent.Visible=!files;
-            status.SetBounds(22,files?314:248,556,24);
-            var size=new Size(600,files?348:status.Visible?280:248);
-            if(ClientSize!=size)ClientSize=size;
+            status.SetBounds(22,248,556,24);
+            if(ClientSize!=SearchWindowSize)ClientSize=SearchWindowSize;
         }finally{ResumeLayout(true);}
         Invalidate();
     }
@@ -95,13 +95,13 @@ sealed partial class LauncherForm
             using var brush=new SolidBrush((e.State&DrawItemState.Selected)!=0?Appearance.Blue:Appearance.Background);e.Graphics.FillRectangle(brush,e.Bounds);
             e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using var pen=new Pen(item.Directory?Appearance.Accent:Appearance.Muted,1.5f);
-            int x=e.Bounds.X+9,y=e.Bounds.Y+13;
+            int x=e.Bounds.X+9,y=e.Bounds.Y+9;
             if(item.Directory)e.Graphics.DrawLines(pen,[new(x,y+5),new(x,y),new(x+8,y),new(x+11,y+4),new(x+22,y+4),new(x+20,y+20),new(x,y+20),new(x,y+5),new(x+22,y+5)]);
             else{e.Graphics.DrawRectangle(pen,x+3,y,16,21);e.Graphics.DrawLine(pen,x+7,y+7,x+15,y+7);e.Graphics.DrawLine(pen,x+7,y+12,x+15,y+12);}
             var flags=TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.EndEllipsis|TextFormatFlags.VerticalCenter|TextFormatFlags.PreserveGraphicsClipping;
             string name=Path.GetFileName(item.Path.TrimEnd('\\','/'));if(name.Length==0)name=item.Path;
-            TextRenderer.DrawText(e.Graphics,name,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y+3,e.Bounds.Width-50,22),Appearance.Ink,flags);
-            TextRenderer.DrawText(e.Graphics,item.Path,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y+25,e.Bounds.Width-50,20),Appearance.Muted,flags);
+            TextRenderer.DrawText(e.Graphics,name,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y,e.Bounds.Width-50,20),Appearance.Ink,flags);
+            TextRenderer.DrawText(e.Graphics,item.Path,Font,new Rectangle(e.Bounds.X+42,e.Bounds.Y+20,e.Bounds.Width-50,20),Appearance.Muted,flags);
         }finally{e.Graphics.Restore(saved);}
     }
     async void UpdatePathCompletion()
