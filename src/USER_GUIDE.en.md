@@ -30,6 +30,8 @@ Hiding an entry changes presentation; disabling rejects its actions and stops ow
 
 Search names, pinyin and aliases such as wx, weixin or vsc. Right-click an app to set aliases; drag pins to reorder. Candidates use two rows of seven. Enter a full file/folder path, including spaces, quotes or environment variables.
 
+Use the selector on the left for Apps / Files / Folder; each opening defaults to Apps. Name searches cover the selected directory and its subdirectories (Documents initially); click Search in to change it, or paste a full path. Select with arrows and press Enter to open. Click VS Code · new window or press Ctrl+Enter to open the selected file/folder in a new VS Code window. If VS Code is not found, select Code.exe. Searches run locally without a model, skip hidden/system entries and links, and stop at 3 seconds, 30,000 entries or 80 results; narrow the scope when prompted. The selected search directory and manually selected Code.exe last for the current run.
+
 Use arrows to select, Enter to open, Tab for path completion, Ctrl+L for input and Shift+F10 for the candidate menu. Drop an executable to add a module; other files, text and links show relevant actions.
 
 Application settings support path, icon, arguments, working directory and administrator launch. Choose from 18 built-in icons or a custom image. Shortcuts support ordering/overflow. Path repair requires confirmation.

@@ -273,6 +273,7 @@ static class Program
         if(args.Length==2&&args[0]=="--application-host-test"){ApplicationHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-consistency-test"){EntryConsistencyTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-inventory"){EntryInventory.ExportExample(args[1]);return;}
+        if(args.Length==2&&args[0]=="--launcher-files-test"){LauncherFileSearchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--release100-test"){Release100Tests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--platform53-test"){Platform53Tests.Run(args[1]);return;}

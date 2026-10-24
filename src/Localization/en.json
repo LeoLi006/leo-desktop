@@ -279,7 +279,7 @@
   "保存便签": "Save note",
   "选择待办日期": "Choose task date",
   "今天": "Today",
-  "读取目录失败：": "Cannot read folder: ",
+  "读取目录失败：": "Could not read folder: ",
   "清单与记录": "Planner & notes",
   "应用与媒体": "Apps & media",
   "外观": "Appearance",
@@ -1155,5 +1155,13 @@
   "无法打开 Edge：": "Cannot open Edge: ",
   "无法保存设置：": "Cannot save settings: ",
   "最多置顶 14 个图标，请先取消一个收藏。": "Pin up to 14 icons. Unpin one first.",
-  "界面语言暂时不可用，其他功能可继续使用。": "Interface language is temporarily unavailable. Other features remain available."
+  "界面语言暂时不可用，其他功能可继续使用。": "Interface language is temporarily unavailable. Other features remain available.",
+  "文件": "Files",
+  "搜索目录：": "Search in: ",
+  "VS Code 新窗口": "VS Code · new window",
+  "输入名称搜索，或粘贴完整路径": "Search by name or paste a full path",
+  "正在搜索…": "Searching…",
+  "已到搜索上限，可缩小搜索目录或补全路径": "Search limit reached. Choose a smaller folder or enter a full path.",
+  "请选择 VS Code 的 Code.exe": "Select VS Code’s Code.exe",
+  "搜索名称或完整路径": "Search names or enter a full path"
 }

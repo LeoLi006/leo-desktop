@@ -151,7 +151,7 @@ sealed partial class LauncherForm : Form
         Controls.Add(size);
         AddButton("×", 548, 6, 30, Hide);
         var field = new SoftPanel { Bounds = new Rectangle(16, 38, 568, 32) }; Appearance.Round(field, 11); Controls.Add(field);
-        query.SetBounds(38, 5, 520, 24); query.PlaceholderText = UiLanguage.T("搜索应用、文件路径或指令");
+        query.SetBounds(114, 5, 444, 24); query.PlaceholderText = UiLanguage.T("搜索应用、文件路径或指令");
         query.BorderStyle = BorderStyle.None; query.Font = Appearance.Body(10.5f);
         query.BackColor = Appearance.Field; query.ForeColor = Appearance.Ink; field.Controls.Add(query);
         recent.SetBounds(18, 76, 564, 166); recent.WrapContents = true; Controls.Add(recent);
@@ -264,7 +264,7 @@ sealed partial class LauncherForm : Form
     public void Open()
     {
         ClientSize=new Size(600,248);status.Visible=false;status.Text="";RefreshModules();Observe(); activationContext = prefs.ContextAware ? lastExternal : "";
-        query.Clear(); debounce.Stop(); Filter();
+        searchKind.SelectedIndex=0; query.Clear(); debounce.Stop(); Filter();
         Show(); Activate(); query.Focus();
     }
     void PopulateRecent()

@@ -74,6 +74,8 @@ Expand only the section you need.
 
 Enter a full file/folder path to open it. Use arrows to select, Tab to complete a path and Enter to open. First launch may need time for app indexing.
 
+Use the selector on the left for Apps / Files / Folder; each opening defaults to Apps. Name searches cover the selected directory and its subdirectories (Documents initially); click Search in to change it, or paste a full path. Select with arrows and press Enter to open. Click VS Code · new window or press Ctrl+Enter to open the selected file/folder in a new VS Code window. If VS Code is not found, select Code.exe. Searches run locally without a model, skip hidden/system entries and links, and stop at 3 seconds, 30,000 entries or 80 results; narrow the scope when prompted. The selected search directory and manually selected Code.exe last for the current run.
+
 </details>
 
 <details>
