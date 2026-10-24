@@ -15,7 +15,7 @@ static class ResearchNewsTests
     {
         string prefix=host=="news.google.com"?"https://news.google.com/rss/articles/":host=="openai.com"?"https://openai.com/index/":host=="deepmind.google"?"https://deepmind.google/blog/":"https://www.qbitai.com/2025/10/";
         return "<rss><channel>"+
-            $"<item><title>智能体产品发布新进展</title><description>Agentic AI agents bring new product capabilities.</description><link>{prefix}agent-release</link><pubDate>Wed, 22 Oct 2025 12:00:00 GMT</pubDate><source>Fixture News</source></item>"+
+            $"<item><title>Agent product release update</title><description>Agentic AI agents bring new product capabilities.</description><link>{prefix}agent-release</link><pubDate>Wed, 22 Oct 2025 12:00:00 GMT</pubDate><source>Fixture News</source></item>"+
             $"<item><title>计算机视觉推出新模型</title><description>Computer vision segmentation announcement.</description><link>{prefix}vision-release</link><pubDate>Thu, 23 Oct 2025 12:00:00 GMT</pubDate><source>Fixture News</source></item>"+
             "<item><title>Agent paper</title><description>Paper abstract.</description><link>https://arxiv.org/abs/2510.12345</link><pubDate>Wed, 22 Oct 2025 12:00:00 GMT</pubDate><source>arXiv</source></item></channel></rss>";
     }
@@ -61,12 +61,18 @@ static class ResearchNewsTests
                 c["offline_news_preserves_content_and_times"]=offline.Items.Length==oldNews.Items.Length&&offline.Sources.All(x=>x.State=="rate-limited")&&offline.Sources.Select(x=>x.Updated).SequenceEqual(oldNews.Sources.Select(x=>x.Updated));handler.Fail=false;
                 var savedText=File.ReadAllText(cache);var hook=AtomicJson.BeforeReplace;time=time.AddMinutes(12);
                 try{AtomicJson.BeforeReplace=path=>{if(path==cache)throw new IOException("fixture cache failure");};var unsaved=await feed.Load("news","all",true,default);c["cache_save_failure_preserves_previous_file"]=File.ReadAllText(cache)==savedText&&unsaved.Items.Length>0&&unsaved.Note.Contains("缓存保存失败");}finally{AtomicJson.BeforeReplace=hook;}
-                var reader=new Reader();using var form=new ResearchNewsForm(feed,true,reader){StartPosition=FormStartPosition.Manual,Location=new(-12000,-12000)};before=handler.Requests;form.Show();
+                int translationCalls=0;var titleTranslator=new ResearchTitleTranslator(null,(titles,_)=>{translationCalls++;return Task.FromResult(JsonSerializer.Serialize(new{translations=titles.Select((t,id)=>new{id,title="智能体产品发布更新"})}));});
+                var reader=new Reader();using var form=new ResearchNewsForm(feed,true,reader,titleTranslator){StartPosition=FormStartPosition.Manual,Location=new(-12000,-12000)};before=handler.Requests;form.Show();
                 c["no_background_network_or_audio"]=handler.Requests==before&&reader.Reads==0;
                 c["professional_removed"]=typeof(ResearchNewsForm).GetField("professional",BindingFlags.Instance|BindingFlags.NonPublic)==null;
                 c["papers_before_newer_projects"]=form.VisibleItems.Take(3).All(i=>i.Source=="arxiv")&&form.VisibleItems.Skip(3).All(i=>i.Source=="github");
                 var list=Field<FlowLayoutPanel>(form,"list");c["retains_compact_brief"]=list.Controls.OfType<ResearchNewsCard>().All(card=>card.Height==130);
                 Field<BarcaButton>(form,"news").PerformClick();c["news_view_contains_only_news"]=form.VisibleItems.Length==2&&form.VisibleItems.All(ResearchNewsFeed.IsNews)&&form.VisibleItems.First().Date>form.VisibleItems.Last().Date;
+                c["no_automatic_translation"]=translationCalls==0;
+                await form.TranslateTitles();var translatedItem=form.VisibleItems.Single(i=>i.Title=="Agent product release update");
+                c["news_title_translated_without_changing_source"]=form.DisplayTitle(translatedItem)=="智能体产品发布更新"&&translationCalls==1&&translatedItem.Url.Contains("https://");
+                Field<BarcaButton>(form,"original").PerformClick();c["original_toggle_no_model_call"]=form.DisplayTitle(translatedItem)==translatedItem.Title&&translationCalls==1;Field<BarcaButton>(form,"original").PerformClick();
+                Field<TextBox>(form,"search").Text="智能体产品";c["chinese_translation_search"]=form.VisibleItems.Length==1;Field<TextBox>(form,"search").Clear();
                 using(var image=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,form.ClientRectangle);image.Save(Path.Combine(Path.GetDirectoryName(report)!,"ai-news.png"));}
                 Area(form,"vision");c["dropdown_changes_related_results"]=form.VisibleItems.Length==1&&form.VisibleItems.Single().Title.Contains("视觉");
                 Field<BarcaButton>(form,"overview").PerformClick();c["shared_field_selection"]=form.VisibleItems.Length==2&&form.VisibleItems.All(i=>i.Topic=="vision");
@@ -86,6 +92,13 @@ static class ResearchNewsTests
                     foreach(var area in ResearchAreas.All.Take(9))await boundedFeed.Load("news",area.Id,false,default);
                     var saved=JsonSerializer.Deserialize<ResearchCache>(File.ReadAllText(bounded))!;c["cache_bounded_to_eight_selections"]=saved.Snapshots.Length==8&&boundedFeed.Get("news","all").Items.Length==0;
                 }
+                var translationStarted=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var blockedTranslator=new ResearchTitleTranslator(null,async(_,token)=>{translationStarted.SetResult();await Task.Delay(Timeout.Infinite,token);return "";});
+                using(var translatingForm=new ResearchNewsForm(feed,true,new Reader(),blockedTranslator)){
+                    translatingForm.Show();Field<BarcaButton>(translatingForm,"news").PerformClick();var translating=translatingForm.TranslateTitles();await translationStarted.Task;Area(translatingForm,"vision");await translating;
+                    c["field_switch_cancels_title_translation"]=blockedTranslator.Display("Agent product release update")=="Agent product release update"&&ModuleActivities.Snapshot().All(a=>a.Module!="research-news");translatingForm.Close();
+                }
+                await ResearchTitleTranslationTests.Check(Path.GetDirectoryName(report)!,c);
                 File.WriteAllText(report,JsonSerializer.Serialize(new{ok=c.Values.All(x=>x),checks=c,model_calls=0,microphone_used=false},new JsonSerializerOptions{WriteIndented=true}));
             }catch(Exception e){File.WriteAllText(report,JsonSerializer.Serialize(new{ok=false,error=e.ToString(),checks=c}));}finally{host.Close();}
         };Application.Run(host);
