@@ -1196,5 +1196,10 @@
   "Agent / 全双工语音论文与开源项目，窗口打开时按需刷新": "Agent / full-duplex voice papers and projects; fetches on demand when opened",
   "按需获取公开论文与仓库；来源连接状态在动态窗口显示。": "Fetches public papers and repositories on demand; source status appears in the briefing window.",
   "Agent 与实时语音论文、开源项目": "Agent and real-time voice papers and open-source projects",
-  "在功能页启停 AI 动态；不需要API Key。": "Enable AI Briefing under Features; no API key is required."
+  "在功能页启停 AI 动态；不需要API Key。": "Enable AI Briefing under Features; no API key is required.",
+  "速览": "Brief",
+  "专业": "Research",
+  "论文动态": "Paper updates",
+  "论文速报": "Paper brief",
+  "项目速报": "Project brief"
 }

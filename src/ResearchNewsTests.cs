@@ -52,7 +52,20 @@ static class ResearchNewsTests
                 var reader=new Reader();using var form=new ResearchNewsForm(feed,true,reader){StartPosition=FormStartPosition.Manual,Location=new(-12000,-12000)};
                 form.Show();c["opening_preview_no_requests_or_audio"]=handler.Requests==9&&reader.Reads==0;
                 c["cross_source_deduplication"]=form.VisibleItems.Length==3;
+                var list=Field<FlowLayoutPanel>(form,"list");
+                var viewSwitch=Field<BarcaButton>(form,"overview");c["view_switch_clear_of_title"]=viewSwitch.Visible&&!viewSwitch.Parent!.Controls.OfType<Label>().First().Bounds.IntersectsWith(viewSwitch.Bounds);
+                c["default_brief_cards"]=list.Controls.OfType<ResearchNewsCard>().All(card=>card.Height==130)&&!Field<bool>(form,"professionalView");
+                c["papers_before_newer_github"]=form.VisibleItems.Take(2).All(i=>i.Source=="arxiv")&&form.VisibleItems.Last().Source!="arxiv";
+                var initialOrder=form.VisibleItems.Select(i=>i.Id).ToArray();int requestsBeforeSwitch=handler.Requests;
+                Field<BarcaButton>(form,"professional").PerformClick();
+                c["professional_preserves_content_order"]=list.Controls.OfType<ResearchNewsCard>().All(card=>card.Height==160)&&form.VisibleItems.Select(i=>i.Id).SequenceEqual(initialOrder);
+                using(var image=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,form.ClientRectangle);image.Save(Path.Combine(Path.GetDirectoryName(report)!,"research-professional.png"));}
+                Field<BarcaButton>(form,"overview").PerformClick();
+                c["switch_reuses_data_no_network_or_audio"]=handler.Requests==requestsBeforeSwitch&&reader.Reads==0&&list.Controls.OfType<ResearchNewsCard>().All(card=>card.Height==130);
+                c["brief_extracts_original_sentence"]=ResearchNewsCard.Brief("First sentence gives a concise original research update. Second sentence contains more detail.")=="First sentence gives a concise original research update.";
+
                 Field<TextBox>(form,"search").Text="turn-taking";c["local_filter"]=form.VisibleItems.Length==1;
+                Field<BarcaButton>(form,"professional").PerformClick();c["switch_preserves_filter"]=form.VisibleItems.Length==1&&Field<TextBox>(form,"search").Text=="turn-taking";Field<BarcaButton>(form,"overview").PerformClick();
                 form.Speak(form.VisibleItems);c["explicit_read_only"]=reader.Reads==1&&reader.Text.Contains("Full-duplex");
                 Field<TextBox>(form,"search").Clear();form.Render();
                 using(var image=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,form.ClientRectangle);image.Save(Path.Combine(Path.GetDirectoryName(report)!,"research-news.png"));}

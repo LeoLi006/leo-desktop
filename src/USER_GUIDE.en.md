@@ -89,6 +89,7 @@ Usage defaults to 100 model-generation requests daily;0 is unlimited. Failed/can
 ## AI Briefing: agents and full-duplex voice research
 
 - **Find it**: click Leo, then the newspaper shortcut at the top (or More if it overflows). Search AI新闻 / 论文 / 全双工, or open AI Briefing from the context menu.
+- **Views**: switch Brief / Research at the top right. Brief is the default, with news-style headlines and short excerpts; Research retains the existing abstracts and metadata. Both put papers before GitHub, with newest dates first within each group. Switching retains filters and does not refetch.
 - **Content**: relevant recent arXiv papers and GitHub repositories active in the last 30 days. Filter by Agents, Full-duplex / Voice, Papers or Open source. The text box filters fetched titles, abstracts and authors locally.
 - **Read**: click a card to open the original paper or repository. Read this item plays one card; Read top stories plays up to five visible items. Stop cancels reading, as does closing the window. No microphone or SenseVoice model is used.
 - **Interpretation**: each source has a fetch timestamp. Paper dates mean first publication; repository dates mean last push. Projects are selected by total stars among recently active repositories, **not daily star growth or a comprehensive ranking**. Titles and abstracts remain in their original language. No generated scientific claims or automatic translation; pronunciation depends on installed system voices.

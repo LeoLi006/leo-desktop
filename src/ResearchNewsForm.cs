@@ -18,6 +18,8 @@ sealed class ResearchNewsForm:BarcaWindow
     readonly Label sources=new(),message=new();readonly TextBox search=new();
     readonly BarcaButton refresh=new(){Text="刷新"},read=new(){Text="播报当前列表"},stop=new(){Text="停止朗读"};
     readonly List<(BarcaButton Button,string Id)> filters=[];
+    readonly BarcaButton overview=new(){Text="速览",Selected=true},professional=new(){Text="专业"};
+    bool professionalView;
     readonly ModuleThemeBinding theme;readonly ActivityOwner activities=new("research-news");
     string filter="all";bool refreshing,released;ResearchItem[] visible=[];
     internal ResearchItem[] VisibleItems=>visible.ToArray();
@@ -26,7 +28,11 @@ sealed class ResearchNewsForm:BarcaWindow
     {
         this.feed=feed;this.preview=preview;this.reader=reader??new ResearchReader();
         Text="Leo · AI 动态";ClientSize=new(860,700);DoubleBuffered=true;
-        Controls.Add(BarcaUi.Chrome(this,"AI 动态","Agent / 全双工语音  ·  论文与开源项目"));
+        var header=BarcaUi.Chrome(this,"AI 动态","Agent / 全双工语音  ·  论文与开源项目");Controls.Add(header);
+        overview.Bounds=new(562,18,84,30);professional.Bounds=new(654,18,84,30);
+        overview.Click+=(_,_)=>SetView(false);professional.Click+=(_,_)=>SetView(true);header.Controls.AddRange([overview,professional]);overview.BringToFront();professional.BringToFront();
+        void FitHeaderTitle(){header.Controls.OfType<Label>().First().Width=Math.Min(500,Math.Max(100,header.Width-360));}
+        header.SizeChanged+=(_,_)=>FitHeaderTitle();FitHeaderTitle();
         int x=22;foreach(var (name,id) in new[]{("全部","all"),("Agent","agent"),("全双工 / 实时语音","voice"),("论文","papers"),("开源项目","projects")}){
             var button=new BarcaButton{Text=name,Bounds=new(x,102,id=="voice"?158:id=="projects"?110:82,32),Selected=id=="all"};
             button.Click+=(_,_)=>{filter=id;foreach(var entry in filters){entry.Button.Selected=entry.Id==id;entry.Button.Invalidate();}Render();};filters.Add((button,id));Controls.Add(button);x=button.Right+8;
@@ -61,16 +67,25 @@ sealed class ResearchNewsForm:BarcaWindow
     {
         if(released)return;var snapshot=feed.Snapshot;
         string term=search.Text.Trim();visible=snapshot.Items.Where(i=>filter switch{"agent"=>i.Topic is "agent" or "both","voice"=>i.Topic is "voice" or "both","papers"=>i.Source=="arxiv","projects"=>i.Source!="arxiv",_=>true})
-            .Where(i=>term.Length==0||(i.Title+" "+i.Summary+" "+i.Authors).Contains(term,StringComparison.OrdinalIgnoreCase)).DistinctBy(i=>i.Id).OrderByDescending(i=>i.Date).Take(60).ToArray();
+            .Where(i=>term.Length==0||(i.Title+" "+i.Summary+" "+i.Authors).Contains(term,StringComparison.OrdinalIgnoreCase)).DistinctBy(i=>i.Id).OrderBy(i=>i.Source=="arxiv"?0:1).ThenByDescending(i=>i.Date).Take(60).ToArray();
         list.SuspendLayout();try{
             foreach(Control old in list.Controls.Cast<Control>().ToArray())old.Dispose();list.Controls.Clear();
-            foreach(var item in visible){var card=new ResearchNewsCard(item,()=>Open(item),()=>Speak([item])){Width=Math.Max(200,list.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-4)};list.Controls.Add(card);}
+            foreach(var group in visible.GroupBy(i=>i.Source=="arxiv")){
+                var section=new Label{Text=UiLanguage.T(group.Key?"论文动态":"开源项目")+"  /  "+group.Count(),Width=770,Height=26,ForeColor=BarcaUi.Gold,Margin=new(4,3,0,4)};UiLanguage.Preserve(section);list.Controls.Add(section);
+                foreach(var item in group){var card=new ResearchNewsCard(item,()=>Open(item),()=>Speak([item]),!professionalView){Width=Math.Max(200,list.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-4)};list.Controls.Add(card);}
+            }
             if(visible.Length==0)list.Controls.Add(new Label{Text=UiLanguage.T(snapshot.Items.Length==0?"还没有动态；点击刷新获取，断网时会保留已有缓存。":"没有匹配的动态"),Width=770,Height=80,ForeColor=BarcaUi.Muted,Padding=new(10,20,10,0)});
         }finally{list.ResumeLayout(true);}
         string SourceName(string id)=>id=="arxiv"?"arXiv":id=="github-agent"?"GitHub · Agent":"GitHub · Voice";
         sources.Text=string.Join("   /   ",snapshot.Sources.Select(s=>SourceName(s.Id)+"  "+(s.Updated is{} updated?updated.ToLocalTime().ToString("MM-dd HH:mm"):"—")+"  "+UiLanguage.T(s.State=="ok"?"已获取":s.State=="rate-limited"?"限流，保留旧内容":"暂不可用，保留旧内容")));
         message.Text=snapshot.Note.Length>0?UiLanguage.T(snapshot.Note):UiLanguage.T("摘要来自原文，未自动翻译；项目为近30天活跃仓库按 Stars 筛选，并非日增星榜。朗读前5条，使用系统本地语音。除此窗口不轮询。");
         read.Enabled=visible.Length>0;
+    }
+    void SetView(bool professionalMode)
+    {
+        if(professionalView==professionalMode)return;
+        StopReading();professionalView=professionalMode;overview.Selected=!professionalMode;professional.Selected=professionalMode;
+        overview.Invalidate();professional.Invalidate();Render();
     }
     void Open(ResearchItem item)
     {
@@ -80,7 +95,7 @@ sealed class ResearchNewsForm:BarcaWindow
     internal void Speak(ResearchItem[] items)
     {
         if(items.Length==0)return;
-        try{reader.Read(string.Join("\n",items.Take(5).Select((i,n)=>$"{n+1}. {i.Title}. {i.Summary[..Math.Min(i.Summary.Length,350)]}")));}
+        try{reader.Read(string.Join("\n",items.Take(5).Select((i,n)=>$"{n+1}. {i.Title}. {(professionalView?i.Summary[..Math.Min(i.Summary.Length,350)]:ResearchNewsCard.Brief(i.Summary))}")));}
         catch(Exception e)when(FeatureFaults.Recoverable(e)){message.Text=UiLanguage.T("本地朗读不可用，请检查系统语音和音频设备；文字阅读不受影响。");}
     }
     void StopReading(){try{reader.Stop();}catch(Exception e)when(FeatureFaults.Recoverable(e)){/* Audio cleanup must not close the window. */}}
@@ -94,14 +109,21 @@ sealed class ResearchNewsForm:BarcaWindow
 
 sealed class ResearchNewsCard:Control
 {
-    readonly ResearchItem item;readonly Action open,speak;readonly Font heading=BarcaUi.Font(10.5f,true),body=BarcaUi.Font(9),small=BarcaUi.Font(8.5f);
+    readonly ResearchItem item;readonly bool compact;readonly Action open,speak;readonly Font heading=BarcaUi.Font(10.5f,true),body=BarcaUi.Font(9),small=BarcaUi.Font(8.5f);
     bool hover;
-    public ResearchNewsCard(ResearchItem item,Action open,Action speak)
+    public ResearchNewsCard(ResearchItem item,Action open,Action speak,bool compact=false)
     {
-        this.item=item;this.open=open;this.speak=speak;Height=160;Margin=new(0,0,0,10);Cursor=Cursors.Hand;TabStop=true;AccessibleRole=AccessibleRole.Link;AccessibleName=item.Title;
+        this.item=item;this.compact=compact;this.open=open;this.speak=speak;Height=compact?130:160;Margin=new(0,0,0,10);Cursor=Cursors.Hand;TabStop=true;AccessibleRole=AccessibleRole.Link;AccessibleName=item.Title;
         SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw|ControlStyles.Selectable,true);
         MouseEnter+=(_,_)=>{hover=true;Invalidate();};MouseLeave+=(_,_)=>{hover=false;Invalidate();};
         Click+=(_,_)=>{if(PointToClient(Cursor.Position) is var point&&point.Y>=Height-30&&point.X>=Width-160)speak();else open();};
+    }
+    internal static string Brief(string summary)
+    {
+        string text=summary.Trim();var sentence=System.Text.RegularExpressions.Regex.Match(text,@"^.*?[.!?。！？](?:\s|$)");
+        if(sentence.Success&&sentence.Length>=35)text=sentence.Value.Trim();
+        if(text.Length<=180)return text;
+        int end=text.LastIndexOf(' ',179,80);return text[..(end>=100?end:179)].TrimEnd()+"…";
     }
     protected override bool IsInputKey(Keys keyData)=>keyData==Keys.Enter||base.IsInputKey(keyData);
     protected override void OnKeyDown(KeyEventArgs e){if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;if(e.Control)speak();else open();}base.OnKeyDown(e);}
@@ -112,11 +134,12 @@ sealed class ResearchNewsCard:Control
         using var border=new Pen(Focused?BarcaUi.Gold:BarcaUi.Line);g.DrawPath(border,shape);
         string topic=item.Topic=="both"?"Agent + Voice":item.Topic=="voice"?"Voice":"Agent";
         string meta=(item.Source=="arxiv"?"arXiv · "+UiLanguage.T("论文"):"GitHub · ★ "+item.Stars?.ToString("N0"))+"   /   "+topic+"   /   "+UiLanguage.T(item.Source=="arxiv"?"发表":"更新")+" "+item.Date.ToLocalTime().ToString("MM-dd");
+        if(compact)meta=UiLanguage.T(item.Source=="arxiv"?"论文速报":"项目速报")+"  ·  "+topic+"  ·  "+item.Date.ToLocalTime().ToString("MM-dd")+"  ·  "+(item.Source=="arxiv"?"arXiv":"GitHub");
         TextRenderer.DrawText(g,meta,small,new Rectangle(16,10,Width-32,20),BarcaUi.Gold,TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
-        TextRenderer.DrawText(g,item.Title,heading,new Rectangle(16,35,Width-32,46),BarcaUi.Text,TextFormatFlags.WordBreak|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
-        TextRenderer.DrawText(g,item.Summary,body,new Rectangle(16,84,Width-32,40),BarcaUi.Muted,TextFormatFlags.WordBreak|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
-        TextRenderer.DrawText(g,UiLanguage.T("点击打开原文")+"  ↗",small,new Rectangle(16,134,Width/2,20),BarcaUi.Muted,TextFormatFlags.SingleLine);
-        TextRenderer.DrawText(g,UiLanguage.T("朗读此条")+"  ▷",small,new Rectangle(Width-145,134,128,20),BarcaUi.Gold,TextFormatFlags.Right|TextFormatFlags.SingleLine);
+        TextRenderer.DrawText(g,item.Title,heading,new Rectangle(16,compact?30:35,Width-32,compact?42:46),BarcaUi.Text,TextFormatFlags.WordBreak|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g,compact?Brief(item.Summary):item.Summary,body,new Rectangle(16,compact?75:84,Width-32,compact?20:40),BarcaUi.Muted,(compact?TextFormatFlags.SingleLine:TextFormatFlags.WordBreak)|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g,UiLanguage.T("点击打开原文")+"  ↗",small,new Rectangle(16,Height-26,Width/2,20),BarcaUi.Muted,TextFormatFlags.SingleLine);
+        TextRenderer.DrawText(g,UiLanguage.T("朗读此条")+"  ▷",small,new Rectangle(Width-145,Height-26,128,20),BarcaUi.Gold,TextFormatFlags.Right|TextFormatFlags.SingleLine);
     }
     protected override void Dispose(bool disposing){if(disposing){heading.Dispose();body.Dispose();small.Dispose();}base.Dispose(disposing);}
 }
