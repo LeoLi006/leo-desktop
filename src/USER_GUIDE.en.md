@@ -85,3 +85,13 @@ Recognition runs locally; recognized text is sent to your configured provider if
 Use Settings → General → Configuration migration/recovery. Review the import summary and retain backups. Migration exports differ from public shares: they may contain tasks, URLs, aliases and program paths, so keep them private. API keys, chat, clipboard and speech models are excluded; do not upload migration files to GitHub.
 
 Usage defaults to 100 model-generation requests daily;0 is unlimited. Failed/cancelled requests can still count if sent; listing models does not count. Tokens reflect provider-reported values, not estimated cost. Disable unsupported token reporting if necessary. Local functionality remains available after reaching the model limit.
+
+## AI Briefing: agents and full-duplex voice research
+
+- **Find it**: click Leo, then the newspaper shortcut at the top (or More if it overflows). Search AI新闻 / 论文 / 全双工, or open AI Briefing from the context menu.
+- **Content**: relevant recent arXiv papers and GitHub repositories active in the last 30 days. Filter by Agents, Full-duplex / Voice, Papers or Open source. The text box filters fetched titles, abstracts and authors locally.
+- **Read**: click a card to open the original paper or repository. Read this item plays one card; Read top stories plays up to five visible items. Stop cancels reading, as does closing the window. No microphone or SenseVoice model is used.
+- **Interpretation**: each source has a fetch timestamp. Paper dates mean first publication; repository dates mean last push. Projects are selected by total stars among recently active repositories, **not daily star growth or a comprehensive ranking**. Titles and abstracts remain in their original language. No generated scientific claims or automatic translation; pronunciation depends on installed system voices.
+- **Network and resources**: on-demand refresh when opened or explicitly requested; fresh results are reused for 10 minutes, with at least one minute between attempts. A failed/rate-limited source retains its own previous items and timestamp. Closing cancels in-flight refresh. There is no persistent news polling.
+- **Control**: Settings → Features → AI Briefing. Entry visibility is separate from enablement. The companion-only profile disables the module.
+- **Cost and privacy**: no model API key or paid model calls; no access to private GitHub repositories, chat or clipboard. Only public metadata is cached; full papers/repositories are not downloaded. First use requires a network connection.

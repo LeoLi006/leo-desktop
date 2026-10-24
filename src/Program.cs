@@ -39,6 +39,7 @@ sealed class Preferences
     public List<string> ClipboardBlockedApps{get;set;}=["1Password","Bitwarden","KeePass","KeePassXC","LastPass","Dashlane"];
     public string? SkinId{get;set;}
     public string DisplayName{get;set;}="Leo";
+    public bool ResearchNewsModule{get;set;}=true;
     public bool SystemMonitorModule{get;set;}=false;
     public bool DesktopMailModule{get;set;}=false;
     public bool SystemMonitorAlerts{get;set;}=false;
@@ -273,6 +274,8 @@ static class Program
         if(args.Length==2&&args[0]=="--application-host-test"){ApplicationHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-consistency-test"){EntryConsistencyTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-inventory"){EntryInventory.ExportExample(args[1]);return;}
+        if(args.Length==2&&args[0]=="--research-news-test"){ResearchNewsTests.Run(args[1]);return;}
+        if(args.Length==2&&args[0]=="--research-news-live"){ResearchNewsTests.Live(args[1]);return;}
         if(args.Length==2&&args[0]=="--launcher-files-test"){LauncherFileSearchTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-display-test"){EntryDisplayTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--release100-test"){Release100Tests.Run(args[1]);return;}
@@ -569,7 +572,7 @@ sealed partial class PetForm : Form
         commands=new ActionDispatcher(prefs,ExecuteLeoActionCore,preview?new ExtensionStore(Path.Combine(Path.GetTempPath(),"leo-preview-no-extensions")):null,applicationHost);
         presentation=new(new ModuleWindowService(this),target=>target switch{ModuleWindowTarget.Football=>prefs.FootballModule,ModuleWindowTarget.Music=>prefs.MusicModule,ModuleWindowTarget.Media=>prefs.MediaModule,ModuleWindowTarget.Chat=>conversations==null||!conversations.IsClosed,ModuleWindowTarget.Clipboard=>launcher==null||!launcher.ClipboardService.IsClosed,_=>true},OpenPresentation,notice=>OperationFeedback.Sink?.Invoke(notice),DismissPresentationFeedback);
         presentation.Configure();musicCapabilityQueue.Feedback=t=>new(presentation.Feedback(ModuleWindowTarget.Music,t),"music");mediaCapabilityQueue.Feedback=t=>new(presentation.Feedback(ModuleWindowTarget.Media,t),"media");
-        RegisterNotesCapability();RegisterConversationCapability();RegisterTodoCapability();RegisterFootballCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();RegisterDesktopTools();
+        RegisterNotesCapability();RegisterConversationCapability();RegisterTodoCapability();RegisterFootballCapability();RegisterMatchPlanning();RegisterWorkflowCapability();RegisterClientCapabilities();RegisterDesktopTools();RegisterResearchNews();
         constructionProbe?.Invoke("dispatcher_ready");
         launcher = new LauncherForm(p, ResizePet, preview, demo,todoStore);if(!preview)MediaControl.Applications=()=>launcher.FileApplications;launcher.MediaRequested=ShowMedia;launcher.RecognizesCommand=commands.RecognizesExtension;launcher.CommandRequested=(text,token)=>commands.ExecuteTextAsync(text,"search",token);launcher.ActionRequested=(action,value,token)=>commands.ExecuteAsync(new(action,value,"search"),token);launcher.OriginActionRequested=(action,value,source,token)=>commands.ExecuteAsync(new(action,value,source),token);launcher.ApplicationsDropped=AddApplicationModules;launcher.RepairApplication=RepairLocalApplication;
         launcher.WindowClosed=target=>presentation.Invalidate(target);launcher.VisibleChanged+=(_,_)=>{if(!launcher.Visible)presentation.Invalidate(ModuleWindowTarget.Applications);};
@@ -960,7 +963,7 @@ sealed partial class PetForm : Form
     {
         if(resourcesDisposed)return;resourcesDisposed=true;
         void Cleanup(Action action){try{action();}catch(Exception e)when(FeatureFaults.Recoverable(e)){System.Diagnostics.Trace.WriteLine("Leo cleanup: "+e.GetType().Name);}}
-        Cleanup(()=>ReleaseDesktopTools());
+        Cleanup(()=>ReleaseDesktopTools());Cleanup(()=>ReleaseResearchNews());
         Cleanup(()=>presentation?.Dispose());
         Cleanup(()=>reminderActivity?.Dispose());Cleanup(()=>matchSyncActivity?.Dispose());Cleanup(()=>companionActivity?.Dispose());
         Cleanup(()=>layeredSurface.Dispose());Cleanup(()=>paintSurface?.Dispose());paintSurface=null;

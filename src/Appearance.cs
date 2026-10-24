@@ -91,6 +91,7 @@ sealed class GlyphButton : Button
         }
         else if(glyph=="monitor"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,3,20,14),new SizeF(2,2));e.Graphics.DrawLines(pen,[new(7,12),new(10,12),new(12,7),new(15,14),new(18,9),new(21,9)]);e.Graphics.DrawLine(pen,14,17,14,21);e.Graphics.DrawLine(pen,9,21,19,21);}
         else if(glyph=="mail"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,5,20,15),new SizeF(3,3));e.Graphics.DrawLines(pen,[new(5,7),new(14,13),new(23,7)]);e.Graphics.DrawLine(pen,5,18,10,13);e.Graphics.DrawLine(pen,23,18,18,13);}
+        else if(glyph=="news"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,3,20,18),new SizeF(2,2));e.Graphics.DrawRectangle(pen,7,6,5,5);e.Graphics.DrawLine(pen,15,7,21,7);e.Graphics.DrawLine(pen,15,11,21,11);e.Graphics.DrawLine(pen,7,15,21,15);e.Graphics.DrawLine(pen,7,18,18,18);}
         else if(glyph=="notes"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(6,3,16,19),new SizeF(2,2));for(int y=8;y<19;y+=5)e.Graphics.DrawLine(pen,10,y,18,y);}
         else if(glyph=="folder"){e.Graphics.DrawLines(pen,[new(4,8),new(4,5),new(11,5),new(14,8),new(24,8),new(22,20),new(5,20),new(4,8),new(24,8)]);}
         else if(glyph=="globe"){e.Graphics.DrawEllipse(pen,5,3,18,18);e.Graphics.DrawEllipse(pen,10,3,8,18);e.Graphics.DrawLine(pen,5,12,23,12);}

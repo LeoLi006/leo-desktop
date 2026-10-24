@@ -26,7 +26,7 @@ sealed class EntryDisplayForm:BarcaWindow
         var scroll=new Panel{Bounds=new(22,108,726,346),AutoScroll=true};int y=0;
         foreach(var entry in EntryDisplay.Entries(prefs)){
             var title=new Label{Text=entry.Name,Bounds=new(8,y+4,305,25),AutoEllipsis=true,ForeColor=BarcaUi.Text,Font=BarcaUi.Font(10,true)};
-            if(!EntryContributions.ReadBuiltins(prefs).Any(e=>e.Id==entry.Id)&&entry.Id is not("system-monitor/open" or "mail-client/open"))UiLanguage.Preserve(title);
+            if(!EntryContributions.ReadBuiltins(prefs).Any(e=>e.Id==entry.Id)&&entry.Id is not("system-monitor/open" or "mail-client/open" or "research-news/open"))UiLanguage.Preserve(title);
             var enabled=new Label{Text=entry.Enabled?"已启用":"已停用",Bounds=new(320,y+5,77,24),ForeColor=entry.Enabled?BarcaUi.Gold:BarcaUi.Muted,Font=BarcaUi.Font(9)};
             var field=new ComboBox{Bounds=new(408,y,260,31),DropDownStyle=ComboBoxStyle.DropDownList,AccessibleName=entry.Id+"入口显示"};CompanionUi.ThemeCombo(field);foreach(var mode in EntryDisplay.Modes)field.Items.Add(new ComboChoice(mode.Label,mode.Value,true));field.SelectedItem=field.Items.Cast<ComboChoice>().First(m=>m.Value==EntryDisplay.EffectiveMode(prefs,entry.Id));fields[entry.Id]=field;
             var hint=new Label{Text="搜索口令："+entry.Hint,Bounds=new(8,y+33,660,23),AutoEllipsis=true,ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(8.5f)};scroll.Controls.AddRange([title,enabled,field,hint]);y+=70;
