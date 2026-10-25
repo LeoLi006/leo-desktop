@@ -91,6 +91,11 @@ sealed class FootTools : Form
         foreach(var (button,target) in TargetButtons)
         {
             string name=target=="edge"?"Edge":GeminiWeb.Name(target);
+            if(target!="gemini")
+            {
+                string logo=Path.Combine(AppContext.BaseDirectory,"assets","web-search-logos",target+".png");
+                try{using var image=Image.FromFile(logo);button.Image=new Bitmap(image);}catch(Exception error)when(error is IOException or ArgumentException or System.Runtime.InteropServices.ExternalException){}
+            }
             button.AccessibleName=name+UiLanguage.T(" · 搜索目标");button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderSize=0;button.ShowSelection=true;
             button.Click+=(_,_)=>SelectTarget(target);
             button.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Escape){SetExpanded(false);e.SuppressKeyPress=true;}};
@@ -141,7 +146,7 @@ sealed class FootTools : Form
         ApplyScale(petSize);
         Shown += (_, _) => { SetExpanded(false); _ = RefreshProxy(); if (!preview&&EntryContributions.Builtin(modules,"clash").Enabled) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
-        Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true;proxyLife.Cancel();proxyLife.Dispose();proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
+        Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true;proxyLife.Cancel();proxyLife.Dispose();proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();foreach(var (button,_) in TargetButtons)button.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
     }
     (GlyphButton Button,string Target)[] TargetButtons=>[(edgeTargetButton,"edge"),(geminiButton,"gemini"),(deepseekButton,"deepseek"),(chatgptWebButton,"chatgpt")];
     void SelectTarget(string target)
