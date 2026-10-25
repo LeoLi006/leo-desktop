@@ -15,8 +15,17 @@
     return found.length === 1 ? found[0] : null;
   };
   const sendButton = doc => {
-    const found = [...doc.querySelectorAll('button.send-button, button[data-test-id="send-button"]')].filter(visible);
-    return found.length === 1 && !found[0].disabled && found[0].getAttribute('aria-disabled') !== 'true' ? found[0] : null;
+    const found = [...doc.querySelectorAll('button')].filter(el => {
+      if (!visible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
+      const label = (el.getAttribute('aria-label') || '').trim();
+      // Gemini can keep the same button class while changing its action to Stop/Voice.
+      if (/stop|cancel|microphone|voice|停止|取消|麦克风|语音/i.test(label)) return false;
+      const semantic = /^(send(?: message| prompt)?|发送(?:消息|提示|提示词)?)$/i.test(label);
+      const marker = el.matches('button.send-button, button[data-test-id="send-button"], button[data-testid="send-button"]');
+      const icon = el.querySelector('mat-icon, .google-symbols, .material-symbols-outlined');
+      return semantic || marker || (icon && (icon.textContent || '').trim() === 'send');
+    });
+    return found.length === 1 ? found[0] : null;
   };
   const clean = s => s.replace(/\r\n/g, '\n').replace(/\u00a0/g, ' ').trim();
   // Exposed only in the repository's Node fixture, never to the page world.
@@ -36,7 +45,7 @@
     if (seen.includes(request.id)) return;
     try { sessionStorage.setItem(seenKey, JSON.stringify([...seen, request.id].slice(-64))); }
     catch { return; }
-    let stopped = false, clicked = false, panel;
+    let stopped = false, clicked = false, filled = false, panel;
     cancelCurrent = () => { stopped = true; panel?.remove(); };
     const chinese = (document.documentElement?.lang || navigator.language || 'en').startsWith('zh');
     const t = (zh, en) => chinese ? zh : en;
@@ -71,8 +80,11 @@
         range.selectNodeContents(input); selection.removeAllRanges(); selection.addRange(range);
         if (!document.execCommand('insertText', false, request.prompt)) {
           input.textContent = request.prompt;
-          input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: request.prompt }));
         }
+        // Notify the Angular/Quill input state even when execCommand succeeded.
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: request.prompt }));
+        filled = true;
+        status(t('Leo 1.0.2 · 已填入，正在等待发送按钮就绪。', 'Leo 1.0.2 · Prompt filled. Waiting for the Send button.'));
         const onEdit = event => { if (event.isTrusted) { stopped = true; status(t('你正在编辑，已停止自动发送。', 'You are editing. Auto-send stopped.')); } };
         input.addEventListener('beforeinput', onEdit);
         try {
@@ -95,7 +107,7 @@
         } finally { input.removeEventListener('beforeinput', onEdit); }
         break;
       }
-      if (!stopped) status(t('等待超时。请确认登录与页面状态；内容未自动重试，可复制后手动发送。', 'Timed out. Check sign-in and page state. No retry; copy the prompt to send manually.'));
+      if (!stopped) status(filled ? t('已填入，但等待发送按钮超时；请手动点击发送，Leo 不会重复点击。', 'Prompt filled, but waiting for Send timed out. Click Send manually; Leo will not retry.') : t('等待超时。请确认登录与页面状态；内容未自动重试，可复制后手动发送。', 'Timed out. Check sign-in and page state. No retry; copy the prompt to send manually.'));
     } catch {
       if (!stopped) status(clicked ? t('发送状态未知，请查看 Gemini；不会重复发送。', 'Send state unknown. Check Gemini; no resend.') : t('自动填入未完成，可复制内容手动发送。', 'Auto-fill incomplete. Copy the prompt to send manually.'));
     }

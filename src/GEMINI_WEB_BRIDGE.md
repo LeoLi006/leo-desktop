@@ -14,7 +14,7 @@ URL: `https://gemini.google.com/app#leo-id=<32-hex>&leo-at=<unix-seconds>&leo-pr
 
 - The content script accepts only the exact Gemini HTTPS origin and its app entry paths; hand-offs expire after 120 seconds. Prompt text is never interpreted as HTML or JavaScript.
 - The fragment is consumed immediately. A bounded per-tab session list stores only up to 64 request IDs, not prompt text. Reload does not resubmit. This is replay protection, not cryptographic proof of provenance; another link with the same fragment format can request a send.
-- Wait up to 60 seconds for a unique visible rich-text editor, a foreground document and a unique enabled Gemini send button. Current selectors are `rich-textarea .ql-editor[contenteditable="true"]` / `[contenteditable="true"][role="textbox"]`, and `button.send-button` / `button[data-test-id="send-button"]`.
+- Wait up to 60 seconds for a unique visible rich-text editor, a foreground document and a unique enabled Gemini send button. Current selectors are `rich-textarea .ql-editor[contenteditable="true"]` / `[contenteditable="true"][role="textbox"]`, and enabled buttons carrying the send class/test-id, an exact Chinese/English Send accessibility label, or a `send` material icon. Stop/voice actions are rejected; multiple actionable matches are not clicked.
 - Existing nonempty drafts stop automation. A trusted user edit stops sending. Input is inserted into the verified editor; no global SendKeys or system clipboard replacement occurs.
 - Click Send exactly once. Observe composer clearing/removal for up to five seconds and report only that sending was triggered, not that a model answered. Unconfirmed sends are never retried. Failure leaves a small page notice with Copy/Cancel; the user can inspect Gemini and act manually.
 - Hidden/unfocused pages wait instead of taking over another window. Page exit or a newer hand-off cancels the old pending loop. No prompt queue or account-login automation exists.
@@ -32,3 +32,9 @@ References: [Edge local extension loading](https://learn.microsoft.com/en-us/mic
 ### 1.0.1 startup correction
 
 A regression fixture reproduces execution at document_start before documentElement exists: reading its language threw before the DOM waiting loop. Language selection now tolerates the missing root and falls back to the browser language. Existing safety/one-shot fixtures remain unchanged. After installing the updated assets, an already loaded unpacked extension must be reloaded in Edge before opening a fresh Leo request; no real-account send was performed by this check.
+
+### 1.0.2 send readiness correction
+
+The reported symptom was successful text insertion followed by a wait timeout. The old resolver only accepted two class/test-id markers. The bridge now also recognizes exact Chinese/English send labels, the alternate data-testid spelling and Material send icons, while excluding disabled, Stop/Voice and ambiguous controls. An explicit composed input notification follows insertion so page state can enable Send even if execCommand returns success without a usable notification. Notices now distinguish waiting for an editor from waiting for Send. The send is still one-shot; no keyboard fallback or uncertain resend is added.
+
+Isolated fixtures cover label-only/icon-only buttons, input notification, delayed button readiness, disabled/ambiguous/unknown controls and a coexisting Stop control, in addition to earlier safety checks. This validates the compatibility logic, not the user's live account. Reload the unpacked extension in Edge (version 1.0.2), then start a new Leo request; existing tabs retain their previously injected script.

@@ -12,13 +12,16 @@ assert.equal(parse(link(),(at+121)*1000),null);
 assert.equal(clean(' x\r\ny\u00a0 '),'x\ny');
 
 async function scenario(options={}) {
-  let now=at*1000, clicks=0, inserts=0, panelText='', removed=0, checked=0;
+  let now=at*1000, clicks=0, inserts=0, panelText='', removed=0, checked=0, notified=false;
   const events={}, memory=new Map(), location=new URL(link());
   function element(){return {style:{},children:[],append(...nodes){this.children.push(...nodes);},attachShadow(){return element();},remove(){removed++;},set textContent(value){panelText=String(value);},get textContent(){return panelText;}};}
-  const input={isConnected:true,textContent:options.draft||'',getClientRects:()=>[{}],focus(){},addEventListener(){},removeEventListener(){},dispatchEvent(){}};
-  const button={isConnected:true,disabled:false,getClientRects:()=>[{}],getAttribute:()=>null,click(){clicks++;if(!options.unconfirmed)input.textContent='';}};
+  const input={isConnected:true,textContent:options.draft||'',getClientRects:()=>[{}],focus(){},addEventListener(){},removeEventListener(){},dispatchEvent(){notified=true;}};
+  const button={isConnected:true,get disabled(){return !!options.disabled || (options.eventRequired&&!notified) || (options.delayed&&now<at*1000+1000);},getClientRects:()=>[{}],
+    getAttribute:key=>key==='aria-label'?(options.label||null):null,matches:selector=>!options.semanticOnly&&!options.iconOnly&&!options.unknown,
+    querySelector:()=>options.iconOnly?{textContent:'send'}:null,click(){clicks++;if(!options.unconfirmed)input.textContent='';}};
+  const nonSend={...button,getAttribute:key=>key==='aria-label'?'Stop response':null,matches:()=>true};
   const document={documentElement:options.earlyDocument?null:{lang:'zh-CN'},body:{append(){}},visibilityState:options.background?'hidden':'visible',hasFocus:()=>true,
-    querySelectorAll(selector){checked++;return options.login?[]:selector.startsWith('rich')?(options.ambiguous?[input,input]:[input]):[button];},
+    querySelectorAll(selector){checked++;return options.login?[]:selector.startsWith('rich')?(options.ambiguous?[input,input]:[input]):options.duplicate?[button,button]:options.withStop?[button,nonSend]:[button];},
     createElement:element,createRange:()=>({selectNodeContents(){}}),execCommand(cmd,unused,prompt){inserts++;input.textContent=prompt;return true;}};
   const window={addEventListener:(key,fn)=>events[key]=fn,getSelection:()=>({removeAllRanges(){},addRange(){}})};window.top=window;
   const sessionStorage={getItem:key=>memory.get(key),setItem:(key,value)=>{if(options.storageFailure)throw Error();memory.set(key,value);}};
@@ -28,7 +31,7 @@ async function scenario(options={}) {
   vm.runInNewContext(code,context);
   for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));
   if(options.replay){location.href=link();events.hashchange();for(let i=0;i<3;i++)await new Promise(resolve=>setImmediate(resolve));}
-  return {clicks,inserts,panelText,removed,checked,hash:location.hash,input:input.textContent};
+  return {clicks,inserts,panelText,removed,checked,hash:location.hash,input:input.textContent,notified};
 }
 (async()=>{
   const early=await scenario({earlyDocument:true});assert.equal(early.clicks,1);assert.equal(early.inserts,1);
@@ -38,6 +41,17 @@ async function scenario(options={}) {
   const ambiguous=await scenario({ambiguous:true});assert.equal(ambiguous.clicks,0);assert.equal(ambiguous.inserts,0);
   const background=await scenario({background:true});assert.equal(background.inserts,0);assert.equal(background.clicks,0);
   const uncertain=await scenario({unconfirmed:true});assert.equal(uncertain.clicks,1);assert.match(uncertain.panelText,/未确认/);
+  for(const label of ['Send message','Send prompt','发送消息','发送']) {
+    const semantic=await scenario({semanticOnly:true,label});assert.equal(semantic.clicks,1,`semantic ${label}`);
+  }
+  const icon=await scenario({iconOnly:true});assert.equal(icon.clicks,1);
+  const notification=await scenario({eventRequired:true,semanticOnly:true,label:'Send message'});assert.equal(notification.clicks,1);assert.equal(notification.notified,true);
+  const delayed=await scenario({delayed:true,semanticOnly:true,label:'发送消息'});assert.equal(delayed.clicks,1);
+  const stop=await scenario({label:'Stop response'});assert.equal(stop.clicks,0);
+  const combined=await scenario({withStop:true});assert.equal(combined.clicks,1);
+  for(const options of [{disabled:true},{duplicate:true},{unknown:true}]) {
+    const blocked=await scenario(options);assert.equal(blocked.clicks,0);assert.match(blocked.panelText,/等待发送按钮超时/);
+  }
   const storage=await scenario({storageFailure:true});assert.equal(storage.clicks,0);assert.equal(storage.inserts,0);
-  console.log('PASS: URL validation, Unicode, TTL, one-shot replay, draft protection, login timeout, ambiguous editor, background, uncertain send, storage failure. No live Gemini requests.');
+  console.log('PASS: URL validation, Unicode, TTL, one-shot replay, draft protection, login timeout, ambiguous editor, background, uncertain send, storage failure, semantic/icon send controls, input notification, delayed readiness, disabled/ambiguous/stop controls. No live Gemini requests.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
