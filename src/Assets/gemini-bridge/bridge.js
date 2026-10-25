@@ -1,41 +1,63 @@
-/* Leo Gemini bridge: no network requests, cookies, account access or persisted prompts. */
+/* Leo web AI bridge: no network requests, cookies, account access or persisted prompts. */
 (() => {
   'use strict';
   const MAX = 2000, TTL = 120;
+  const sites = {
+    'https://gemini.google.com': { id:'gemini', name:'Gemini', path:/^\/(?:u\/\d+\/)?app\/?$/, editor:'rich-textarea .ql-editor[contenteditable="true"], [contenteditable="true"][role="textbox"]' },
+    'https://chat.deepseek.com': { id:'deepseek', name:'DeepSeek', path:/^\/(?:a\/chat\/?)?$/, editor:'textarea#chat-input, textarea[placeholder], [contenteditable="true"][role="textbox"]' },
+    'https://chatgpt.com': { id:'chatgpt', name:'ChatGPT', path:/^\/$/, editor:'#prompt-textarea[contenteditable="true"], textarea#prompt-textarea, textarea[name="prompt-textarea"], textarea#mobile-composer-prompt' }
+  };
+  const siteFor = href => { const url=new URL(href),site=sites[url.origin];return site&&site.path.test(url.pathname)?site:null; };
   const parse = (href, now = Date.now()) => {
     const url = new URL(href), p = new URLSearchParams(url.hash.slice(1));
-    if (url.origin !== 'https://gemini.google.com' || !/^\/(?:u\/\d+\/)?app\/?$/.test(url.pathname)) return null;
+    const site=siteFor(href);
+    if (!site || (p.has('leo-site') && p.get('leo-site')!==site.id)) return null;
     const id = p.get('leo-id'), prompt = p.get('leo-prompt'), at = Number(p.get('leo-at'));
     if (!/^[a-f0-9]{32}$/.test(id || '') || !prompt?.trim() || prompt.length > MAX || !Number.isFinite(at) || Math.abs(now / 1000 - at) > TTL) return null;
-    return { id, prompt };
+    return { id, prompt, site };
   };
   const visible = el => !!el && el.isConnected && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-  const editor = doc => {
-    const found = [...doc.querySelectorAll('rich-textarea .ql-editor[contenteditable="true"], [contenteditable="true"][role="textbox"]')].filter(visible);
+  const editor = (doc,site=sites['https://gemini.google.com']) => {
+    const found = [...doc.querySelectorAll(site.editor)].filter(visible);
     return found.length === 1 ? found[0] : null;
   };
-  const sendButton = doc => {
-    const found = [...doc.querySelectorAll('button')].filter(el => {
+  const sendButton = (doc,site=sites['https://gemini.google.com']) => {
+    const found = [...doc.querySelectorAll(site.id==='deepseek'?'button, [role="button"]':'button')].filter(el => {
       if (!visible(el) || el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
       const label = (el.getAttribute('aria-label') || '').trim();
       // Gemini can keep the same button class while changing its action to Stop/Voice.
       if (/stop|cancel|microphone|voice|停止|取消|麦克风|语音/i.test(label)) return false;
       const semantic = /^(send(?: message| prompt)?|发送(?:消息|提示|提示词)?)$/i.test(label);
-      const marker = el.matches('button.send-button, button[data-test-id="send-button"], button[data-testid="send-button"]');
+      const marker = el.matches('button.send-button, button[data-test-id="send-button"], button[data-testid="send-button"]'+(site.id==='chatgpt'?', button#composer-submit-button':''));
       const icon = el.querySelector('mat-icon, .google-symbols, .material-symbols-outlined');
-      return semantic || marker || (icon && (icon.textContent || '').trim() === 'send');
+      const deepseekIcon=site.id==='deepseek'&&el.querySelector('.ds-icon svg[viewBox="0 0 14 16"], svg[data-icon="send"]');
+      return semantic || marker || deepseekIcon || (icon && (icon.textContent || '').trim() === 'send');
     });
     return found.length === 1 ? found[0] : null;
   };
   const clean = s => s.replace(/\r\n/g, '\n').replace(/\u00a0/g, ' ').trim();
+  const textOf = input => input.tagName==='TEXTAREA' ? input.value : input.textContent || '';
+  const fill = (input,prompt,doc,win) => {
+    input.focus();
+    if(input.tagName==='TEXTAREA') {
+      const setter=Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype,'value')?.set;
+      if(!setter)throw new Error('Native textarea setter unavailable');
+      setter.call(input,prompt);
+    } else {
+      const selection=win.getSelection(),range=doc.createRange();range.selectNodeContents(input);selection.removeAllRanges();selection.addRange(range);
+      if(!doc.execCommand('insertText',false,prompt))input.textContent=prompt;
+    }
+    input.dispatchEvent(new InputEvent('input',{bubbles:true,composed:true,inputType:'insertText',data:prompt}));
+  };
   // Exposed only in the repository's Node fixture, never to the page world.
-  if (typeof module !== 'undefined' && module.exports) { module.exports = { parse, editor, sendButton, clean }; return; }
+  if (typeof module !== 'undefined' && module.exports) { module.exports = { parse, editor, sendButton, clean, siteFor, textOf, fill }; return; }
   if (window.top !== window) return;
   let cancelCurrent = () => {};
   async function launch() {
     cancelCurrent();
     const request = parse(location.href);
     if (!request) return;
+    const site=request.site;
     // Consume the hand-off immediately: refresh/back must not send the prompt again.
     history.replaceState(history.state, '', location.pathname + location.search);
     const seenKey = 'leo-gemini-consumed';
@@ -48,7 +70,7 @@
     let stopped = false, clicked = false, filled = false, panel;
     cancelCurrent = () => { stopped = true; panel?.remove(); };
     const chinese = (document.documentElement?.lang || navigator.language || 'en').startsWith('zh');
-    const t = (zh, en) => chinese ? zh : en;
+    const t = (zh, en) => (chinese ? zh : en).replaceAll('Gemini',site.name);
     const sleep = () => new Promise(resolve => setTimeout(resolve, 200));
     const deadline = Date.now() + 60000;
     const status = message => {
@@ -71,33 +93,25 @@
     try {
       while (!stopped && Date.now() < deadline) {
         status(t('Leo · 正在等待 Gemini 输入框，可取消。请先完成登录。', 'Leo · Waiting for Gemini. Sign in if needed; cancel anytime.'));
-        const input = editor(document);
+        const input = editor(document,site);
         if (!input || !document.hasFocus() || document.visibilityState !== 'visible') { await sleep(); continue; }
-        if (clean(input.textContent || '')) { status(t('Gemini 已有草稿，未覆盖或发送。可复制 Leo 内容后手动处理。', 'Gemini contains a draft. Nothing overwritten or sent; copy the Leo prompt if needed.')); return; }
-        input.focus();
-        // Target only the verified editor. No keyboard/clipboard injection into other windows.
-        const selection = window.getSelection(), range = document.createRange();
-        range.selectNodeContents(input); selection.removeAllRanges(); selection.addRange(range);
-        if (!document.execCommand('insertText', false, request.prompt)) {
-          input.textContent = request.prompt;
-        }
-        // Notify the Angular/Quill input state even when execCommand succeeded.
-        input.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: request.prompt }));
+        if (clean(textOf(input))) { status(t('Gemini 已有草稿，未覆盖或发送。可复制 Leo 内容后手动处理。', 'Gemini contains a draft. Nothing overwritten or sent; copy the Leo prompt if needed.')); return; }
+        fill(input,request.prompt,document,window);
         filled = true;
-        status(t('Leo 1.0.2 · 已填入，正在等待发送按钮就绪。', 'Leo 1.0.2 · Prompt filled. Waiting for the Send button.'));
+        status(t('Leo 1.1.0 · 已填入，正在等待发送按钮就绪。', 'Leo 1.1.0 · Prompt filled. Waiting for the Send button.'));
         const onEdit = event => { if (event.isTrusted) { stopped = true; status(t('你正在编辑，已停止自动发送。', 'You are editing. Auto-send stopped.')); } };
         input.addEventListener('beforeinput', onEdit);
         try {
           while (!stopped && Date.now() < deadline) {
-            if (!input.isConnected || clean(input.textContent || '') !== clean(request.prompt)) {
+            if (!input.isConnected || clean(textOf(input)) !== clean(request.prompt)) {
               status(t('输入框发生变化，已停止自动发送。', 'The editor changed. Auto-send stopped.')); return;
             }
-            const button = sendButton(document);
+            const button = sendButton(document,site);
             if (!button || !document.hasFocus() || document.visibilityState !== 'visible') { await sleep(); continue; }
             clicked = true; button.click(); // Exactly once. Never retry an uncertain send.
             for (let i = 0; i < 25 && !stopped; i++) {
               await sleep();
-              if (!input.isConnected || !clean(input.textContent || '')) {
+              if (!input.isConnected || !clean(textOf(input))) {
                 status(t('Leo · 已触发发送，请在 Gemini 查看回复。', 'Leo · Send triggered. View the reply in Gemini.'));
                 setTimeout(() => panel?.remove(), 2500); return;
               }

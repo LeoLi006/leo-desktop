@@ -10,7 +10,7 @@ sealed class FootTools : Form
     Preferences modules=new();
     bool Quick(string id)=>EntryContributions.Builtin(modules,id).Shortcut;
     int CompactUnits=>UtilityUnits==4?64:94;
-    int UtilityUnits=>4+30*((Quick("terminal")?1:0)+(Quick("clash")?1:0)+(Quick("edge")?2:0));
+    int UtilityUnits=>4+30*((Quick("terminal")?1:0)+(Quick("clash")?1:0)+(Quick("edge")?4:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
     public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var entry=EntryContributions.Builtin(p,pair.Item1);pair.Item2.AccessibleName=entry.Name;var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(entry.Icon);old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!Quick("edge"))expanded=false;if(!EntryContributions.Builtin(p,"clash").Enabled)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
     readonly Button terminal;
@@ -22,7 +22,9 @@ sealed class FootTools : Form
     public const int CompactWidth = 94;
     readonly TextBox search = new();
     readonly GlyphButton geminiButton=new("gemini");
-    bool geminiSearch;
+    readonly GlyphButton deepseekButton=new("deepseek");
+    readonly GlyphButton chatgptWebButton=new("chatgpt-web");
+    string webTarget="edge";
     readonly GlyphButton moreButton=new("more");
     bool utilitiesOpen;
     readonly Button searchButton = new GlyphButton("search");
@@ -78,16 +80,23 @@ sealed class FootTools : Form
         foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)})ShortcutManagement.Wire(pair.Item2,pair.Item1,id=>ManageShortcut?.Invoke(id));
         terminal.FlatAppearance.MouseOverBackColor = Appearance.Hover;
         var tip = new UiToolTip(); tip.SetToolTip(terminal, "管理员终端");
-        moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / Edge / Gemini");
+        moreButton.AccessibleName="展开更多工具";moreButton.FlatStyle=FlatStyle.Flat;moreButton.FlatAppearance.BorderSize=0;moreButton.Click+=(_,_)=>SetUtilities(!utilitiesOpen);tip.SetToolTip(moreButton,"可选工具 · 终端 / Clash / Edge / 网页 AI");
         searchButton.SetBounds(33, 2, 28, 24); searchButton.FlatStyle = FlatStyle.Flat;
         searchButton.FlatAppearance.BorderSize = 0; searchButton.BackColor = Appearance.Background;
         searchButton.FlatAppearance.MouseOverBackColor = Appearance.Hover;
         searchButton.AccessibleName = "展开 Edge 搜索";
-        searchButton.Click += (_, _) => OpenSearch(false);
+        searchButton.Click += (_, _) => OpenSearch("edge");
         geminiButton.AccessibleName="Gemini 网页快捷输入";geminiButton.FlatStyle=FlatStyle.Flat;geminiButton.FlatAppearance.BorderSize=0;
-        geminiButton.Click+=(_,_)=>OpenSearch(true);
+        geminiButton.Click+=(_,_)=>OpenSearch("gemini");
         geminiButton.MouseUp+=(_,e)=>{if(e.Button==MouseButtons.Right){try{GeminiWeb.Setup();}catch(Exception error){UiDialogs.Show(error.Message,"Gemini");}}};
         tip.SetToolTip(geminiButton,UiLanguage.T("Gemini 网页 · 右键设置扩展"));
+        foreach(var (button,target) in new[]{(deepseekButton,"deepseek"),(chatgptWebButton,"chatgpt")})
+        {
+            button.AccessibleName=GeminiWeb.Name(target)+UiLanguage.T(" 网页快捷输入");button.FlatStyle=FlatStyle.Flat;button.FlatAppearance.BorderSize=0;
+            button.Click+=(_,_)=>OpenSearch(target);
+            button.MouseUp+=(_,e)=>{if(e.Button==MouseButtons.Right){try{GeminiWeb.Setup();}catch(Exception error){UiDialogs.Show(error.Message,"Leo Web AI");}}};
+            tip.SetToolTip(button,GeminiWeb.Name(target)+UiLanguage.T(" 网页 · 右键设置扩展"));
+        }
         tip.SetToolTip(searchButton, "Edge 搜索");
         chatButton.AccessibleName = "问 Leo"; chatButton.FlatStyle = FlatStyle.Flat; chatButton.FlatAppearance.BorderSize = 0;
         chatButton.Click += (_, _) => ChatRequested?.Invoke(); tip.SetToolTip(chatButton, "问 Leo · 右键直接说话 · Ctrl+Alt+V");
@@ -124,20 +133,20 @@ sealed class FootTools : Form
             if (e.KeyCode != Keys.Enter) return;
             e.SuppressKeyPress = true;
             if (string.IsNullOrWhiteSpace(search.Text)) return;
-            try { EntryContributions.BuiltinAction(modules,"edge");if(geminiSearch)GeminiWeb.Open(search.Text);else Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
-            catch (Exception error) { UiDialogs.Show((geminiSearch?"无法打开 Gemini：":"无法打开 Edge：") + error.Message, "Leo"); }
+            try { EntryContributions.BuiltinAction(modules,"edge");if(webTarget!="edge")GeminiWeb.Open(search.Text,webTarget);else Process.Start(EdgeStart(search.Text)); search.Clear(); SetExpanded(false); }
+            catch (Exception error) { UiDialogs.Show((webTarget!="edge"?UiLanguage.T("无法打开网页 AI："):"无法打开 Edge：") + error.Message, "Leo"); }
         };
-        Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, geminiButton, search]);
+        Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, geminiButton, deepseekButton, chatgptWebButton, search]);
         ApplyScale(petSize);
         Shown += (_, _) => { SetExpanded(false); _ = RefreshProxy(); if (!preview&&EntryContributions.Builtin(modules,"clash").Enabled) proxyTimer.Start(); };
         Deactivate += (_, _) => CollapseSearch();
         Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true;proxyLife.Cancel();proxyLife.Dispose();proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
     }
-    void OpenSearch(bool gemini)
+    void OpenSearch(string target)
     {
-        bool close=expanded&&geminiSearch==gemini;geminiSearch=gemini;
-        search.PlaceholderText=UiLanguage.T(gemini?"问 Gemini，回车发送":"输入关键词，回车搜索");
-        search.MaxLength=gemini?GeminiWeb.MaxPromptLength:32767;geminiButton.ActiveState=gemini;SetExpanded(!close);
+        bool close=expanded&&webTarget==target;webTarget=target;bool ai=target!="edge";
+        search.PlaceholderText=ai?GeminiWeb.Name(target)+UiLanguage.T(" · 输入后回车发送"):UiLanguage.T("输入关键词，回车搜索");
+        search.MaxLength=ai?GeminiWeb.MaxPromptLength:32767;geminiButton.ActiveState=target=="gemini";deepseekButton.ActiveState=target=="deepseek";chatgptWebButton.ActiveState=target=="chatgpt";SetExpanded(!close);
     }
     void SetExpanded(bool value)
     {
@@ -160,7 +169,7 @@ sealed class FootTools : Form
         SuspendLayout();
         chatButton.Bounds=new Rectangle(S(3),S(2),S(28),S(24));todoButton.Bounds=new Rectangle(S(33),S(2),S(28),S(24));moreButton.Bounds=new Rectangle(S(63),S(2),S(28),S(24));moreButton.ActiveState=utilitiesOpen;
         chatButton.Visible=todoButton.Visible=true;moreButton.Visible=UtilityUnits>4;
-        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,Quick("terminal")),((Button)proxyButton,Quick("clash")),(searchButton,Quick("edge")),((Button)geminiButton,Quick("edge"))}){
+        int toolX=3;foreach(var (button,enabled) in new[]{(terminal,Quick("terminal")),((Button)proxyButton,Quick("clash")),(searchButton,Quick("edge")),((Button)geminiButton,Quick("edge")),((Button)deepseekButton,Quick("edge")),((Button)chatgptWebButton,Quick("edge"))}){
             button.Visible=utilitiesOpen&&enabled;if(enabled){button.Bounds=new Rectangle(S(toolX),S(32),S(28),S(24));toolX+=30;}
         }
         search.Visible=expanded&&Quick("edge");search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+3),S(36),S(154),S(21));
@@ -183,10 +192,22 @@ sealed class FootTools : Form
     public bool VerifyGeminiSearch()
     {
         CollapseSearch();SetUtilities(true);geminiButton.PerformClick();
-        bool opened=expanded&&geminiSearch&&search.Visible&&search.PlaceholderText==UiLanguage.T("问 Gemini，回车发送");
-        search.Text="fixture";searchButton.PerformClick();bool switched=expanded&&!geminiSearch&&search.Text=="fixture";
+        bool opened=expanded&&webTarget=="gemini"&&search.Visible&&search.PlaceholderText.StartsWith("Gemini");
+        search.Text="fixture";searchButton.PerformClick();bool switched=expanded&&webTarget=="edge"&&search.Text=="fixture";
         searchButton.PerformClick();bool closed=!expanded;geminiButton.PerformClick();geminiButton.PerformClick();
         bool closedGemini=!expanded;CollapseSearch();return opened&&switched&&closed&&closedGemini;
+    }
+    public bool VerifyWebAiTargets()
+    {
+        CollapseSearch();SetUtilities(true);bool ok=true;
+        foreach(var (button,target) in new[]{(geminiButton,"gemini"),(deepseekButton,"deepseek"),(chatgptWebButton,"chatgpt")})
+        {
+            button.PerformClick();search.Text="fixture";
+            ok&=expanded&&webTarget==target&&search.PlaceholderText.StartsWith(GeminiWeb.Name(target))&&search.MaxLength==GeminiWeb.MaxPromptLength;
+            searchButton.PerformClick();ok&=expanded&&webTarget=="edge"&&search.Text=="fixture";
+            button.PerformClick();button.PerformClick();ok&=!expanded;
+        }
+        CollapseSearch();return ok;
     }
     public bool VerifyButtonOrder()=>chatButton.Top==todoButton.Top&&todoButton.Top==moreButton.Top&&chatButton.Left<todoButton.Left&&todoButton.Left<moreButton.Left&&terminal.Top>chatButton.Top&&terminal.Left<proxyButton.Left&&proxyButton.Left<searchButton.Left;
     public static ProcessStartInfo TerminalStart()

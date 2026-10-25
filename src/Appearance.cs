@@ -90,6 +90,7 @@ sealed class GlyphButton : Button
             e.Graphics.DrawLine(pen, 9, 9, 19, 9); e.Graphics.DrawLine(pen, 9, 13, 16, 13);
         }
         else if(glyph=="gemini"){e.Graphics.DrawClosedCurve(pen,new PointF[]{new(14,2),new(17,9),new(25,12),new(17,15),new(14,22),new(11,15),new(3,12),new(11,9)});}
+        else if(glyph is "deepseek" or "chatgpt-web"){using var f=Appearance.Body(glyph=="deepseek"?10:7);using var brush=new SolidBrush(IconColor);e.Graphics.DrawString(glyph=="deepseek"?"DS":"GPT",f,brush,new RectangleF(1,2,26,21),new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center});}
         else if(glyph=="monitor"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,3,20,14),new SizeF(2,2));e.Graphics.DrawLines(pen,[new(7,12),new(10,12),new(12,7),new(15,14),new(18,9),new(21,9)]);e.Graphics.DrawLine(pen,14,17,14,21);e.Graphics.DrawLine(pen,9,21,19,21);}
         else if(glyph=="mail"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,5,20,15),new SizeF(3,3));e.Graphics.DrawLines(pen,[new(5,7),new(14,13),new(23,7)]);e.Graphics.DrawLine(pen,5,18,10,13);e.Graphics.DrawLine(pen,23,18,18,13);}
         else if(glyph=="news"){e.Graphics.DrawRoundedRectangle(pen,new RectangleF(4,3,20,18),new SizeF(2,2));e.Graphics.DrawRectangle(pen,7,6,5,5);e.Graphics.DrawLine(pen,15,7,21,7);e.Graphics.DrawLine(pen,15,11,21,11);e.Graphics.DrawLine(pen,7,15,21,15);e.Graphics.DrawLine(pen,7,18,18,18);}

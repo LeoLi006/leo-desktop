@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const code = fs.readFileSync(require('node:path').join(__dirname, '../Assets/gemini-bridge/bridge.js'), 'utf8');
-const {parse, clean} = require('../Assets/gemini-bridge/bridge.js');
+const {parse, clean, siteFor} = require('../Assets/gemini-bridge/bridge.js');
 const at = 1720000000;
 const link = (prompt='中文 & # ?\nsecond line', id='a'.repeat(32)) => `https://gemini.google.com/app#leo-id=${id}&leo-at=${at}&leo-prompt=${encodeURIComponent(prompt)}`;
 assert.equal(parse(link(), at*1000).prompt, '中文 & # ?\nsecond line');
@@ -14,24 +14,28 @@ assert.equal(clean(' x\r\ny\u00a0 '),'x\ny');
 async function scenario(options={}) {
   let now=at*1000, clicks=0, inserts=0, panelText='', removed=0, checked=0, notified=false;
   const events={}, memory=new Map(), location=new URL(link());
+  if(options.provider==='deepseek')location.href=link().replace('https://gemini.google.com/app','https://chat.deepseek.com/');
+  if(options.provider==='chatgpt')location.href=link().replace('https://gemini.google.com/app','https://chatgpt.com/');
   function element(){return {style:{},children:[],append(...nodes){this.children.push(...nodes);},attachShadow(){return element();},remove(){removed++;},set textContent(value){panelText=String(value);},get textContent(){return panelText;}};}
+  class TextArea {get value(){return this._value||'';}set value(v){this._value=v;}}
   const input={isConnected:true,textContent:options.draft||'',getClientRects:()=>[{}],focus(){},addEventListener(){},removeEventListener(){},dispatchEvent(){notified=true;}};
+  if(options.textarea){Object.setPrototypeOf(input,TextArea.prototype);input.tagName='TEXTAREA';input.value=options.draft||'';}
   const button={isConnected:true,get disabled(){return !!options.disabled || (options.eventRequired&&!notified) || (options.delayed&&now<at*1000+1000);},getClientRects:()=>[{}],
     getAttribute:key=>key==='aria-label'?(options.label||null):null,matches:selector=>!options.semanticOnly&&!options.iconOnly&&!options.unknown,
-    querySelector:()=>options.iconOnly?{textContent:'send'}:null,click(){clicks++;if(!options.unconfirmed)input.textContent='';}};
+    querySelector:selector=>options.deepseekIcon&&selector.includes('viewBox')?{}:options.iconOnly&&!selector.includes('viewBox')?{textContent:'send'}:null,click(){clicks++;if(!options.unconfirmed){input.textContent='';if(options.textarea)input.value='';}}};
   const nonSend={...button,getAttribute:key=>key==='aria-label'?'Stop response':null,matches:()=>true};
   const document={documentElement:options.earlyDocument?null:{lang:'zh-CN'},body:{append(){}},visibilityState:options.background?'hidden':'visible',hasFocus:()=>true,
-    querySelectorAll(selector){checked++;return options.login?[]:selector.startsWith('rich')?(options.ambiguous?[input,input]:[input]):options.duplicate?[button,button]:options.withStop?[button,nonSend]:[button];},
+    querySelectorAll(selector){checked++;return options.login?[]:!selector.startsWith('button')?(options.ambiguous?[input,input]:[input]):options.duplicate?[button,button]:options.withStop?[button,nonSend]:[button];},
     createElement:element,createRange:()=>({selectNodeContents(){}}),execCommand(cmd,unused,prompt){inserts++;input.textContent=prompt;return true;}};
-  const window={addEventListener:(key,fn)=>events[key]=fn,getSelection:()=>({removeAllRanges(){},addRange(){}})};window.top=window;
+  const window={HTMLTextAreaElement:TextArea,addEventListener:(key,fn)=>events[key]=fn,getSelection:()=>({removeAllRanges(){},addRange(){}})};window.top=window;
   const sessionStorage={getItem:key=>memory.get(key),setItem:(key,value)=>{if(options.storageFailure)throw Error();memory.set(key,value);}};
   const context={document,window,location,navigator:{language:'en',clipboard:{writeText:()=>Promise.resolve()}},history:{state:null,replaceState(a,b,path){location.href=location.origin+path;}},sessionStorage,
     URL,URLSearchParams,Date:{now:()=>now},getComputedStyle:()=>({visibility:'visible'}),InputEvent:function(){},
     setTimeout(fn,ms){now+=ms;queueMicrotask(fn);}};
   vm.runInNewContext(code,context);
   for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));
-  if(options.replay){location.href=link();events.hashchange();for(let i=0;i<3;i++)await new Promise(resolve=>setImmediate(resolve));}
-  return {clicks,inserts,panelText,removed,checked,hash:location.hash,input:input.textContent,notified};
+  if(options.replay){location.href=link().replace('https://gemini.google.com/app',options.provider==='deepseek'?'https://chat.deepseek.com/':options.provider==='chatgpt'?'https://chatgpt.com/':'https://gemini.google.com/app');events.hashchange();for(let i=0;i<3;i++)await new Promise(resolve=>setImmediate(resolve));}
+  return {clicks,inserts,panelText,removed,checked,hash:location.hash,input:options.textarea?input.value:input.textContent,notified};
 }
 (async()=>{
   const early=await scenario({earlyDocument:true});assert.equal(early.clicks,1);assert.equal(early.inserts,1);
@@ -53,5 +57,18 @@ async function scenario(options={}) {
     const blocked=await scenario(options);assert.equal(blocked.clicks,0);assert.match(blocked.panelText,/等待发送按钮超时/);
   }
   const storage=await scenario({storageFailure:true});assert.equal(storage.clicks,0);assert.equal(storage.inserts,0);
+  for(const provider of ['deepseek','chatgpt']) {
+    for(const textarea of [false,true]) {
+      const result=await scenario({provider,textarea,replay:true,eventRequired:true,semanticOnly:true,label:'Send message'});
+      assert.equal(result.clicks,1,`${provider} ${textarea} one-shot`);assert.equal(result.hash,'');assert.equal(result.notified,true);
+      const existing=await scenario({provider,textarea,draft:'preserve me'});assert.equal(existing.clicks,0);assert.equal(existing.input,'preserve me');
+      const timeout=await scenario({provider,textarea,login:true});assert.equal(timeout.clicks,0);assert.match(timeout.panelText,/超时/);
+      const uncertain=await scenario({provider,textarea,unconfirmed:true});assert.equal(uncertain.clicks,1);assert.match(uncertain.panelText,/未确认/);
+    }
+  }
+  const dsIcon=await scenario({provider:'deepseek',textarea:true,deepseekIcon:true,unknown:true});assert.equal(dsIcon.clicks,1);
+  assert.equal(siteFor('https://chatgpt.com/').id,'chatgpt');assert.equal(siteFor('https://chat.deepseek.com/').id,'deepseek');
+  for(const href of ['https://chatgpt.com/c/old','https://chat.deepseek.com/a/chat/s/old','https://chatgpt.com.evil.test/','http://chatgpt.com/'])assert.equal(siteFor(href),null);
+  assert.equal(parse(link()+'&leo-site=chatgpt',at*1000),null);
   console.log('PASS: URL validation, Unicode, TTL, one-shot replay, draft protection, login timeout, ambiguous editor, background, uncertain send, storage failure, semantic/icon send controls, input notification, delayed readiness, disabled/ambiguous/stop controls. No live Gemini requests.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,40 +1,34 @@
-# Gemini web bridge
+# Web AI browser bridge
 
-User instructions: [中文](QUICK_START.md#gemini-网页快捷输入) / [English](QUICK_START.en.md#gemini-web-quick-input).
+User instructions: [中文](QUICK_START.md#网页-ai-快捷输入gemini--deepseek--chatgpt) / [English](QUICK_START.en.md#web-ai-quick-input-gemini--deepseek--chatgpt).
 
-## Scope and integration
+## Integration and compatibility
 
-`FootTools` adds a Gemini sparkle beside the existing Edge search button. Both use the same expandable textbox, existing scale/layout/theme handling and Edge module visibility rules. `GeminiWeb` validates an explicit user prompt (1–2,000 UTF-16 characters after trimming), generates a fresh request ID/timestamp and opens Edge using the existing configured browser path. This is a browser hand-off, not a Gemini API tool; it is not exposed to the model registry or workflows. No new background host activity is introduced.
+The existing `GeminiWeb` class name and `assets/gemini-bridge` installation path are preserved so the user's unpacked extension does not need reinstalling. `GeminiWeb.Home/Name/Url/Open` accept only gemini, deepseek or chatgpt. `FootTools` adds DS/GPT buttons beside Gemini and Edge using one expandable textbox. All four targets share draft text, layout/theme scaling and Edge module enable/shortcut rules. No model-registry tool or workflow permission is added; only explicit footer input launches a web hand-off.
 
-`Assets/gemini-bridge` is a Manifest V3 content-script extension, copied by the existing asset build rule to `app/assets/gemini-bridge`. The user must load that directory once in Edge. There is no automatic browser-policy change, debugging port, separate browser profile, cookie access, external script or extension download. The right-click setup action opens the existing browser's extension page and this local directory. This adds an optional browser-side component, not an independently installable Leo module.
+Manifest V3 extension **Leo Web AI 1.1.0** runs only on `https://gemini.google.com/*`, `https://chat.deepseek.com/*` and `https://chatgpt.com/*`, with no background script, network fetch, telemetry, cookies API or extra permissions. Existing installations must reload in Edge and approve any added site access. Users sign in separately. No account, CAPTCHA, consent or browser security-policy bypass exists.
 
-## Hand-off and execution
+## Protocol and adapters
 
-URL: `https://gemini.google.com/app#leo-id=<32-hex>&leo-at=<unix-seconds>&leo-prompt=<encoded-text>`.
+`<allowed-home>#leo-site=<provider>&leo-id=<32-hex>&leo-at=<unix-seconds>&leo-prompt=<encoded-text>`. Legacy Gemini links without leo-site remain accepted. Provider mismatch, unsupported origins/entry paths, invalid ID, empty/oversized text and timestamps outside 120 seconds are rejected. A request is consumed immediately; only the last 64 IDs are kept in per-origin per-tab session storage. Prompt text is not persisted. This is replay protection, not cryptographic proof of provenance: another URL using this protocol can request a send. URL fragments may still be observed/retained by browser/site components.
 
-- The content script accepts only the exact Gemini HTTPS origin and its app entry paths; hand-offs expire after 120 seconds. Prompt text is never interpreted as HTML or JavaScript.
-- The fragment is consumed immediately. A bounded per-tab session list stores only up to 64 request IDs, not prompt text. Reload does not resubmit. This is replay protection, not cryptographic proof of provenance; another link with the same fragment format can request a send.
-- Wait up to 60 seconds for a unique visible rich-text editor, a foreground document and a unique enabled Gemini send button. Current selectors are `rich-textarea .ql-editor[contenteditable="true"]` / `[contenteditable="true"][role="textbox"]`, and enabled buttons carrying the send class/test-id, an exact Chinese/English Send accessibility label, or a `send` material icon. Stop/voice actions are rejected; multiple actionable matches are not clicked.
-- Existing nonempty drafts stop automation. A trusted user edit stops sending. Input is inserted into the verified editor; no global SendKeys or system clipboard replacement occurs.
-- Click Send exactly once. Observe composer clearing/removal for up to five seconds and report only that sending was triggered, not that a model answered. Unconfirmed sends are never retried. Failure leaves a small page notice with Copy/Cancel; the user can inspect Gemini and act manually.
-- Hidden/unfocused pages wait instead of taking over another window. Page exit or a newer hand-off cancels the old pending loop. No prompt queue or account-login automation exists.
+- Gemini: existing rich-textarea/Quill selectors; semantic Send labels, send marker or material icon.
+- DeepSeek: chat-input/visible placeholder textarea or accessible contenteditable; semantic Send controls, markers or the known DS send SVG (`viewBox="0 0 14 16"`) within a button/role-button. No generic submit/last-button fallback.
+- ChatGPT: visible prompt-textarea contenteditable/textarea, named textarea or mobile-composer-prompt; semantic Send, data-testid or composer-submit-button.
+- Textareas use the native HTMLTextAreaElement value setter plus a composed input event, supporting React controlled inputs. Rich text preserves the working execCommand insertion plus explicit input notification. Text verification uses value for textareas and textContent otherwise.
 
-Without the extension, the URL only opens Gemini; it does not guarantee prefilling/submission. Browser/site changes may require selector maintenance. Prompts travel in a URL fragment; immediate removal does not guarantee the browser/site never observes or stores them. Gemini's own account, connectivity, regional availability and usage limits still apply.
+One visible editor and one enabled Send control are required. Disabled, Stop/Voice and ambiguous controls are rejected. An existing draft or trusted manual edit stops automation. Only a foreground, focused page can insert/send. Waiting is bounded to 60 seconds and offers Copy/Cancel; after one click the bridge observes composer clearing/removal for up to five seconds and never retries uncertain sends. It reports send triggering, not a completed model response. Page exit/new hand-off cancels pending work. No global SendKeys, clipboard replacement, conversation-history reading or request queue exists.
 
-## Targeted verification
+Webpage selectors are compatibility assumptions based on public implementations and must be maintained when sites change. A matching DOM fixture is not evidence of live-account success. Gemini was confirmed working by the user before this extension; the new sites still require live user acceptance after reloading.
 
-`--gemini-web-test <absolute-report-path>` checks URL/limit handling, request uniqueness, manifest scope, actual WinForms toggle/switch behavior, Edge compatibility, module hiding and small/large scaling. `node src/Tests/GeminiBridge.test.cjs` uses an isolated DOM fixture to check Unicode/special characters, expiry, drafts, login timeout, ambiguous editors, inactive pages, uncertain sends, replay and session-storage failure. Neither sends requests to Gemini or uses a real account/API key.
+## Targeted checks
 
-These checks cannot establish compatibility with the currently signed-in Gemini DOM. Manual acceptance after extension loading: enter one disposable prompt in Leo, verify it appears once in a new Gemini chat and receives a response; try a page with an existing draft and confirm it is preserved. Do not describe the feature as end-to-end verified until this browser check is complete.
+`--gemini-web-test <absolute-report-path>` checks all provider URLs, allow-list validation, manifest scope, WinForms switching/toggling at multiple sizes, drafts and Edge-module hiding. `node src/Tests/GeminiBridge.test.cjs` exercises the original Gemini safety cases plus DeepSeek/ChatGPT rich/textarea inputs, native setter notification, existing drafts, timeout, uncertain sends, replay and the DS role-button icon path. No live accounts or API requests are used.
 
-References: [Edge local extension loading](https://learn.microsoft.com/en-us/microsoft-edge/extensions/getting-started/extension-sideloading), [Chrome content script model](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts). No third-party extension source is bundled.
+Manual acceptance: reload extension 1.1.0, approve site access, log in, then submit one disposable prompt from each new button. Verify one submission and a site response. Check that an existing draft is preserved. Browser-origin changes or renamed/disabled send controls must fail closed, not click an arbitrary action.
 
-### 1.0.1 startup correction
+## Change notes
 
-A regression fixture reproduces execution at document_start before documentElement exists: reading its language threw before the DOM waiting loop. Language selection now tolerates the missing root and falls back to the browser language. Existing safety/one-shot fixtures remain unchanged. After installing the updated assets, an already loaded unpacked extension must be reloaded in Edge before opening a fresh Leo request; no real-account send was performed by this check.
-
-### 1.0.2 send readiness correction
-
-The reported symptom was successful text insertion followed by a wait timeout. The old resolver only accepted two class/test-id markers. The bridge now also recognizes exact Chinese/English send labels, the alternate data-testid spelling and Material send icons, while excluding disabled, Stop/Voice and ambiguous controls. An explicit composed input notification follows insertion so page state can enable Send even if execCommand returns success without a usable notification. Notices now distinguish waiting for an editor from waiting for Send. The send is still one-shot; no keyboard fallback or uncertain resend is added.
-
-Isolated fixtures cover label-only/icon-only buttons, input notification, delayed button readiness, disabled/ambiguous/unknown controls and a coexisting Stop control, in addition to earlier safety checks. This validates the compatibility logic, not the user's live account. Reload the unpacked extension in Edge (version 1.0.2), then start a new Leo request; existing tabs retain their previously injected script.
+- 1.0.1: tolerate document_start before documentElement exists.
+- 1.0.2: recognize semantic Gemini send controls and explicitly notify input state.
+- 1.1.0: shared site adapters, native textarea support, DeepSeek/ChatGPT footer entries and site binding; preserve Gemini behavior and extension path.

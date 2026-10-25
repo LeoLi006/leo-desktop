@@ -1270,5 +1270,14 @@
   "Gemini 网页 · 右键设置扩展": "Gemini web · Right-click to set up extension",
   "问 Gemini，回车发送": "Ask Gemini, Enter to send",
   "无法打开 Gemini：": "Cannot open Gemini: ",
-  "可选工具 · 终端 / Clash / Edge / Gemini": "Optional tools · Terminal / Clash / Edge / Gemini"
+  "可选工具 · 终端 / Clash / Edge / Gemini": "Optional tools · Terminal / Clash / Edge / Gemini",
+  " 网页快捷输入": " web quick input",
+  " 网页 · 右键设置扩展": " web · Right-click to set up extension",
+  " · 输入后回车发送": " · Enter prompt, press Enter",
+  "请先输入要发送的内容。": "Enter a prompt first.",
+  "网页 AI 快捷输入最多支持2000个字符。": "Web AI quick input supports up to 2,000 characters.",
+  "未找到网页 AI 扩展，请重新更新 Leo。": "Web AI extension missing. Update Leo again.",
+  "无法打开网页 AI：": "Cannot open web AI: ",
+  "可选工具 · 终端 / Clash / Edge / 网页 AI": "Optional tools · Terminal / Clash / Edge / Web AI",
+  "首次使用：在 Edge 扩展页打开“开发人员模式”，点击“加载解压缩的扩展”，选择接下来打开的 gemini-bridge 文件夹。更新已有扩展时点击“重新加载”，并允许新增的 ChatGPT、DeepSeek 站点权限。分别登录要使用的网站；以后在对应输入框回车即可填入并发送。无需 API Key。": "First use: enable Developer mode in Edge extensions, click Load unpacked and select the opened gemini-bridge folder. For an existing extension, click Reload and allow the new ChatGPT/DeepSeek sites. Sign into each site; then press Enter in its Leo input to fill and send. No API key required."
 }
