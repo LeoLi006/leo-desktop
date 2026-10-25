@@ -274,6 +274,7 @@ static class Program
         if(args.Length==2&&args[0]=="--application-host-test"){ApplicationHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-consistency-test"){EntryConsistencyTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-inventory"){EntryInventory.ExportExample(args[1]);return;}
+        if(args.Length==2&&args[0]=="--gemini-web-test"){GeminiWebTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--research-news-test"){ResearchNewsTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--research-news-live"){ResearchNewsTests.Live(args[1]);return;}
         if(args.Length==2&&args[0]=="--launcher-files-test"){LauncherFileSearchTests.Run(args[1]);return;}

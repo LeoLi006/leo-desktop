@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Leo → Gemini",
+  "version": "1.0.0",
+  "description": "Fill and send prompts explicitly entered in Leo. Runs only on Gemini; no API key, telemetry or background service.",
+  "content_scripts": [{
+    "matches": ["https://gemini.google.com/*"],
+    "js": ["bridge.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }]
+}

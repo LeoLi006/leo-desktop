@@ -1261,5 +1261,14 @@
   "标题翻译数量不匹配，已保留原文。": "Translation count mismatch; originals are kept.",
   "标题翻译编号无效，已保留原文。": "Invalid translation identifiers; originals are kept.",
   "标题翻译超时，已保留原文；已完成的翻译可继续使用。": "Translation timed out. Original headlines and completed translations remain available.",
-  "新闻来自媒体与官方发布，不混入论文摘要；按发布时间排序。摘要保留原文，点击打开报道。朗读前5条；仅手动翻译标题时调用模型 API。": "Publisher news and official announcements, newest first. Original excerpts; click to open. Reads up to 5 items. Model API calls occur only when you manually translate headlines."
+  "新闻来自媒体与官方发布，不混入论文摘要；按发布时间排序。摘要保留原文，点击打开报道。朗读前5条；仅手动翻译标题时调用模型 API。": "Publisher news and official announcements, newest first. Original excerpts; click to open. Reads up to 5 items. Model API calls occur only when you manually translate headlines.",
+  "请先输入要发送给 Gemini 的内容。": "Enter a prompt for Gemini first.",
+  "Gemini 快捷输入最多支持2000个字符。": "Gemini quick input supports up to 2,000 characters.",
+  "未找到 Gemini 网页扩展，请重新更新 Leo。": "Gemini browser extension is missing. Update Leo again.",
+  "首次使用：在 Edge 扩展页打开“开发人员模式”，点击“加载解压缩的扩展”，选择接下来打开的 gemini-bridge 文件夹。然后登录 Gemini。只需设置一次；以后在 Gemini 输入框回车即可自动填入并发送。扩展仅访问 Gemini 页面，不需要 API Key。": "First use: on the Edge extensions page, enable Developer mode, click Load unpacked, and select the gemini-bridge folder that opens next. Sign in to Gemini. This is a one-time setup; pressing Enter in Leo will then fill and send your prompt. The extension only accesses Gemini and needs no API key.",
+  "Gemini 网页快捷输入": "Gemini web quick input",
+  "Gemini 网页 · 右键设置扩展": "Gemini web · Right-click to set up extension",
+  "问 Gemini，回车发送": "Ask Gemini, Enter to send",
+  "无法打开 Gemini：": "Cannot open Gemini: ",
+  "可选工具 · 终端 / Clash / Edge / Gemini": "Optional tools · Terminal / Clash / Edge / Gemini"
 }

@@ -1,4 +1,4 @@
-# Leo quick start
+﻿# Leo quick start
 
 [简体中文](QUICK_START.md) | **English**
 
@@ -209,3 +209,11 @@ For more operations read the [full user guide](USER_GUIDE.en.md). Architecture/p
 - **Read aloud**: click a card to open its source. Read this item or Read top stories plays original headlines and short excerpts (up to 5 items). Stop or close the window to cancel. No recording, SenseVoice requirement, automatic translation or generated scientific conclusions.
 - **Cache and network**: fetches on opening or changing selection; text filtering remains local. Each mode/field has its own cache and original source timestamps. Failed sources retain only that selection's older content. Fresh results are reused for 10 minutes, with at least a minute between refreshes of the same selection. Switching cancels obsolete requests; there is no persistent news polling. Older caches upgrade on new queries.
 - **Control and cost**: Settings → Features → AI Briefing; entry visibility is separate. The companion-only profile disables it. Fetching, reading aloud and cached views do not call a model. Only manual headline translation uses your configured model API/key. No private repository, chat or clipboard access. Only public metadata and headline translations are cached; full papers/repositories are not downloaded.
+
+## Gemini web quick input
+
+- Expand Leo's foot tools and click the sparkle next to Edge. Type and press Enter to open Gemini; the browser extension fills the composer and clicks Send. Click the same icon to collapse; switching Edge/Gemini preserves unsent text. This entry follows the Edge module's enable/shortcut settings. No Gemini API is used.
+- **One-time setup**: right-click the sparkle. In Edge at `edge://extensions/`, enable Developer mode, choose Load unpacked, select the opened `gemini-bridge` folder, then sign into Gemini. Loading the extension requires your browser confirmation; Leo does not change browser security policy. The extension runs only on Gemini, without account credentials, other-site access, chat-history reading or background model requests.
+- Without the enabled extension, Gemini opens but **nothing is filled or sent automatically**. Install once in the browser profile being used. Keep the extension folder in place. Right-click the icon to reopen setup instructions.
+- Up to 2,000 characters per prompt; opens a new Gemini page. Working connectivity and sign-in are required. The extension waits up to 60 seconds and offers Cancel. Existing drafts are never overwritten. Send is clicked once, with no retry on uncertain results. Site changes may require selector updates; copy the prompt for manual sending if needed.
+- Prompts travel in a URL fragment that the extension clears immediately; neither Leo logs nor extension storage save their text. The browser/site may still observe or retain the URL/content; this is not privacy isolation. Hand-offs expire after two minutes; reload does not resubmit.
