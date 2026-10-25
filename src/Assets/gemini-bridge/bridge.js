@@ -5,7 +5,7 @@
   const sites = {
     'https://gemini.google.com': { id:'gemini', name:'Gemini', path:/^\/(?:u\/\d+\/)?app\/?$/, editor:'rich-textarea .ql-editor[contenteditable="true"], [contenteditable="true"][role="textbox"]' },
     'https://chat.deepseek.com': { id:'deepseek', name:'DeepSeek', path:/^\/(?:a\/chat\/?)?$/, editor:'textarea#chat-input, textarea[placeholder], [contenteditable="true"][role="textbox"]' },
-    'https://chatgpt.com': { id:'chatgpt', name:'ChatGPT', path:/^\/$/, editor:'#prompt-textarea[contenteditable="true"], textarea#prompt-textarea, textarea[name="prompt-textarea"], textarea#mobile-composer-prompt' }
+    'https://chatgpt.com': { id:'chatgpt', name:'ChatGPT', path:/^\/$/, editor:'#prompt-textarea[contenteditable]:not([contenteditable="false"]), textarea#prompt-textarea, textarea[name="prompt-textarea"], textarea#mobile-composer-prompt', fallback:'.ProseMirror[contenteditable]:not([contenteditable="false"]), [data-lexical-editor="true"][contenteditable]:not([contenteditable="false"]), [data-testid="prompt-textarea"][contenteditable]:not([contenteditable="false"])' }
   };
   const siteFor = href => { const url=new URL(href),site=sites[url.origin];return site&&site.path.test(url.pathname)?site:null; };
   const parse = (href, now = Date.now()) => {
@@ -18,7 +18,8 @@
   };
   const visible = el => !!el && el.isConnected && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const editor = (doc,site=sites['https://gemini.google.com']) => {
-    const found = [...doc.querySelectorAll(site.editor)].filter(visible);
+    let found = [...doc.querySelectorAll(site.editor)].filter(visible);
+    if (!found.length && site.fallback) found=[...doc.querySelectorAll(site.fallback)].filter(visible);
     return found.length === 1 ? found[0] : null;
   };
   const sendButton = (doc,site=sites['https://gemini.google.com']) => {
@@ -28,12 +29,14 @@
       // Gemini can keep the same button class while changing its action to Stop/Voice.
       if (/stop|cancel|microphone|voice|停止|取消|麦克风|语音/i.test(label)) return false;
       const semantic = /^(send(?: message| prompt)?|发送(?:消息|提示|提示词)?)$/i.test(label);
-      const marker = el.matches('button.send-button, button[data-test-id="send-button"], button[data-testid="send-button"]'+(site.id==='chatgpt'?', button#composer-submit-button':''));
+      const marker = el.matches('button.send-button, [role="button"][data-testid="send-button"], button[data-test-id="send-button"], button[data-testid="send-button"]'+(site.id==='chatgpt'?', button#composer-submit-button':''));
       const icon = el.querySelector('mat-icon, .google-symbols, .material-symbols-outlined');
       const deepseekIcon=site.id==='deepseek'&&el.querySelector('.ds-icon svg[viewBox="0 0 14 16"], svg[data-icon="send"]');
       return semantic || marker || deepseekIcon || (icon && (icon.textContent || '').trim() === 'send');
     });
-    return found.length === 1 ? found[0] : null;
+    // DeepSeek can nest a role-button around the same actual button.
+    const deepest=site.id==='deepseek'?found.filter(el=>!found.some(other=>other!==el&&el.contains(other))):found;
+    return deepest.length === 1 ? deepest[0] : null;
   };
   const clean = s => s.replace(/\r\n/g, '\n').replace(/\u00a0/g, ' ').trim();
   const textOf = input => input.tagName==='TEXTAREA' ? input.value : input.textContent || '';
@@ -94,11 +97,15 @@
       while (!stopped && Date.now() < deadline) {
         status(t('Leo · 正在等待 Gemini 输入框，可取消。请先完成登录。', 'Leo · Waiting for Gemini. Sign in if needed; cancel anytime.'));
         const input = editor(document,site);
-        if (!input || !document.hasFocus() || document.visibilityState !== 'visible') { await sleep(); continue; }
+        if (!input) { await sleep(); continue; }
+        if (!document.hasFocus() || document.visibilityState !== 'visible') {
+          status(t('已找到输入框；请点击 Gemini 网页空白处，Leo 将继续。', 'Composer found. Click an empty area of the Gemini page to continue.'));await sleep();continue;
+        }
         if (clean(textOf(input))) { status(t('Gemini 已有草稿，未覆盖或发送。可复制 Leo 内容后手动处理。', 'Gemini contains a draft. Nothing overwritten or sent; copy the Leo prompt if needed.')); return; }
         fill(input,request.prompt,document,window);
         filled = true;
-        status(t('Leo 1.1.0 · 已填入，正在等待发送按钮就绪。', 'Leo 1.1.0 · Prompt filled. Waiting for the Send button.'));
+        status(t('Leo 1.1.1 · 已填入，正在等待发送按钮就绪。', 'Leo 1.1.1 · Prompt filled. Waiting for the Send button.'));
+        const filledAt=Date.now();
         const onEdit = event => { if (event.isTrusted) { stopped = true; status(t('你正在编辑，已停止自动发送。', 'You are editing. Auto-send stopped.')); } };
         input.addEventListener('beforeinput', onEdit);
         try {
@@ -107,8 +114,19 @@
               status(t('输入框发生变化，已停止自动发送。', 'The editor changed. Auto-send stopped.')); return;
             }
             const button = sendButton(document,site);
-            if (!button || !document.hasFocus() || document.visibilityState !== 'visible') { await sleep(); continue; }
-            clicked = true; button.click(); // Exactly once. Never retry an uncertain send.
+            if (!document.hasFocus() || document.visibilityState !== 'visible') { await sleep(); continue; }
+            if (!button) {
+              // Only DeepSeek: use its composer key handler once, never global keyboard input.
+              // Wait for rendering first; never follow a possibly successful click with Enter.
+              if(site.id!=='deepseek'||Date.now()-filledAt<1500){await sleep();continue;}
+              const blocked=[...document.querySelectorAll('button, [role="button"]')].some(el=>visible(el)&&(
+                /stop|停止|停止生成|^(send(?: message| prompt)?|发送(?:消息|提示|提示词)?)$/i.test(el.getAttribute('aria-label')||'') ||
+                el.matches('button.send-button, [data-testid="send-button"], [data-test-id="send-button"]') ||
+                el.querySelector('.ds-icon svg[viewBox="0 0 14 16"], svg[data-icon="send"]')));
+              if(blocked){await sleep();continue;}
+              clicked=true;input.focus();
+              input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true,composed:true}));
+            } else { clicked = true; button.click(); } // Exactly once. Never retry an uncertain send.
             for (let i = 0; i < 25 && !stopped; i++) {
               await sleep();
               if (!input.isConnected || !clean(textOf(input))) {
