@@ -21,7 +21,7 @@ sealed class FootTools : Form
     public int ReservedSpace => S(64);
     public const int CompactWidth = 94;
     readonly TextBox search = new();
-    const int SearchExtraUnits=314;
+    const int SearchExtraUnits=204;
     readonly GlyphButton edgeTargetButton=new("globe");
     readonly GlyphButton geminiButton=new("gemini");
     readonly GlyphButton deepseekButton=new("deepseek");
@@ -181,9 +181,9 @@ sealed class FootTools : Form
         int toolX=3;foreach(var (button,enabled) in new[]{(terminal,Quick("terminal")),((Button)proxyButton,Quick("clash")),(searchButton,Quick("edge"))}){
             button.Visible=utilitiesOpen&&enabled;if(enabled){button.Bounds=new Rectangle(S(toolX),S(32),S(28),S(24));toolX+=30;}
         }
-        search.Visible=expanded&&Quick("edge");search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+3),S(36),S(180),S(21));
-        int targetX=VisibleCompactUnits+191;
-        foreach(var (button,_) in TargetButtons){button.Visible=expanded&&Quick("edge");button.Bounds=new Rectangle(S(targetX),S(32),S(28),S(24));targetX+=30;}
+        search.Visible=expanded&&Quick("edge");search.AutoSize=false;search.Bounds=new Rectangle(S(VisibleCompactUnits+12),S(36),S(180),S(21));
+        int targetX=VisibleCompactUnits+43;
+        foreach(var (button,_) in TargetButtons){button.Visible=expanded&&Quick("edge");button.Bounds=new Rectangle(S(targetX),S(2),S(28),S(24));targetX+=30;}
         ClientSize=new Size(S(expanded?VisibleCompactUnits+SearchExtraUnits:VisibleCompactUnits),S(utilitiesOpen?58:28));
         ResumeLayout();
         if (!workArea.IsEmpty) Follow(petBounds, workArea);
@@ -209,7 +209,7 @@ sealed class FootTools : Form
         {
             button.PerformClick();
             ok&=expanded&&webTarget==target&&search.Text=="fixture"&&TargetButtons.Count(x=>x.Button.ActiveState==true)==1;
-            ok&=TargetButtons.All(x=>x.Button.Visible&&x.Button.Left>=search.Right&&ClientRectangle.Contains(x.Button.Bounds));
+            ok&=TargetButtons.All(x=>x.Button.Visible&&x.Button.Left>=search.Left&&x.Button.Right<=search.Right&&x.Button.Bottom<=search.Top&&x.Button.Left>=moreButton.Right+S(12)&&ClientRectangle.Contains(x.Button.Bounds));
             button.PerformClick();ok&=expanded&&search.Text=="fixture";
         }
         searchButton.PerformClick();ok&=!expanded&&TargetButtons.All(x=>!x.Button.Visible);
