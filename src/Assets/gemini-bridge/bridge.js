@@ -14,7 +14,7 @@
     if (!site || (p.has('leo-site') && p.get('leo-site')!==site.id)) return null;
     const id = p.get('leo-id'), prompt = p.get('leo-prompt'), at = Number(p.get('leo-at'));
     if (!/^[a-f0-9]{32}$/.test(id || '') || !prompt?.trim() || prompt.length > MAX || !Number.isFinite(at) || Math.abs(now / 1000 - at) > TTL) return null;
-    return { id, prompt, site };
+    return { id, prompt, site, language:p.get('leo-lang')==='en'?'en':'zh-CN' };
   };
   const visible = el => !!el && el.isConnected && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
   const editor = (doc,site=sites['https://gemini.google.com']) => {
@@ -72,8 +72,8 @@
     catch { return; }
     let stopped = false, clicked = false, filled = false, panel;
     cancelCurrent = () => { stopped = true; panel?.remove(); };
-    const chinese = (document.documentElement?.lang || navigator.language || 'en').startsWith('zh');
-    const t = (zh, en) => (chinese ? zh : en).replaceAll('Gemini',site.name);
+    const chinese = request.language!=='en';
+    const t = (zh, en) => chinese ? zh : en;
     const sleep = () => new Promise(resolve => setTimeout(resolve, 200));
     const deadline = Date.now() + 60000;
     const status = message => {
@@ -95,23 +95,23 @@
     };
     try {
       while (!stopped && Date.now() < deadline) {
-        status(t('Leo · 正在等待 Gemini 输入框，可取消。请先完成登录。', 'Leo · Waiting for Gemini. Sign in if needed; cancel anytime.'));
+        status(t('Leo · 正在准备输入，请先完成登录。', 'Leo · Preparing input. Sign in if needed.'));
         const input = editor(document,site);
         if (!input) { await sleep(); continue; }
         if (!document.hasFocus() || document.visibilityState !== 'visible') {
-          status(t('已找到输入框；请点击 Gemini 网页空白处，Leo 将继续。', 'Composer found. Click an empty area of the Gemini page to continue.'));await sleep();continue;
+          status(t('Leo · 请点击网页空白处继续。', 'Leo · Click an empty area of this page to continue.'));await sleep();continue;
         }
-        if (clean(textOf(input))) { status(t('Gemini 已有草稿，未覆盖或发送。可复制 Leo 内容后手动处理。', 'Gemini contains a draft. Nothing overwritten or sent; copy the Leo prompt if needed.')); return; }
+        if (clean(textOf(input))) { status(t('Leo · 检测到已有草稿，未覆盖或发送。', 'Leo · Existing draft detected. Nothing overwritten or sent.')); return; }
         fill(input,request.prompt,document,window);
         filled = true;
-        status(t('Leo 1.1.1 · 已填入，正在等待发送按钮就绪。', 'Leo 1.1.1 · Prompt filled. Waiting for the Send button.'));
+        status(t('Leo · 内容已填入，正在准备发送。', 'Leo · Prompt filled. Preparing to send.'));
         const filledAt=Date.now();
-        const onEdit = event => { if (event.isTrusted) { stopped = true; status(t('你正在编辑，已停止自动发送。', 'You are editing. Auto-send stopped.')); } };
+        const onEdit = event => { if (event.isTrusted) { stopped = true; status(t('Leo · 你正在编辑，已停止自动发送。', 'Leo · You are editing. Auto-send stopped.')); } };
         input.addEventListener('beforeinput', onEdit);
         try {
           while (!stopped && Date.now() < deadline) {
             if (!input.isConnected || clean(textOf(input)) !== clean(request.prompt)) {
-              status(t('输入框发生变化，已停止自动发送。', 'The editor changed. Auto-send stopped.')); return;
+              status(t('Leo · 输入框发生变化，已停止自动发送。', 'Leo · The editor changed. Auto-send stopped.')); return;
             }
             const button = sendButton(document,site);
             if (!document.hasFocus() || document.visibilityState !== 'visible') { await sleep(); continue; }
@@ -130,18 +130,18 @@
             for (let i = 0; i < 25 && !stopped; i++) {
               await sleep();
               if (!input.isConnected || !clean(textOf(input))) {
-                status(t('Leo · 已触发发送，请在 Gemini 查看回复。', 'Leo · Send triggered. View the reply in Gemini.'));
+                status(t('Leo · 已触发发送，请在网页查看回复。', 'Leo · Send triggered. View the reply on this page.'));
                 setTimeout(() => panel?.remove(), 2500); return;
               }
             }
-            status(t('已点击发送，但未确认页面状态；请查看 Gemini，未自动重试。', 'Send clicked, but page state is unconfirmed. Check Gemini; no automatic retry.')); return;
+            status(t('Leo · 已尝试发送，未确认结果；请查看网页，不会重复发送。', 'Leo · Send attempted; result unconfirmed. Check this page. No resend.')); return;
           }
         } finally { input.removeEventListener('beforeinput', onEdit); }
         break;
       }
-      if (!stopped) status(filled ? t('已填入，但等待发送按钮超时；请手动点击发送，Leo 不会重复点击。', 'Prompt filled, but waiting for Send timed out. Click Send manually; Leo will not retry.') : t('等待超时。请确认登录与页面状态；内容未自动重试，可复制后手动发送。', 'Timed out. Check sign-in and page state. No retry; copy the prompt to send manually.'));
+      if (!stopped) status(filled ? t('Leo · 等待发送按钮超时，可手动发送。', 'Leo · Waiting for Send timed out. Send manually if needed.') : t('Leo · 等待超时，请确认登录和页面状态。', 'Leo · Timed out. Check sign-in and page state.'));
     } catch {
-      if (!stopped) status(clicked ? t('发送状态未知，请查看 Gemini；不会重复发送。', 'Send state unknown. Check Gemini; no resend.') : t('自动填入未完成，可复制内容手动发送。', 'Auto-fill incomplete. Copy the prompt to send manually.'));
+      if (!stopped) status(clicked ? t('Leo · 已尝试发送，未确认结果；请查看网页，不会重复发送。', 'Leo · Send attempted; result unconfirmed. Check this page. No resend.') : t('Leo · 自动填入未完成，可复制内容手动发送。', 'Leo · Auto-fill incomplete. Copy the prompt to send manually.'));
     }
   }
   window.addEventListener('hashchange', launch);

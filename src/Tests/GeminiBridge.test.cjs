@@ -16,6 +16,7 @@ async function scenario(options={}) {
   const events={}, memory=new Map(), location=new URL(link());
   if(options.provider==='deepseek')location.href=link().replace('https://gemini.google.com/app','https://chat.deepseek.com/');
   if(options.provider==='chatgpt')location.href=link().replace('https://gemini.google.com/app','https://chatgpt.com/');
+  if(options.language)location.hash+='&leo-lang='+options.language;
   function element(){return {style:{},children:[],append(...nodes){this.children.push(...nodes);},attachShadow(){return element();},remove(){removed++;},set textContent(value){panelText=String(value);},get textContent(){return panelText;}};}
   class TextArea {get value(){return this._value||'';}set value(v){this._value=v;}}
   const input={isConnected:true,textContent:options.draft||'',getClientRects:()=>[{}],focus(){},addEventListener(){},removeEventListener(){},dispatchEvent(event){if(event.type==='keydown'){enters++;if(!options.unconfirmed){this.textContent='';if(options.textarea)this.value='';}}else notified=true;}};
@@ -72,6 +73,13 @@ async function scenario(options={}) {
   const disabledDs=await scenario({provider:'deepseek',textarea:true,disabled:true});assert.equal(disabledDs.enters,0);assert.equal(disabledDs.clicks,0);
   const nestedDs=await scenario({provider:'deepseek',textarea:true,nested:true});assert.equal(nestedDs.clicks,1);assert.equal(nestedDs.enters,0);
   const fallbackGpt=await scenario({provider:'chatgpt',fallback:true});assert.equal(fallbackGpt.clicks,1);assert.equal(fallbackGpt.inserts,1);
+  const unified=[];
+  for(const provider of ['gemini','deepseek','chatgpt']) {
+    const result=await scenario({provider});unified.push(result.panelText);
+    const english=await scenario({provider,language:'en'});assert.match(english.panelText,/Leo · Send triggered/);
+    const draft=await scenario({provider,draft:'protected'});assert.equal(draft.panelText,'Leo · 检测到已有草稿，未覆盖或发送。');
+  }
+  assert.equal(new Set(unified).size,1);assert.equal(unified[0],'Leo · 已触发发送，请在网页查看回复。');
   const dsIcon=await scenario({provider:'deepseek',textarea:true,deepseekIcon:true,unknown:true});assert.equal(dsIcon.clicks,1);
   assert.equal(siteFor('https://chatgpt.com/').id,'chatgpt');assert.equal(siteFor('https://chat.deepseek.com/').id,'deepseek');
   for(const href of ['https://chatgpt.com/c/old','https://chat.deepseek.com/a/chat/s/old','https://chatgpt.com.evil.test/','http://chatgpt.com/'])assert.equal(siteFor(href),null);

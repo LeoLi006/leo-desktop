@@ -62,6 +62,7 @@ sealed class GlyphButton : Button
     readonly string glyph;
     bool hovered;
     public bool? ActiveState;
+    public bool ShowSelection;
     public Color IconColor => glyph == "proxy" && ActiveState != true ? Appearance.Muted : Appearance.Accent;
     public GlyphButton(string kind)
     {
@@ -75,7 +76,7 @@ sealed class GlyphButton : Button
     {
         e.Graphics.Clear(Appearance.Background);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        if (hovered || Focused)
+        if (hovered || Focused || (ShowSelection && ActiveState==true))
         {
             using var shape = Appearance.Path(ClientRectangle, Math.Min(9, Height / 2));
             using var brush = new LinearGradientBrush(ClientRectangle, Appearance.Blue, Appearance.Red, 20f); e.Graphics.FillPath(brush, shape);

@@ -13,7 +13,7 @@ static class GeminiWeb
         text=text.Trim();
         if(text.Length==0)throw new ArgumentException(UiLanguage.T("请先输入要发送的内容。"));
         if(text.Length>MaxPromptLength)throw new ArgumentException(UiLanguage.T("网页 AI 快捷输入最多支持2000个字符。"));
-        return Home(provider)+"#leo-site="+provider+"&leo-id="+Guid.NewGuid().ToString("N")+"&leo-at="+DateTimeOffset.UtcNow.ToUnixTimeSeconds()+"&leo-prompt="+Uri.EscapeDataString(text);
+        return Home(provider)+"#leo-site="+provider+"&leo-lang="+(UiLanguage.English?"en":"zh-CN")+"&leo-id="+Guid.NewGuid().ToString("N")+"&leo-at="+DateTimeOffset.UtcNow.ToUnixTimeSeconds()+"&leo-prompt="+Uri.EscapeDataString(text);
     }
     public static void Open(string text,string provider="gemini")=>Process.Start(FootTools.EdgeUrlStart(Url(text,provider)));
     public static void Setup()

@@ -4,9 +4,9 @@ User instructions: [中文](QUICK_START.md#网页-ai-快捷输入gemini--deepsee
 
 ## Integration and compatibility
 
-The existing `GeminiWeb` class name and `assets/gemini-bridge` installation path are preserved so the user's unpacked extension does not need reinstalling. `GeminiWeb.Home/Name/Url/Open` accept only gemini, deepseek or chatgpt. `FootTools` adds DS/GPT buttons beside Gemini and Edge using one expandable textbox. All four targets share draft text, layout/theme scaling and Edge module enable/shortcut rules. No model-registry tool or workflow permission is added; only explicit footer input launches a web hand-off.
+The existing `GeminiWeb` class name and `assets/gemini-bridge` installation path are preserved so the user's unpacked extension does not need reinstalling. `GeminiWeb.Home/Name/Url/Open` accept only gemini, deepseek or chatgpt. `FootTools` keeps one search disclosure button; its expandable textbox is followed by four mutually exclusive Edge/Gemini/DeepSeek/ChatGPT selectors. Selection preserves the draft, stays expanded and restores input focus; only Enter dispatches. Repeated disclosure hides textbox and all selectors. The last selection is session-only, with Edge as startup default. All four targets share draft text, layout/theme scaling and Edge module enable/shortcut rules. No model-registry tool or workflow permission is added; only explicit footer input launches a web hand-off.
 
-Manifest V3 extension **Leo Web AI 1.1.1** runs only on `https://gemini.google.com/*`, `https://chat.deepseek.com/*` and `https://chatgpt.com/*`, with no background script, network fetch, telemetry, cookies API or extra permissions. Existing installations must reload in Edge and approve any added site access. Users sign in separately. No account, CAPTCHA, consent or browser security-policy bypass exists.
+Manifest V3 extension **Leo Web AI 1.2.0** runs only on `https://gemini.google.com/*`, `https://chat.deepseek.com/*` and `https://chatgpt.com/*`, with no background script, network fetch, telemetry, cookies API or extra permissions. Existing installations must reload in Edge and approve any added site access. Users sign in separately. No account, CAPTCHA, consent or browser security-policy bypass exists.
 
 ## Protocol and adapters
 
@@ -36,3 +36,7 @@ Manual acceptance: reload extension 1.1.1, approve site access, log in, then sub
 ### 1.1.1 compatibility follow-up
 
 User reports: Gemini sends successfully; DeepSeek fills then waits for Send; ChatGPT times out before filling. Added nested-role-button deduplication and the bounded, single-shot DeepSeek composer key fallback described above; expanded ChatGPT editable variants and fallback selectors. Isolated regressions cover native textarea Enter submission, uncertain Enter without retry, disabled control suppression, nested role controls and alternate ChatGPT composer resolution. These are compatibility changes, not a live-browser diagnosis or guarantee; no real-account request was made by the tests.
+
+### 1.2.0 unified entry and notices
+
+Foot tools now contribute one search button instead of four separate utility entries. Target selectors are visible only while the input is expanded and have a persistent selection highlight. Layout/toggle checks cover all targets, preserved drafts, repeated selection, disclosure close and multiple scales. Shared page notices omit provider-specific wording and version strings; leo-lang carries the host UI choice (en/zh-CN), with Chinese as the legacy default. DOM insertion, send controls, DeepSeek Enter fallback and one-shot verification are unchanged. Fixture checks compare identical Chinese notices across all sites and verify explicit English selection despite Chinese page language.
