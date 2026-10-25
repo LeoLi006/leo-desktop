@@ -28,3 +28,7 @@ Without the extension, the URL only opens Gemini; it does not guarantee prefilli
 These checks cannot establish compatibility with the currently signed-in Gemini DOM. Manual acceptance after extension loading: enter one disposable prompt in Leo, verify it appears once in a new Gemini chat and receives a response; try a page with an existing draft and confirm it is preserved. Do not describe the feature as end-to-end verified until this browser check is complete.
 
 References: [Edge local extension loading](https://learn.microsoft.com/en-us/microsoft-edge/extensions/getting-started/extension-sideloading), [Chrome content script model](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts). No third-party extension source is bundled.
+
+### 1.0.1 startup correction
+
+A regression fixture reproduces execution at document_start before documentElement exists: reading its language threw before the DOM waiting loop. Language selection now tolerates the missing root and falls back to the browser language. Existing safety/one-shot fixtures remain unchanged. After installing the updated assets, an already loaded unpacked extension must be reloaded in Edge before opening a fresh Leo request; no real-account send was performed by this check.

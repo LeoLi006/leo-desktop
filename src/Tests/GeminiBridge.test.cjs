@@ -17,7 +17,7 @@ async function scenario(options={}) {
   function element(){return {style:{},children:[],append(...nodes){this.children.push(...nodes);},attachShadow(){return element();},remove(){removed++;},set textContent(value){panelText=String(value);},get textContent(){return panelText;}};}
   const input={isConnected:true,textContent:options.draft||'',getClientRects:()=>[{}],focus(){},addEventListener(){},removeEventListener(){},dispatchEvent(){}};
   const button={isConnected:true,disabled:false,getClientRects:()=>[{}],getAttribute:()=>null,click(){clicks++;if(!options.unconfirmed)input.textContent='';}};
-  const document={documentElement:{lang:'zh-CN'},body:{append(){}},visibilityState:options.background?'hidden':'visible',hasFocus:()=>true,
+  const document={documentElement:options.earlyDocument?null:{lang:'zh-CN'},body:{append(){}},visibilityState:options.background?'hidden':'visible',hasFocus:()=>true,
     querySelectorAll(selector){checked++;return options.login?[]:selector.startsWith('rich')?(options.ambiguous?[input,input]:[input]):[button];},
     createElement:element,createRange:()=>({selectNodeContents(){}}),execCommand(cmd,unused,prompt){inserts++;input.textContent=prompt;return true;}};
   const window={addEventListener:(key,fn)=>events[key]=fn,getSelection:()=>({removeAllRanges(){},addRange(){}})};window.top=window;
@@ -31,6 +31,7 @@ async function scenario(options={}) {
   return {clicks,inserts,panelText,removed,checked,hash:location.hash,input:input.textContent};
 }
 (async()=>{
+  const early=await scenario({earlyDocument:true});assert.equal(early.clicks,1);assert.equal(early.inserts,1);
   const normal=await scenario({replay:true});assert.equal(normal.clicks,1);assert.equal(normal.inserts,1);assert.equal(normal.hash,'');
   const draft=await scenario({draft:'my draft'});assert.equal(draft.clicks,0);assert.equal(draft.input,'my draft');assert.equal(draft.inserts,0);
   const login=await scenario({login:true});assert.equal(login.clicks,0);assert.match(login.panelText,/超时/);assert.ok(login.checked<310);

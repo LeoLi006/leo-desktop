@@ -38,7 +38,7 @@
     catch { return; }
     let stopped = false, clicked = false, panel;
     cancelCurrent = () => { stopped = true; panel?.remove(); };
-    const chinese = (document.documentElement.lang || navigator.language).startsWith('zh');
+    const chinese = (document.documentElement?.lang || navigator.language || 'en').startsWith('zh');
     const t = (zh, en) => chinese ? zh : en;
     const sleep = () => new Promise(resolve => setTimeout(resolve, 200));
     const deadline = Date.now() + 60000;
