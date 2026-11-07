@@ -4,7 +4,7 @@
 
 Just using the product? Start with the [quick start](QUICK_START.en.md) or [user guide](USER_GUIDE.en.md); implementation details on this page are optional.
 
-This reference describes main through source commit `42fea41`. The release version is `1.05.0`, consolidating implementation through the stated commit and subsequent packaging revisions. Use documentation and source from the same commit.
+The current release is `1.06.0`. The foundation reference retains the deliveries through `42fea41`; file processing, web integration and packaging additions are defined by the v1.06.0 tag. Use source and documentation from the same tag.
 
 ## 1. Product and requirements
 
@@ -144,3 +144,9 @@ Import failures: check exact manifest casing, IDs, numeric versions/ranges, depe
 The delivered subset includes unified execution, internal entries/services and the existing package recovery path. It does not include independent physical delivery of every built-in module, arbitrary-code sandbox/signature trust, full protocol negotiation, all complex windows/settings as descriptors, a global request ledger, general parallel compensation or completed long-term real-world qualification. Short tests cannot prove multi-day leak freedom.
 
 Issue reports should include commit/version, Windows environment, reproduction, expected/actual behavior and sanitized error types. Never attach a whole personal runtime directory.
+
+## v1.06.0 file processing and web integration
+
+File drops reuse DropActionForm, application modules and files_with_app. ApplicationOpenRule declares extensions, folder/batch support, a module reference and adapter. Modules continue owning executable, icon, flags, working directory and explicit administrator settings. The handoff adapter adds local ImportScript and the LeoFileImport/1 request/receipt protocol, with bounded waiting/cancellation and confirmation of import only. Extension matching does not add protocol support to arbitrary software. New tools need a known import interface; never equate launch with processing completion or export private paths in share packages. See [file-processing implementation](DROP_OPEN_IMPLEMENTATION.md).
+
+Web AI reuses footer search and requires manually loading the bundled extension and granting site access. Site login, layout changes and security challenges still apply. This is neither a model API nor a browser-automation platform; see [web bridge](GEMINI_WEB_BRIDGE.md). ClashDock, Mojian and readers are optional external products, not bundled or auto-installed; absence affects their corresponding entry only.
