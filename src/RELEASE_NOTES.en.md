@@ -2,6 +2,32 @@
 
 [简体中文](RELEASE_NOTES.md) | **English**
 
+## v1.06.0 — 2026-11-07 · File quick actions and optional integrations
+
+This feature release consolidates changes since v1.05.0 while retaining the 1.x compatibility range. The complete Windows x64 ZIP bundles the desktop runtime and includes a SHA-256 checksum.
+
+### Find and process files
+
+- Icon-based application/file search switching, direct paths and VS Code new-window opening. Search modes have matching dimensions; size-slider repaint was corrected.
+- Right-click real local apps to reveal their executable. Shortcuts resolve their target instead of revealing the Start Menu shortcut folder.
+- Drop on Leo's head, face or body, then choose: dropping never immediately runs a file. Up to three relevant primary actions; other openers, copy/reveal, notes and tasks remain secondary.
+- One Markdown file can be handed to a separately configured Mojian with the new import interface and a provisioned Python environment. Import is confirmed only by a matching receipt. Check preview, template and output location and confirm generation in Mojian yourself. No automatic generation/export, overwrite or dependency installation; no Markdown batch handoff yet.
+- VS Code always opens a new window. PDFs can use configured SumatraPDF. Capability rules reuse application modules, extensions, executable, arguments, working directory and explicit administrator settings. Paths stay local. Type matching is not a compatibility guarantee; submitting a launch request does not prove opening succeeded.
+
+### Integrate existing products when needed
+
+- AI news and paper/project briefs with field selection, optional Chinese title translation and reading aloud. Network sources may lag or omit content.
+- Footer search targets Edge, Gemini, DeepSeek or ChatGPT. Web AI filling/sending requires manually loading the bundled browser extension and signing in to the selected website, without a model API key. Site changes, login and security challenges may require manual intervention.
+- The former proxy shortcut opens separately installed ClashDock. This package does not bundle or assume it is installed. Missing configuration/dependencies yield a brief message; right-click to configure its path.
+- Missing optional apps, Mojian scripts/programs or modules remain isolated. Targeted checks cover configuration read failures, launch failures, timeouts, cancellation and continued operation after failures.
+
+### Installation, privacy and verification
+
+Extract everything, run Install-Leo.cmd and select the existing dedicated Leo folder when updating. Manifest checks, backup and rollback are retained. Personal settings are preserved. No third-party client, private path, API key, chat/clipboard data or voice model is distributed. Chinese and English guides remain separate; start with [Quick start](QUICK_START.en.md).
+
+Evidence includes 55 open-capability checks, 15 ClashDock checks, 51 prior drop/entry checks and Mojian interface/isolated real-GUI import checks. Release verification additionally checks the manifest, clean installation, bundled-runtime startup and update rollback. Targeted verification is not a guarantee for every OS or long-running workload.
+
+
 ## Quick-start documentation
 
 Added a [quick start](QUICK_START.en.md) with three-minute setup, an entry lookup table, expandable task instructions and troubleshooting. The home page prioritizes download/use; developer references are separate. Chinese and English remain independent. Documentation/future packaging inputs only; the v1.05.0 binary is unchanged.

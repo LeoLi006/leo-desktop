@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 namespace LeoLauncher;
@@ -30,6 +30,7 @@ static class LeoInstaller
     {
         string normalized=name.Replace('\\','/');string file=Path.GetFileName(name);
         if(normalized is "assets/clubs.json" or "assets/pinyin.json")return true;
+        if(normalized is "assets/gemini-bridge/manifest.json" or "assets/gemini-bridge/bridge.js" or "assets/web-search-logos/chatgpt-source.svg")return true;
         if(normalized.StartsWith("assets/",StringComparison.OrdinalIgnoreCase))return Path.GetExtension(file).ToLowerInvariant() is ".png" or ".ico" or ".jpg" or ".webp" or ".txt" or ".md";
         if(normalized.StartsWith("licenses/",StringComparison.OrdinalIgnoreCase))return Path.GetExtension(file).ToLowerInvariant() is ".txt" or ".md" or "";
         if(System.Text.RegularExpressions.Regex.IsMatch(normalized,@"^[a-z]{2,3}(?:-[A-Za-z]{2,4})?/[^/]+\.resources\.dll$"))return true;

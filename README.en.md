@@ -4,13 +4,20 @@
 
 Find apps, tasks, notes, football and everyday actions faster, and combine useful steps. Use just the pet if you prefer; every optional feature does not need to be enabled.
 
-**Windows x64 · Latest release v1.05.0 · Local features need no model API.**
+**Windows x64 · Latest release v1.06.0 · Local features need no model API.**
 
-[Download](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.05.0) · **[Three-minute quick start](src/QUICK_START.en.md)** · [Find a feature](src/QUICK_START.en.md#where-do-i-find-it) · [Troubleshooting](src/QUICK_START.en.md#if-something-is-wrong)
+[Download](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.06.0) · **[Three-minute quick start](src/QUICK_START.en.md)** · [Find a feature](src/QUICK_START.en.md#where-do-i-find-it) · [Troubleshooting](src/QUICK_START.en.md#if-something-is-wrong)
+
+## v1.06.0 feature release
+
+File/folder search, VS Code new windows, Markdown import into Mojian and PDF quick reading; AI news by field and unified Edge / Gemini / DeepSeek / ChatGPT search. Optional tools are configured locally; missing dependencies affect their own entry only. Mojian and ClashDock are separate products, not bundled clients.
+
+[Release notes](src/RELEASE_NOTES.en.md) · [File quick actions](src/QUICK_START.en.md#file-quick-actions-markdown-code-and-pdf)
+
 
 ## First time? Do these four things
 
-1. Download `Leo-v1.05.0-win-x64.zip`, extract everything and run `Install-Leo.cmd`.
+1. Download `Leo-v1.06.0-win-x64.zip`, extract everything and run `Install-Leo.cmd`.
 2. Click the sheep, type an app name and open a result. Click again to dismiss search.
 3. Click the planner icon below it and add one task, or right-click→Planner & notes→Quick capture.
 4. Right-click→Settings: General changes name, size and startup; Features enables only wanted tools. Click Save settings.
@@ -51,7 +58,7 @@ Leo complements specialist applications. Email stays in your mail client; music/
 | [Full user guide](src/USER_GUIDE.en.md) | Need settings, limits or further troubleshooting |
 | [Change log](src/RELEASE_NOTES.en.md) | Want to see what changed |
 
-Chinese/English pages are separate with a language link at the top. GitHub documentation is current; the original v1.05.0 archive retains its release-time guides and was not repackaged for these documentation changes.
+Chinese/English pages are separate with a language link at the top. The v1.06.0 package includes updated guides for file actions and optional integrations.
 
 ## Updates and feedback
 

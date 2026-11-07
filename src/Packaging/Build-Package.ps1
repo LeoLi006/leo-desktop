@@ -1,4 +1,4 @@
-param([string]$OutputDirectory,[string]$RuntimeVersion='9.0.21')
+﻿param([string]$OutputDirectory,[string]$RuntimeVersion='9.0.21')
 $ErrorActionPreference='Stop'
 $root=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 if(-not $OutputDirectory){$OutputDirectory=Join-Path $root '.build/distribution'}
@@ -65,8 +65,8 @@ $files=[ordered]@{}
 foreach($file in Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName){
  $relative=[IO.Path]::GetRelativePath($payload,$file.FullName).Replace('\','/')
  if($relative -match '(^|/)(leo-.*\.json|.*\.(pdb|key|pem|pfx|log|onnx|wav))$' -or $relative -match '(^|/)(data|models|backups|update-backups|todo-backups)/'){throw "Unexpected personal/debug artifact: $relative"}
- if($file.Extension -eq '.json' -and $relative -notin @('LeoLauncher.runtimeconfig.json','LeoLauncher.deps.json','assets/clubs.json','assets/pinyin.json')){throw "Unexpected JSON file: $relative"}
- if($file.Extension -in '.json','.md','.txt','.cmd'){
+ if($file.Extension -eq '.json' -and $relative -notin @('LeoLauncher.runtimeconfig.json','LeoLauncher.deps.json','assets/clubs.json','assets/pinyin.json','assets/gemini-bridge/manifest.json')){throw "Unexpected JSON file: $relative"}
+ if($file.Extension -in '.json','.md','.txt','.cmd','.js'){
   $content=Get-Content -LiteralPath $file.FullName -Raw
   if($content -match '(?i)C:[\\/]Users[\\/]|paratera\.com|sk-[a-zA-Z0-9_-]{20,}'){throw "Private information detected: $relative"}
  }

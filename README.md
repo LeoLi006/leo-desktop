@@ -4,13 +4,20 @@
 
 让应用、待办、便签、足球和常用操作更容易找到，也能把多个操作组合起来。想只用桌宠也可以，不用把所有功能都打开。
 
-**Windows x64 · 最新发布v1.05.0 · 本地功能无需模型API。**
+**Windows x64 · 最新发布v1.06.0 · 本地功能无需模型API。**
 
-[下载安装](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.05.0) · **[三分钟快速上手](src/QUICK_START.md)** · [功能入口速查](src/QUICK_START.md#我想做什么入口速查) · [常见问题](src/QUICK_START.md#遇到问题先看这里)
+[下载安装](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.06.0) · **[三分钟快速上手](src/QUICK_START.md)** · [功能入口速查](src/QUICK_START.md#我想做什么入口速查) · [常见问题](src/QUICK_START.md#遇到问题先看这里)
+
+## v1.06.0 功能大更新
+
+文件/文件夹搜索、VS Code 新窗口、Markdown → 墨笺导入与 PDF 快捷阅读；按领域浏览 AI 资讯，以及 Edge / Gemini / DeepSeek / ChatGPT 统一搜索。第三方工具按需配置，缺失时仅对应入口不可用。ClashDock 与墨笺需另行准备，不随安装包附送。
+
+[完整更新说明](src/RELEASE_NOTES.md) · [文件处理操作](src/QUICK_START.md#文件快捷处理markdown代码与-pdf)
+
 
 ## 第一次用，先做这四步
 
-1. 下载`Leo-v1.05.0-win-x64.zip`，完整解压，运行`Install-Leo.cmd`。
+1. 下载`Leo-v1.06.0-win-x64.zip`，完整解压，运行`Install-Leo.cmd`。
 2. 单击桌面小羊，输入软件名，点击结果或回车打开；再点小羊关闭搜索。
 3. 点脚下清单图标，记一件待办；或者右键→清单与记录→一句话速记。
 4. 右键→设置：常规改名字、大小和开机启动；功能页只开启需要的工具，最后点“保存设置”。
@@ -51,7 +58,7 @@ Leo不会替代专业软件：邮件在原客户端处理，音乐和媒体依�
 | [完整使用手册](src/USER_GUIDE.md) | 想进一步了解设置、限制和排查方式 |
 | [更新记录](src/RELEASE_NOTES.md) | 想知道某个版本改了什么 |
 
-文档中英文分开，每页顶部可切换。当前GitHub说明已更新；原v1.05.0安装包仍保留其发布时的文档，没有因本次文档调整重新打包。
+文档中英文分开，每页顶部可切换。v1.06.0 安装包附更新后的中英文指南，文件处理及第三方工具的配置与限制见快速上手。
 
 ## 更新与反馈
 
