@@ -16,13 +16,15 @@ sealed class DropContent:IDisposable
     public bool IsImageFile=>Paths.Length==1&&File.Exists(Paths[0])&&new[]{".png",".jpg",".jpeg",".bmp",".gif",".webp"}.Contains(Path.GetExtension(Paths[0]),StringComparer.OrdinalIgnoreCase);
     public bool HasMedia=>Paths.Any(p=>new[]{".mp4",".mkv",".avi",".mov",".mp3",".flac",".wav",".webm",".m4a",".wmv",".ts"}.Contains(Path.GetExtension(p),StringComparer.OrdinalIgnoreCase));
     public string[] ActionIds(Preferences p,IEnumerable<AppEntry>? applications=null)=>Paths.Length>0?
-        (Paths.Any(DropOpenExecution.MayRun)?Array.Empty<string>():new[]{"default"})
-        .Concat(LauncherFileSearch.FindCode(applications??[])!=null?new[]{"code"}:[])
-        .Concat(Paths.Length==1&&HasMedia&&DropOpenExecution.MediaAvailable(p)?new[]{"potplayer"}:[])
-        .Concat(new[]{"choose_app","copy_paths","reveal","note","todo"})
-        .Concat(Paths.Any(ApplicationDrop.IsProgram)?new[]{"add_module"}:[])
-        .Concat(IsImageFile?new[]{"copy_image_file"}:[]).ToArray():Image!=null?new[]{"copy_image","save_image"}:
+        FileActionIds(p,applications):Image!=null?new[]{"copy_image","save_image"}:
         new[]{"copy_text","note","todo"}.Concat(IsUrl&&p.EdgeModule?new[]{"open_url"}:[]).ToArray();
+    string[] FileActionIds(Preferences p,IEnumerable<AppEntry>? applications)
+    {
+        var candidates=ApplicationOpenCapabilities.Candidates(p,Paths,applications);
+        return (candidates.Default?new[]{"default"}:Array.Empty<string>()).Concat(candidates.Apps.Select(a=>a.Rule.Id))
+            .Concat(new[]{"configure_open","choose_app","copy_paths","reveal","note","todo"})
+            .Concat(Paths.Any(ApplicationDrop.IsProgram)?new[]{"add_module"}:[]).Concat(IsImageFile?new[]{"copy_image_file"}:[]).ToArray();
+    }
 
 }
 sealed class QuickTextForm:BarcaWindow
@@ -33,8 +35,15 @@ sealed class QuickTextForm:BarcaWindow
 sealed partial class PetForm
 {
     DropActionForm? dropWindow;
+    void ConfigureDropOpening(string[] paths)
+    {
+        using var editor=new ApplicationOpenSettings(prefs);WindowPositions.Prepare(editor,"application-open-settings",Bounds,previewMode);
+        if(editor.ShowDialog(dropWindow)!=DialogResult.OK)return;
+        ApplySettings(editor.Result!,!previewMode&&LeoStartup.Enabled);
+        var copy=paths.ToArray();BeginInvoke((Action)(()=>AcceptDrop(new DataObject(DataFormats.FileDrop,copy))));
+    }
     void AcceptDrop(IDataObject data)
     {
-        DropContent? content=null;try{content=DropContent.Read(data);launcher.Hide();RevealDock(true);dropWindow?.Close();dropWindow=new DropActionForm(content,prefs,(a,v)=>commands.ExecuteAsync(new(a,v,"drop")),AddApplicationModules,ShowNotes,text=>{using var confirm=new QuickTextForm("添加待办",text);WindowPositions.Prepare(confirm,"drop-todo",Bounds,previewMode);if(confirm.ShowDialog()==DialogResult.OK){todoClient.From("drop-ui").Add(confirm.Value,DateOnly.FromDateTime(DateTime.Today),null);todoWindow?.View.Render();OperationFeedback.Show("已添加到今天的清单");}},launcher.FileApplications,(a,v,t)=>commands.ExecuteAsync(new(a,v,"drop"),t));WindowPositions.Prepare(dropWindow,"drop-actions",Bounds,true);dropWindow.Show();dropWindow.Activate();}catch(Exception e){content?.Dispose();OperationFeedback.Error(e.Message);}
+        DropContent? content=null;try{content=DropContent.Read(data);launcher.Hide();RevealDock(true);dropWindow?.Close();dropWindow=new DropActionForm(content,prefs,(a,v)=>commands.ExecuteAsync(new(a,v,"drop")),AddApplicationModules,ShowNotes,text=>{using var confirm=new QuickTextForm("添加待办",text);WindowPositions.Prepare(confirm,"drop-todo",Bounds,previewMode);if(confirm.ShowDialog()==DialogResult.OK){todoClient.From("drop-ui").Add(confirm.Value,DateOnly.FromDateTime(DateTime.Today),null);todoWindow?.View.Render();OperationFeedback.Show("已添加到今天的清单");}},launcher.FileApplications,(a,v,t)=>commands.ExecuteAsync(new(a,v,"drop"),t),()=>ConfigureDropOpening(content.Paths));WindowPositions.Prepare(dropWindow,"drop-actions",Bounds,true);dropWindow.Show();dropWindow.Activate();}catch(Exception e){content?.Dispose();OperationFeedback.Error(e.Message);}
     }
 }

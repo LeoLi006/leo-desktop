@@ -34,7 +34,7 @@ sealed partial class PetForm
             case "files_with_app":return await DropOpenExecution.Execute(prefs,value,token,
                 previewMode?(_,_)=>Task.FromResult(true):ApplicationCapabilityHost.StartProcess,
                 path=>previewMode||WindowsOpenWith.Show(path,dropWindow is{IsDisposed:false}?dropWindow.Handle:IntPtr.Zero),
-                ()=>LauncherFileSearch.FindCode(launcher.FileApplications));
+                ()=>LauncherFileSearch.FindCode(launcher.FileApplications),launcher.FileApplications,(a,v,t)=>commands.ExecuteAsync(new(a,v,commands.CurrentSource),t));
             case "notes_open":case "note_add":throw new InvalidOperationException("便签动作必须通过已注册模块执行");
             case "path_reveal":{string path=commands.CurrentSource=="application-menu"?FileDropActions.RequirePath(value):LocalPath.Resolve(value);if(!previewMode)Process.Start(FileDropActions.FolderStart(path));return "已打开所在文件夹。";}
             case "path_open":{string path=LocalPath.Resolve(value);if(!previewMode)Process.Start(new ProcessStartInfo(path){UseShellExecute=true});return "已打开 "+Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));}
