@@ -30,7 +30,7 @@ sealed class FootTools : Form
     readonly GlyphButton moreButton=new("more");
     bool utilitiesOpen;
     readonly Button searchButton = new GlyphButton("search");
-    readonly GlyphButton proxyButton = new("proxy");
+    readonly GlyphButton proxyButton = new("proxy") { ActiveState = true };
     readonly GlyphButton chatButton = new("chat");
     readonly GlyphButton todoButton = new("todo");
     public Action<string>? ManageShortcut;
