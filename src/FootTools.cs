@@ -111,6 +111,9 @@ sealed class FootTools : Form
         proxyButton.AccessibleName = "打开 ClashDock";
         proxyButton.FlatStyle = FlatStyle.Flat; proxyButton.FlatAppearance.BorderSize = 0;
         tip.SetToolTip(proxyButton, "打开 ClashDock · 应用与网站分流");
+        var dockMenu=new ContextMenuStrip();var configureDock=new ToolStripMenuItem("设置 ClashDock 路径…");
+        configureDock.Click+=(_,_)=>{if(preview)return;try{ClashDockShortcut.Configure(this);}catch(Exception e){OperationFeedback.Error(UiLanguage.T(e.Message));}};
+        dockMenu.Items.Add(configureDock);proxyButton.ContextMenuStrip=dockMenu;proxyButton.Disposed+=(_,_)=>dockMenu.Dispose();
         proxyButton.Click += (_, _) => {
             if (!EntryContributions.Builtin(modules,"clash").Shortcut) return;
             try { if (DockRequested != null) DockRequested(); else if (!preview) ClashDockShortcut.Open(this); }

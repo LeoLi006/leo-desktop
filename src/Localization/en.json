@@ -1379,5 +1379,11 @@
   "处理工具报告导入失败；未确认转换完成。": "The tool reported import failure. Conversion has not been confirmed.",
   "已提交工具启动请求，但未收到导入确认；请检查工具窗口。未确认转换完成，请勿直接重复生成。": "Launch requested, but import was not confirmed. Check the tool window before retrying. Conversion has not been confirmed.",
   "已停止等待导入；工具可能已接收文件，请检查其窗口。未撤回已提交请求。": "Stopped waiting. The tool may have received the file; check its window. Submitted requests were not withdrawn.",
-  "文件交接必须使用导入回执入口。": "File handoff must use the import receipt action."
+  "文件交接必须使用导入回执入口。": "File handoff must use the import receipt action.",
+  "设置 ClashDock 路径…": "Configure ClashDock path…",
+  "ClashDock 未配置或不可用；可右键按钮设置路径。": "ClashDock is not configured or unavailable. Right-click this button to configure its path.",
+  "无法打开 ClashDock：": "Cannot open ClashDock: ",
+  "Windows 未能启动 ClashDock。": "Windows could not start ClashDock.",
+  "选择 ClashDock（仅首次需要）": "Choose ClashDock",
+  "ClashDock 路径配置无效。": "Invalid ClashDock path configuration."
 }

@@ -59,6 +59,24 @@ static class FileImportTests
         c["pdf_prioritizes_reader_not_all_apps"]=DropActionForm.PrimaryIds(["default","foxit","annotate","sumatra","choose_app"],true).SequenceEqual(new[]{"sumatra","default"});
         c["folders_prioritize_code_and_explorer"]=DropActionForm.PrimaryIds(["default","code","choose_app"],true).SequenceEqual(new[]{"code","default"});
         c["handoff_draft_preserves_script_and_uses_private_app_reference"]=LocalApplications.Clone(prefs).ApplicationOpenRules.Single().ImportScript==script&&!ApplicationPackages.Export(ApplicationPackages.Create(local)).Contains(folder);
+        File.WriteAllText(script,"isolated fixture; never execute");File.Delete(exe);
+        c["handoff_missing_program_is_unavailable"]=!ApplicationOpenCapabilities.Resolve(prefs).Single(a=>a.Rule.Id==rule.Id).Available;
+        File.WriteAllText(exe,"isolated fixture; never execute");
+        var absent=LocalApplications.Clone(prefs);absent.ApplicationModules.Clear();
+        c["handoff_removed_module_is_unavailable"]=ApplicationOpenCapabilities.Resolve(absent).Single(a=>a.Rule.Id==rule.Id).State=="removed";
+        using(var panel=new DropActionForm(new(){Paths=[source]},absent,(_,_)=>Task.FromResult("unused"),_=>{},_=>{},_=>{},[],configure:()=>{})){
+            panel.Show();Application.DoEvents();var buttons=panel.Controls.OfType<FlowLayoutPanel>().SelectMany(f=>f.Controls.OfType<Button>()).ToArray();
+            c["handoff_absent_tool_only_disables_its_button"]=!buttons.Single(b=>b.Tag as string=="mojian").Enabled&&buttons.Single(b=>b.Tag as string=="configure_open").Enabled&&!panel.IsDisposed;
+            panel.Close();
+        }
+        int configs=0;
+        using(var panel=new DropActionForm(new(){Paths=[source]},prefs,(_,_)=>Task.FromException<string>(new IOException("isolated startup failure")),_=>{},_=>{},_=>{},[],configure:()=>configs++)){
+            panel.Show();Application.DoEvents();var buttons=panel.Controls.OfType<FlowLayoutPanel>().SelectMany(f=>f.Controls.OfType<Button>()).ToArray();
+            buttons.Single(b=>b.Tag as string=="mojian").PerformClick();
+            c["handoff_launch_failure_does_not_close_or_disable_panel"]=!panel.IsDisposed&&buttons.Single(b=>b.Tag as string=="mojian").Enabled;
+            buttons.Single(b=>b.Tag as string=="configure_open").PerformClick();c["handoff_other_action_survives_failure"]=configs==1;
+            panel.Close();
+        }
         foreach(string text in new[]{"文件快捷处理","转为墨笺手写","导入预览，生成需确认","用 SumatraPDF 阅读"}){
             string old=UiLanguage.Current;UiLanguage.Configure("en");c["translated_"+text]=UiLanguage.T(text)!=text;UiLanguage.Configure(old);
         }
