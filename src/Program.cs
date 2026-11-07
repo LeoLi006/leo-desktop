@@ -218,6 +218,7 @@ static class Program
         BarcaScrollTheme.Start(); UiTheme.Start();UiLanguage.Start();
         Application.AddMessageFilter(new EscapeWindows());
         Application.SetCompatibleTextRenderingDefault(false);
+        if(args.Length==2&&args[0]=="--clashdock-shortcut-test"){ClashDockShortcutTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--m05-conversation-test"){ConversationTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--additional-contract-test"){AdditionalContractTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--module-contract-test"){ModuleContractTests.Run(args[1]);return;}
@@ -581,7 +582,7 @@ sealed partial class PetForm : Form
         EntryContributions.Bind(prefs,commands.Registry,commands,launcher.RefreshModules);HostServiceDiagnostics.Bind(prefs,commands.Registry,presentation);launcher.RefreshModules();
         if(!preview){ModuleRepair.Applications=()=>InvokeRequired?(AppEntry[])Invoke(()=>launcher.FileApplications.ToArray()):launcher.FileApplications.ToArray();ModulePaths.RepairRequested=RepairBuiltinPath;}
         constructionProbe?.Invoke("launcher_ready");
-        foot = new FootTools(p.PetSize, preview);foot.ProxyAction=(a,t)=>commands.ExecuteAsync(new(a,"","foot-ui"),t);
+        foot = new FootTools(p.PetSize, preview);
         if(!preview)ConfigureClientActivity();
         foot.ManageShortcut=ManageQuickEntry;launcher.ManageShortcut=ManageQuickEntry;foot.ConfigureModules(prefs);
         foot.ChatRequested += ShowChat;

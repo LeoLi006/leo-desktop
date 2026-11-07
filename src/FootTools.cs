@@ -12,7 +12,7 @@ sealed class FootTools : Form
     int CompactUnits=>UtilityUnits==4?64:94;
     int UtilityUnits=>4+30*((Quick("terminal")?1:0)+(Quick("clash")?1:0)+(Quick("edge")?1:0));
     int VisibleCompactUnits=>Math.Max(CompactUnits,utilitiesOpen?UtilityUnits:0);
-    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var entry=EntryContributions.Builtin(p,pair.Item1);pair.Item2.AccessibleName=entry.Name;var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(entry.Icon);old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!Quick("edge"))expanded=false;if(!EntryContributions.Builtin(p,"clash").Enabled)proxyTimer.Stop();else if(IsHandleCreated&&Visible)proxyTimer.Start();LayoutTools();}
+    public void ConfigureModules(Preferences p){modules=p;foreach(var pair in new[]{("terminal",terminal),("clash",(Button)proxyButton),("edge",searchButton)}){var entry=EntryContributions.Builtin(p,pair.Item1);pair.Item2.AccessibleName=pair.Item1=="clash"?"打开 ClashDock":entry.Name;var old=pair.Item2.Image;pair.Item2.Image=LocalApplications.Icon(entry.Icon);old?.Dispose();pair.Item2.Invalidate();}if(UtilityUnits==4)utilitiesOpen=false;if(!Quick("edge"))expanded=false;LayoutTools();}
     readonly Button terminal;
     Font? scaledFont;
     int S(int value) => Math.Max(1, (int)Math.Round(value * uiScale));
@@ -37,10 +37,10 @@ sealed class FootTools : Form
     public event Action? ChatRequested;
     public event Action? TodosRequested;
     public event Action? VoiceRequested;
-    readonly System.Windows.Forms.Timer proxyTimer = new() { Interval = 1200 };
-    bool proxyBusy,proxyRefreshing,proxyReleased;
-    readonly CancellationTokenSource proxyLife=new();
-    public Func<string,CancellationToken,Task<string>>? ProxyAction;
+
+    bool proxyReleased;
+
+    public Action? DockRequested;
     Rectangle petBounds, workArea;
     bool expanded;
     public bool IsSearchOpen=>expanded;
@@ -108,24 +108,14 @@ sealed class FootTools : Form
         chatButton.Click += (_, _) => ChatRequested?.Invoke(); tip.SetToolTip(chatButton, "问 Leo · 右键直接说话 · Ctrl+Alt+V");
         chatButton.MouseUp+=(_,e)=>{if(e.Button==MouseButtons.Right)VoiceRequested?.Invoke();};
         todoButton.AccessibleName="每日清单";todoButton.FlatStyle=FlatStyle.Flat;todoButton.FlatAppearance.BorderSize=0;todoButton.Click+=(_,_)=>TodosRequested?.Invoke();tip.SetToolTip(todoButton,"每日清单");
-        proxyButton.AccessibleName = "Clash Verge 系统代理";
+        proxyButton.AccessibleName = "打开 ClashDock";
         proxyButton.FlatStyle = FlatStyle.Flat; proxyButton.FlatAppearance.BorderSize = 0;
-        async Task<ProxyStatus> ReadProxy(){if(preview)return new(true,true,"Clash 系统代理已开启 · 示例");if(ProxyAction==null)throw new InvalidOperationException("代理入口尚未就绪");return System.Text.Json.JsonSerializer.Deserialize<ProxyStatus>(await ProxyAction("proxy_status",proxyLife.Token))??throw new IOException("代理状态无效");}
-        async Task RefreshProxy()
-        {
-            if(proxyBusy||proxyRefreshing||IsDisposed||!EntryContributions.Builtin(modules,"clash").Enabled)return;proxyRefreshing=true;
-            try{var state=await ReadProxy();if(IsDisposed)return;proxyButton.ActiveState=state.Enabled;tip.SetToolTip(proxyButton,state.Description);proxyButton.Invalidate();}
-            catch(OperationCanceledException){}catch(Exception error){if(!IsDisposed)tip.SetToolTip(proxyButton,error.Message);}finally{proxyRefreshing=false;}
-        }
-        async Task ChangeProxy(bool? target=null) {
-            if(preview||proxyBusy||!EntryContributions.Builtin(modules,"clash").Enabled)return;
-            proxyBusy=true;proxyButton.Enabled=false;bool? desired=target;
-            try{desired??=(await ReadProxy()).Enabled!=true;OperationFeedback.Pending(desired.Value?"正在开启系统代理…":"正在关闭系统代理…");string message=await ProxyAction!(desired.Value?"proxy_on":"proxy_off",proxyLife.Token);if(!IsDisposed)OperationFeedback.Show(message);}
-            catch(OperationCanceledException){}catch(Exception error){if(!IsDisposed)OperationFeedback.Error(error.Message,()=>ChangeProxy(desired));}
-            finally{if(!IsDisposed){proxyBusy=false;proxyButton.Enabled=true;await RefreshProxy();}}
-        }
-        proxyButton.Click+=async(_,_)=>await ChangeProxy();
-        FeatureFaults.Timer(proxyTimer,"代理状态检查",()=>{_ = RefreshProxy();},enabled:()=>EntryContributions.Builtin(modules,"clash").Enabled);
+        tip.SetToolTip(proxyButton, "打开 ClashDock · 应用与网站分流");
+        proxyButton.Click += (_, _) => {
+            if (!EntryContributions.Builtin(modules,"clash").Shortcut) return;
+            try { if (DockRequested != null) DockRequested(); else if (!preview) ClashDockShortcut.Open(this); }
+            catch (Exception error) { OperationFeedback.Error("无法打开 ClashDock：" + error.Message); }
+        };
         search.SetBounds(67, 6, 154, 21); search.PlaceholderText = UiLanguage.T("输入关键词，回车搜索");
         search.BorderStyle = BorderStyle.None; search.BackColor = Appearance.Background; search.ForeColor = Appearance.Ink;
         search.Visible = false;
@@ -144,9 +134,9 @@ sealed class FootTools : Form
         };
         Controls.AddRange([moreButton,terminal, searchButton, proxyButton, chatButton, todoButton, edgeTargetButton, geminiButton, deepseekButton, chatgptWebButton, search]);
         ApplyScale(petSize);
-        Shown += (_, _) => { SetExpanded(false); _ = RefreshProxy(); if (!preview&&EntryContributions.Builtin(modules,"clash").Enabled) proxyTimer.Start(); };
+        Shown += (_, _) => SetExpanded(false);
         Deactivate += (_, _) => CollapseSearch();
-        Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true;proxyLife.Cancel();proxyLife.Dispose();proxyTimer.Dispose(); foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();foreach(var (button,_) in TargetButtons)button.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
+        Disposed += (_, _) => { if(proxyReleased)return;proxyReleased=true; foreach(var b in new[]{terminal,(Button)proxyButton,searchButton})b.Image?.Dispose();foreach(var (button,_) in TargetButtons)button.Image?.Dispose();tip.Dispose(); scaledFont?.Dispose(); };
     }
     (GlyphButton Button,string Target)[] TargetButtons=>[(edgeTargetButton,"edge"),(geminiButton,"gemini"),(deepseekButton,"deepseek"),(chatgptWebButton,"chatgpt")];
     void SelectTarget(string target)
