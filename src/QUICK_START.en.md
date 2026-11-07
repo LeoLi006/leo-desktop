@@ -2,13 +2,13 @@
 
 [简体中文](QUICK_START.md) | **English**
 
-For v1.05.0. Read the first two sections once; afterward use the task lookup table. **App search, tasks and quick notes work without a model API. You do not need API setup to get started.**
+For v1.06.0. Read the first two sections once; afterward use the task lookup table. **App search, tasks and quick notes work without a model API. You do not need API setup to get started.**
 
-[Download Windows version](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.05.0) · [Full user guide](USER_GUIDE.en.md) · [Troubleshooting](#if-something-is-wrong)
+[Download Windows version](https://github.com/LeoLi006/leo-desktop/releases/tag/v1.06.0) · [Full user guide](USER_GUIDE.en.md) · [Troubleshooting](#if-something-is-wrong)
 
 ## Get started in three minutes
 
-1. **Install:** download `Leo-v1.05.0-win-x64.zip`, extract everything, then run `Install-Leo.cmd`. For an update, choose your existing Leo installation folder.
+1. **Install:** download `Leo-v1.06.0-win-x64.zip`, extract everything, then run `Install-Leo.cmd`. For an update, choose your existing Leo installation folder.
 2. **Find an app:** click the sheep, type an app name, then click a result or press Enter. Click the sheep again to hide search.
 3. **Remember one task:** click the planner icon below the sheep, enter a task and add it. Alternatively right-click the sheep→Planner & notes→Daily planner.
 4. **Make it yours:** right-click→Settings. General changes name, size and startup; Features enables only the tools you want. Click Save settings when finished.
