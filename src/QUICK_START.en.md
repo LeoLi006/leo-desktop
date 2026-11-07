@@ -196,3 +196,12 @@ If customized, follow the actual values in Settings→Hotkeys.
 Still stuck? [Report an issue](https://github.com/LeoLi006/leo-desktop/issues) with version, clicks, expected/actual behavior and sanitized screenshots. Never attach a key or the entire runtime folder.
 
 For more operations read the [full user guide](USER_GUIDE.en.md). Architecture/protocol/developer documents are optional for product users.
+
+
+## Mojian: Word / Markdown handwriting conversion
+
+Optionally connect [Mojian handwriting tool](https://github.com/LeoLi006/handwriting-tool) through Leo's existing local-application modules. Open its independent GUI from the shortcut bar, menu or search. Mojian converts Word `.docx`, Markdown and TXT to handwriting-style PNG/PDF locally; rendering, fonts and preview stay in Mojian and do not use Leo's model API.
+
+- **Automatic setup**: download/extract Mojian and follow its [Leo integration guide](https://github.com/LeoLi006/handwriting-tool/blob/main/integrations/leo/README.en.md), specifying your own installed Leo folder. The script backs up settings, avoids duplicate entries and preserves existing entry preferences. Shared packages contain no personal paths/settings.
+- **Manual setup**: create a Windows `.lnk` shortcut to Mojian's `启动GUI.vbs`, then add that shortcut in Leo Settings → Features → Application modules. Alternatively import the [data-only package](Integrations/Mojian/mojian.leoapp.json) and choose your local shortcut in the preview. Save settings and search `墨笺`; automatic setup also adds `mojian`, `shouxie` and `handwriting`. Check More if the shortcut overflows.
+- **Scope**: disable/remove the entry without deleting Mojian or documents. Download both tools separately; Leo does not bundle Python, the converter or your documents. This integration/docs update does not rebuild older release packages. Unattended conversion/export from Leo is not implemented.

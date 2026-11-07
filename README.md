@@ -80,3 +80,12 @@ Leo不会替代专业软件：邮件在原客户端处理，音乐和媒体依�
 内部模块仍需宿主组装，worker扩展不是权限沙箱。只提交相关检查；不上传个人数据、Key、模型和运行目录。分发前核对项目及第三方许可、商标与素材权利。
 
 </details>
+
+
+## 墨笺：Word / Markdown 手写转换
+
+可选接入 [墨笺手写体工具](https://github.com/LeoLi006/handwriting-tool)，通过 Leo 的现有本机应用模块，在快捷栏、菜单或搜索中打开墨笺独立窗口。支持 Word `.docx`、Markdown、TXT 转手写风格 PNG / PDF；转换、字体与预览由墨笺本地处理，不调用 Leo 的模型 API。
+
+- **自动接入**：下载并解压墨笺，按其 [Leo 接入说明](https://github.com/LeoLi006/handwriting-tool/blob/main/integrations/leo/README.md) 指定自己的 Leo 安装目录执行接入脚本。脚本备份原配置、去重并保留原有入口设置；本机路径和配置不包含在分享包中。
+- **手动接入**：为墨笺 `启动GUI.vbs` 建立 Windows `.lnk` 快捷方式，再到 Leo 设置 → 功能 → 应用模块，新建应用并选择该快捷方式。也可导入 [数据模块包](src/Integrations/Mojian/mojian.leoapp.json)，在配置预览中选择自己的快捷方式。保存设置后可搜 `墨笺`；自动接入还提供 `手写`、`mojian`、`shouxie` 等简称。快捷按钮溢出时查看“更多”。
+- **范围**：入口可停用或移除，不删除墨笺和文档。两款工具需分别下载；没有把 Python、转换引擎或用户文档打进 Leo。本次是接入脚本和文档更新，不代表旧 Release 安装包已重新打包。暂不支持从 Leo 无人值守转换或自动导出。
