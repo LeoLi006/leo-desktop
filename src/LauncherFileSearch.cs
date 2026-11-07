@@ -23,11 +23,15 @@ static class LauncherFileSearch
         }
         return new(found.OrderByDescending(p=>p.Directory).ThenBy(p=>p.Path,StringComparer.OrdinalIgnoreCase).ToArray(),false);
     }
+    public static string? FindCode(IEnumerable<AppEntry> applications,string configured="")=>new[]{configured,
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","Microsoft VS Code","Code.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Microsoft VS Code","Code.exe")}
+        .Concat(applications.Select(a=>a.ExePath)).FirstOrDefault(p=>Path.GetFileName(p).Equals("Code.exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(p));
     public static ProcessStartInfo CodeStart(string executable,string target)
     {
         if(!Path.GetFileName(executable).Equals("Code.exe",StringComparison.OrdinalIgnoreCase)||!File.Exists(executable))throw new IOException("请选择 VS Code 的 Code.exe");
         var start=new ProcessStartInfo(executable){UseShellExecute=true};
-        start.ArgumentList.Add("--new-window");start.ArgumentList.Add(LocalPath.Resolve(target));return start;
+        start.ArgumentList.Add("--new-window");start.ArgumentList.Add(FileDropActions.RequirePath(target));return start;
     }
 }
 
@@ -141,10 +145,9 @@ sealed partial class LauncherForm
         if(launcherReleased||commandRunning)return;
         try{
             string target=pathChoices.SelectedItem is PathChoice choice?choice.Path:LocalPath.Resolve(query.Text);
-            target=LocalPath.Resolve(target);
+            target=FileDropActions.RequirePath(target);
             if(inCode){
-                string? executable=new[]{codeExecutable,Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","Microsoft VS Code","Code.exe"),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Microsoft VS Code","Code.exe")}
-                    .Concat(FileApplications.Select(a=>a.ExePath)).FirstOrDefault(p=>Path.GetFileName(p).Equals("Code.exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(p));
+                string? executable=LauncherFileSearch.FindCode(FileApplications,codeExecutable);
                 if(executable==null){menuOpen=true;try{using var dialog=new OpenFileDialog{Filter="VS Code (Code.exe)|Code.exe",Title=UiLanguage.T("请选择 VS Code 的 Code.exe")};if(dialog.ShowDialog(this)!=DialogResult.OK)return;executable=codeExecutable=dialog.FileName;}finally{menuOpen=false;Activate();}}
                 var start=LauncherFileSearch.CodeStart(executable,target);if(!preview)Process.Start(start);Hide();
             }else if(CommandRequested!=null){query.Text=target;await RunCommand();}

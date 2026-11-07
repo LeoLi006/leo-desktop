@@ -324,6 +324,13 @@ sealed partial class LauncherForm : Form
                 }
                 Open();
             });
+            if(ApplicationLocation.CanOffer(app,prefs))menu.Items.Add("打开应用所在文件夹",null,async(_,_)=>{
+                try{string path=ApplicationLocation.Resolve(app,prefs);
+                    if(OriginActionRequested!=null)await OriginActionRequested("path_reveal",path,"application-menu",CancellationToken.None);
+                    else if(ActionRequested!=null)await ActionRequested("path_reveal",path,CancellationToken.None);
+                    else throw new InvalidOperationException("应用入口尚未就绪");
+                }catch(OperationCanceledException){}catch(Exception error)when(FeatureFaults.Recoverable(error)){if(!IsDisposed)OperationFeedback.Error(UiLanguage.T(error.Message));}
+            });
             Point press = Point.Empty; bool suppressClick = false;
             tile.MouseDown += (_, e) => { press = e.Location; suppressClick = false; };
             tile.MouseMove += (_, e) => {

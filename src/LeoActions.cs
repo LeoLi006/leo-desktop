@@ -31,9 +31,12 @@ sealed partial class PetForm
     Task<string> ExecuteLeoAction(string action,string value,CancellationToken token)=>commands.ExecuteAsync(new(action,value,"chat"),token);
     async Task<string> ExecuteLeoActionCore(string action,string value,CancellationToken token){token.ThrowIfCancellationRequested();if(!LeoActions.Names.Contains(action))throw new ArgumentException("不支持的功能");Modules.Require(prefs,Modules.ForAction(action));
         switch(action){
-            case "files_with_app":{using var doc=JsonDocument.Parse(value);var root=doc.RootElement;string app=root.TryGetProperty("application",out var application)?application.GetString()??"":"";var paths=root.GetProperty("paths").EnumerateArray().Select(e=>e.GetString()??"").ToArray();var start=root.TryGetProperty("module",out var module)&&module.GetString() is {Length:>0} moduleId?FileDropActions.ConfiguredStart(prefs,moduleId,paths):FileDropActions.AppStart(app,paths);if(!previewMode)Process.Start(start);return "已交给所选应用。";}
+            case "files_with_app":return await DropOpenExecution.Execute(prefs,value,token,
+                previewMode?(_,_)=>Task.FromResult(true):ApplicationCapabilityHost.StartProcess,
+                path=>previewMode||WindowsOpenWith.Show(path,dropWindow is{IsDisposed:false}?dropWindow.Handle:IntPtr.Zero),
+                ()=>LauncherFileSearch.FindCode(launcher.FileApplications));
             case "notes_open":case "note_add":throw new InvalidOperationException("便签动作必须通过已注册模块执行");
-            case "path_reveal":{string path=LocalPath.Resolve(value);if(!previewMode)Process.Start(FileDropActions.FolderStart(path));return "已打开所在文件夹。";}
+            case "path_reveal":{string path=commands.CurrentSource=="application-menu"?FileDropActions.RequirePath(value):LocalPath.Resolve(value);if(!previewMode)Process.Start(FileDropActions.FolderStart(path));return "已打开所在文件夹。";}
             case "path_open":{string path=LocalPath.Resolve(value);if(!previewMode)Process.Start(new ProcessStartInfo(path){UseShellExecute=true});return "已打开 "+Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));}
             case "local_app_open":return await commands.ExecuteAsync(new("local:"+value,"",commands.CurrentSource),token);
             case "module_list":return JsonSerializer.Serialize(new{modules=commands.Modules.Select(m=>new{m.Id,m.Name,m.Version,m.Enabled,m.Actions}),applications=(prefs.ApplicationModules??[]).Select(a=>new{a.Id,a.Name,a.Enabled,action="local_app_open"}),extensions=commands.Extensions.Load().Select(m=>new{m.Id,m.Name,m.Version,m.Runtime,commands=m.Commands.Select(c=>new{c.Id,c.Title,c.Phrases,action="ext:"+m.Id+":"+c.Id})})});

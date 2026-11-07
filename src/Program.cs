@@ -148,7 +148,7 @@ static class Catalog
             .Where(x => !Path.GetExtension(x.Target).Equals(".lnk", StringComparison.OrdinalIgnoreCase) || (x.ExePath.Length > 0 && !new[] { "help", "uninstall", "readme", "帮助", "卸载", "官网", "参考文档" }.Any(word => x.Name.Contains(word, StringComparison.OrdinalIgnoreCase))))
             .OrderBy(x => x.Name).ToList();
     }
-    static AppEntry ResolveExecutable(AppEntry entry)
+    internal static AppEntry ResolveExecutable(AppEntry entry)
     {
         if (Path.GetExtension(entry.Target).Equals(".exe", StringComparison.OrdinalIgnoreCase)) return entry with { ExePath = entry.Target };
         if (!Path.GetExtension(entry.Target).Equals(".lnk", StringComparison.OrdinalIgnoreCase)) return entry;
@@ -275,6 +275,7 @@ static class Program
         if(args.Length==2&&args[0]=="--application-host-test"){ApplicationHostServiceTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-consistency-test"){EntryConsistencyTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--entry-inventory"){EntryInventory.ExportExample(args[1]);return;}
+        if(args.Length==2&&args[0]=="--drop-open-test"){DropOpenTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--gemini-web-test"){GeminiWebTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--research-news-test"){ResearchNewsTests.Run(args[1]);return;}
         if(args.Length==2&&args[0]=="--research-news-live"){ResearchNewsTests.Live(args[1]);return;}
@@ -592,6 +593,11 @@ sealed partial class PetForm : Form
         hit.AllowDrop = true;
         hit.DragEnter += (_, e) => e.Effect = DropContent.Accepts(e.Data)?DragDropEffects.Copy:DragDropEffects.None;
         hit.DragDrop += (_, e) => { if(e.Data!=null)AcceptDrop(e.Data); };
+        hit.DragOver+=(_,e)=>e.Effect=DropContent.Accepts(e.Data)?DragDropEffects.Copy:DragDropEffects.None;
+        AllowDrop=true;
+        DragEnter+=(_,e)=>e.Effect=DropContent.Accepts(e.Data)?DragDropEffects.Copy:DragDropEffects.None;
+        DragOver+=(_,e)=>e.Effect=DropContent.Accepts(e.Data)?DragDropEffects.Copy:DragDropEffects.None;
+        DragDrop+=(_,e)=>{if(e.Data!=null)AcceptDrop(e.Data);};
         launcher.PetBounds = () => Bounds;
         if(!preview){WindowPositions.PetBounds=()=>Bounds;WindowPositions.MonitorsChanged=OnMonitorsChanged;OperationFeedback.Sink=PresentFeedback;}
         launcher.PointerOverPet = () => hit.Bounds.Contains(Cursor.Position);

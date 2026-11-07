@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 namespace LeoLauncher;
 
 static class FileDropActions
@@ -9,14 +10,43 @@ static class FileDropActions
     {
         if (!Path.GetExtension(executable).Equals(".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(executable)) throw new IOException("请选择可执行的桌面应用");
         var start = new ProcessStartInfo(executable) { UseShellExecute = true };
-        foreach (var path in ValidPaths(paths)) start.ArgumentList.Add(path);
+        foreach (var path in RequirePaths(paths)) start.ArgumentList.Add(path);
         if (start.ArgumentList.Count == 0) throw new IOException("文件已不存在");
         return start;
     }
     public static string QuoteArgument(string value){var output=new System.Text.StringBuilder("\"");int slashes=0;foreach(char c in value){if(c=='\\'){slashes++;continue;}if(c=='"'){output.Append('\\',slashes*2+1).Append(c);slashes=0;continue;}output.Append('\\',slashes).Append(c);slashes=0;}return output.Append('\\',slashes*2).Append('"').ToString();}
-    public static ProcessStartInfo ConfiguredStart(Preferences prefs,string module,IEnumerable<string> paths){var app=prefs.ApplicationModules.FirstOrDefault(a=>a.Id==module)??throw new ArgumentException("应用模块不存在。");if(!app.Enabled)throw new InvalidOperationException("应用模块已停用。");var valid=ValidPaths(paths);if(valid.Length==0)throw new IOException("文件已不存在。");var start=LocalApplications.Start(app);start.Arguments=(app.Arguments+" "+string.Join(" ",valid.Select(QuoteArgument))).Trim();return start;}
+    public static string[] RequirePaths(IEnumerable<string> paths)
+    {
+        var values=paths.ToArray();
+        if(values.Length==0||values.Length>100)throw new ArgumentException("一次拖入须为1～100项，未提交打开请求。");
+        var result=values.Select(RequirePath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return result;
+    }
+    public static string RequirePath(string path)
+    {
+        if(string.IsNullOrWhiteSpace(path)||!Path.IsPathFullyQualified(path)||(!File.Exists(path)&&!Directory.Exists(path)))throw new IOException("文件或文件夹不存在，请检查路径。");
+        return Path.GetFullPath(path);
+    }
+    [DllImport("shell32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern IntPtr CommandLineToArgvW(string command,out int count);
+    [DllImport("kernel32.dll")]static extern IntPtr LocalFree(IntPtr memory);
+    internal static string[] ParseArguments(string arguments)
+    {
+        var memory=CommandLineToArgvW("leo.exe "+arguments,out int count);
+        if(memory==IntPtr.Zero)throw new IOException("无法解析应用启动参数。");
+        try{return Enumerable.Range(1,count-1).Select(i=>Marshal.PtrToStringUni(Marshal.ReadIntPtr(memory,i*IntPtr.Size))!).ToArray();}finally{LocalFree(memory);}
+    }
+    public static ProcessStartInfo ConfiguredStart(Preferences prefs,string module,IEnumerable<string> paths)
+    {
+        var app=prefs.ApplicationModules.FirstOrDefault(a=>a.Id==module)??throw new ArgumentException("应用模块不存在。");
+        if(!app.Enabled)throw new InvalidOperationException("应用模块已停用。");
+        var valid=RequirePaths(paths);var start=LocalApplications.Start(app);start.Arguments="";
+        foreach(string arg in ParseArguments(app.Arguments))start.ArgumentList.Add(arg);
+        foreach(string path in valid)start.ArgumentList.Add(path);
+        return start;
+    }
     public static ProcessStartInfo FolderStart(string path)
     {
+        path=RequirePath(path);
         var start = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
         start.ArgumentList.Add(Directory.Exists(path) ? path : "/select," + path);
         return start;
