@@ -1,4 +1,4 @@
-﻿# Leo quick start
+# Leo quick start
 
 [简体中文](QUICK_START.md) | **English**
 
@@ -218,3 +218,11 @@ For more operations read the [full user guide](USER_GUIDE.en.md). Architecture/p
 - **First installation**: right-click any web AI button. Enable Edge Developer mode, choose Load unpacked and select the opened `gemini-bridge` folder. Sign in to each site separately. Without the enabled extension, only the website opens; nothing is filled or submitted automatically.
 - **Limits**: no model API or key; each website's own account access, quotas and connectivity requirements apply. Up to 2,000 characters, a 60-second wait and a Cancel option. Existing drafts are preserved; manual edits stop automation. Uncertain sends are not retried. Handle sign-in, CAPTCHA and consent prompts yourself; Leo does not bypass them.
 - **Privacy and troubleshooting**: the extension only runs on these three sites, without accessing chat history, credentials or other websites. Prompt text travels in a URL fragment that is consumed immediately; Leo does not log it. The browser/site may still observe or retain URLs/content. Hand-offs expire after two minutes and refresh does not resubmit. Site changes may require adapter updates; copy the prompt for manual sending on timeout. After reloading the extension, start a new request from Leo; old tabs do not resend.
+
+## Mojian: Word / Markdown handwriting conversion
+
+Optionally connect [Mojian handwriting tool](https://github.com/LeoLi006/handwriting-tool) through Leo's existing local-application modules. Open its independent GUI from the shortcut bar, menu or search. Mojian converts Word `.docx`, Markdown and TXT to handwriting-style PNG/PDF locally; rendering, fonts and preview stay in Mojian and do not use Leo's model API.
+
+- **Automatic setup**: download/extract Mojian and follow its [Leo integration guide](https://github.com/LeoLi006/handwriting-tool/blob/main/integrations/leo/README.en.md), specifying your own installed Leo folder. The script backs up settings, avoids duplicate entries and preserves existing entry preferences. Shared packages contain no personal paths/settings.
+- **Manual setup**: create a Windows `.lnk` shortcut to Mojian's `启动GUI.vbs`, then add that shortcut in Leo Settings → Features → Application modules. Alternatively import the [data-only package](Integrations/Mojian/mojian.leoapp.json) and choose your local shortcut in the preview. Save settings and search `墨笺`; automatic setup also adds `mojian`, `shouxie` and `handwriting`. Check More if the shortcut overflows.
+- **Scope**: disable/remove the entry without deleting Mojian or documents. Download both tools separately; Leo does not bundle Python, the converter or your documents. This integration/docs update does not rebuild older release packages. Unattended conversion/export from Leo is not implemented.

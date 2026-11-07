@@ -1,0 +1,10 @@
+{
+  "Format": "LeoApplicationPackage",
+  "Protocol": 1,
+  "Id": "6711ebc98d954dd8a04ea449bad791c5",
+  "Version": "1.0.0",
+  "Name": "墨笺·手写转换",
+  "HostMin": "1.04.0",
+  "HostMax": "1.99.99",
+  "Dependencies": ["windows", "local-application/v1"]
+}
