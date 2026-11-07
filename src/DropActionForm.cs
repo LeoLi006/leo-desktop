@@ -11,15 +11,16 @@ sealed class DropActionForm:BarcaWindow
         lifetime=life.Token;AutoScaleMode=AutoScaleMode.None;Text="Leo · 拖放动作";StartPosition=FormStartPosition.Manual;
         var catalog=applications.ToArray();var ids=content.ActionIds(p,catalog);
         var openers=content.Paths.Length>0?ApplicationOpenCapabilities.Candidates(p,content.Paths,catalog).Apps.ToDictionary(a=>a.Rule.Id):new Dictionary<string,ResolvedOpenApplication>();
-        var primaryIds=new[]{"default","choose_app","open_url","configure_open"}.Concat(openers.Keys).ToArray();
+        var primaryIds=PrimaryIds(ids,content.Paths.Length>0);
+        ids=primaryIds.Concat(ids.Where(id=>!primaryIds.Contains(id))).ToArray();
         bool CanUse(string id)=>openers.TryGetValue(id,out var app)?app.Available&&ApplicationOpenCapabilities.Matches(app.Rule,content.Paths)&&(content.Paths.Length==1||app.Rule.Multiple):id=="choose_app"?content.Paths.Length==1:id!="configure_open"||configure!=null;
-        var ownedImages=new List<Image>();
-        string Caption(ResolvedOpenApplication app)=>app.Rule.Name+(app.Application?.Administrator==true?" · 管理员":"")+"\n"+(app.Available?(content.Paths.Length>1&&!app.Rule.Multiple?"仅支持单项":app.Source):"未配置 / 不可用");
+        var ownedImages=new List<Image>();var tips=new ToolTip();
+        string Caption(ResolvedOpenApplication app)=>UiLanguage.T(app.Rule.Adapter=="code"?"VS Code 新窗口":app.Rule.Name)+(app.Application?.Administrator==true?" · 管理员":"")+"\n"+(app.Available?(content.Paths.Length>1&&!app.Rule.Multiple?"仅支持单项":UiLanguage.T(app.Rule.Adapter=="handoff"?"导入预览，生成需确认":app.Source)):UiLanguage.T("未配置 / 不可用"));
         int mainRows=(ids.Count(primaryIds.Contains)+2)/3,otherRows=(ids.Count(id=>!primaryIds.Contains(id))+2)/3;
         var area=Screen.FromRectangle(WindowPositions.PetBounds?.Invoke()??Screen.PrimaryScreen!.WorkingArea).WorkingArea;
         int primaryHeight=Math.Min(mainRows*54,Math.Max(54,area.Height-366-otherRows*38));
         ClientSize=new(590,350+primaryHeight+otherRows*38);
-        Controls.Add(BarcaUi.Chrome(this,content.Paths.Length>0?"用什么打开？":"选择一个动作",content.Paths.Length>0?$"已接收 {content.Paths.Length} 个文件或文件夹":content.IsUrl?"已接收网址":content.Image!=null?"已接收图片":"已接收文字"));
+        Controls.Add(BarcaUi.Chrome(this,content.Paths.Length>0?"文件快捷处理":"选择一个动作",content.Paths.Length>0?$"已接收 {content.Paths.Length} 个文件或文件夹":content.IsUrl?"已接收网址":content.Image!=null?"已接收图片":"已接收文字"));
         var summary=new TextBox{Text=content.Summary,ReadOnly=true,Multiline=true,ScrollBars=ScrollBars.Vertical,Bounds=new(24,104,542,88),BackColor=BarcaUi.Raised,ForeColor=BarcaUi.Text,BorderStyle=BorderStyle.None};UiLanguage.Preserve(summary);
         var scope=new Label{Bounds=new(24,199,542,44),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9),Text=content.Paths.Length>1?"以下操作处理全部列出的项目；标记“仅支持单项”的应用不可用于本批。":"打开操作只处理上面列出的这一项。"};
         if(content.Paths.Any(DropOpenExecution.MayRun))scope.Text="程序或脚本不提供默认运行，请显式选择应用查看或添加模块。";
@@ -32,7 +33,7 @@ sealed class DropActionForm:BarcaWindow
         foreach(string id in ids){
             var button=new BarcaButton{Text=titles.GetValueOrDefault(id)??openers[id].Rule.Name,Tag=id,Size=new(174,primaryIds.Contains(id)?44:30),Margin=new Padding(5),TabIndex=buttons.Count,Enabled=CanUse(id)};
             if(openers.TryGetValue(id,out var opener)){
-                button.Font=BarcaUi.Font(8.3f);button.Text=Caption(opener);
+                button.Font=BarcaUi.Font(8.3f);button.Text=primaryIds.Contains(id)?Caption(opener):UiLanguage.T(opener.Rule.Name)+(opener.Available?"":" · "+UiLanguage.T("未配置 / 不可用"));button.AccessibleDescription=Caption(opener);tips.SetToolTip(button,Caption(opener));
                 try{Image? icon=opener.Icon.Length>0?LocalApplications.Icon(opener.Icon):null;if(icon==null&&File.Exists(opener.Path)){using var native=System.Drawing.Icon.ExtractAssociatedIcon(opener.Path);icon=native?.ToBitmap();}icon??=BuiltinIcons.TryCreate("glyph:"+(opener.Rule.Adapter=="code"?"code":opener.Rule.Adapter=="media"?"media":"notes"));if(icon!=null){button.Image=icon;ownedImages.Add(icon);}}catch(Exception e)when(FeatureFaults.Recoverable(e)){}
             }
             if(id=="choose_app"&&content.Paths.Length>1){button.Enabled=false;button.Text="其他应用（仅单项）";}
@@ -72,10 +73,11 @@ sealed class DropActionForm:BarcaWindow
         Controls.AddRange([summary,scope,primary,secondaryTitle,secondary,status]);MinimumSize=MaximumSize=Size;
         Shown+=(_,_)=>buttons.FirstOrDefault(b=>b.Enabled)?.Focus();
         Activated+=(_,_)=>{if(busy||content.Paths.Length==0)return;var fresh=ApplicationOpenCapabilities.Resolve(p,catalog).ToDictionary(a=>a.Rule.Id);
-            foreach(var pair in openers.ToArray())if(fresh.TryGetValue(pair.Key,out var next)){if(pair.Value.Source=="系统默认 / 类型匹配"&&ApplicationOpenCapabilities.Identity(pair.Value.Path)==ApplicationOpenCapabilities.Identity(next.Path))next=next with{Source=pair.Value.Source};openers[pair.Key]=next;var b=buttons.Single(b=>b.Tag as string==pair.Key);b.Enabled=CanUse(pair.Key);b.Text=Caption(next);}else{openers[pair.Key]=pair.Value with{State="removed"};var b=buttons.Single(b=>b.Tag as string==pair.Key);b.Enabled=false;b.Text=Caption(openers[pair.Key]);}
+            foreach(var pair in openers.ToArray())if(fresh.TryGetValue(pair.Key,out var next)){if(pair.Value.Source=="系统默认 / 类型匹配"&&ApplicationOpenCapabilities.Identity(pair.Value.Path)==ApplicationOpenCapabilities.Identity(next.Path))next=next with{Source=pair.Value.Source};openers[pair.Key]=next;var b=buttons.Single(b=>b.Tag as string==pair.Key);b.Enabled=CanUse(pair.Key);b.Text=primaryIds.Contains(pair.Key)?Caption(next):UiLanguage.T(next.Rule.Name)+(next.Available?"":" · "+UiLanguage.T("未配置 / 不可用"));b.AccessibleDescription=Caption(next);tips.SetToolTip(b,Caption(next));}else{openers[pair.Key]=pair.Value with{State="removed"};var b=buttons.Single(b=>b.Tag as string==pair.Key);b.Enabled=false;b.Text=UiLanguage.T(pair.Value.Rule.Name)+" · "+UiLanguage.T("未配置 / 不可用");tips.SetToolTip(b,Caption(openers[pair.Key]));}
         };
-        FormClosing+=(_,_)=>{if(!released)life.Cancel();};Disposed+=(_,_)=>{if(released)return;released=true;life.Cancel();life.Dispose();foreach(var image in ownedImages)image.Dispose();content.Dispose();};
+        FormClosing+=(_,_)=>{if(!released)life.Cancel();};Disposed+=(_,_)=>{if(released)return;released=true;life.Cancel();life.Dispose();tips.Dispose();foreach(var image in ownedImages)image.Dispose();content.Dispose();};
     }
+    internal static string[] PrimaryIds(string[] ids,bool files)=>files?new[]{"mojian","code","sumatra","default"}.Where(ids.Contains).Take(3).ToArray():ids.Where(id=>id=="open_url").ToArray();
     protected override bool ProcessCmdKey(ref Message message,Keys key)
     {
         if(key==Keys.Escape){Close();return true;}

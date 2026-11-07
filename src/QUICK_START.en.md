@@ -244,3 +244,13 @@ Optionally connect [Mojian handwriting tool](https://github.com/LeoLi006/handwri
 - **Add another app**: Add capability, link its module and declare its formats; no drop-panel code change is needed. Disable unwanted capabilities. Missing programs, disabled modules and unconfigured roles are unavailable; batch-incompatible apps are marked single-item.
 - **Sources**: Default / type match means the default handler also matches that rule. Leo file-type match is a configured extension match, not a format-compatibility guarantee. Windows Open With owns system recommendations. Choose another app and browsing are manual choices. Default/module/detected entries are deduplicated by actual executable path.
 - **Detection and safety**: use configured modules, Windows App Paths/associations and existing Code/PotPlayer detection; no disk-wide scan, automatic install or default-association change. Every batch item must match and the app must declare batch support. Leo requests file opening only; it adds no macro/script execution or security-bypass flags. Saved administrator settings are used only after explicitly selecting that app.
+
+
+## File quick actions: Markdown, code and PDF
+
+- Drop one `.md` or `.markdown` file and choose **Import into Mojian**. Leo confirms import only after a matching receipt. Check preview, template, fonts and output location in Mojian, then confirm generation yourself. Leo does not choose styles, export or overwrite the source. One Markdown input per handoff.
+- Drop folders or declared editable text/code files and choose **Open in a new VS Code window**. This always uses `--new-window`. Configure Code.exe through Configure open apps if it is unavailable.
+- Drop a PDF to choose **Read with SumatraPDF**. Its path stays in local settings; configure/repair it from the same settings dialog.
+- At most three relevant actions occupy the primary area. Other viewers, default opening, Open With, copying paths, revealing locations, notes and tasks remain secondary as appropriate. Dropping alone runs nothing. Use arrows/Tab, Enter and Esc.
+- Processing tools use the existing Open capabilities dialog: choose **File import handoff**, link an application module (program, arguments, working directory and explicit administrator option), and specify the import script and extensions. The script must implement `LeoFileImport/1`; declaring extensions does not add import support to arbitrary software. No extra panel or system-association change is needed.
+- Esc closes the panel and stops waiting, but cannot recall an already submitted import. A timeout means no confirmation; inspect the tool before retrying. Conversion progress and completion remain Mojian's responsibility.

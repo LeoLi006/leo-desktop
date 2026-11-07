@@ -4,13 +4,13 @@ sealed class ApplicationOpenSettings:BarcaWindow
 {
     public Preferences? Result{get;private set;}
     readonly Preferences draft;readonly ListBox list=new();readonly TextBox name=new(),types=new();
-    readonly ComboBox application=new();readonly CheckBox folders=new(),multiple=new(),enabled=new();readonly Label detail=new();
+    readonly ComboBox application=new(),adapter=new();readonly TextBox script=new();readonly CheckBox folders=new(),multiple=new(),enabled=new();readonly Label detail=new();
     string current="";bool loading;
     public ApplicationOpenSettings(Preferences source)
     {
-        draft=LocalApplications.Clone(source);draft.ApplicationOpenRules??=[];AutoScaleMode=AutoScaleMode.None;Text="应用打开能力";ClientSize=new(720,570);
+        draft=LocalApplications.Clone(source);draft.ApplicationOpenRules??=[];AutoScaleMode=AutoScaleMode.None;Text="应用打开能力";ClientSize=new(720,700);
         Controls.Add(BarcaUi.Chrome(this,"应用打开能力","文件类型匹配不是兼容保证；程序、图标和启动选项复用应用模块。"));
-        list.SetBounds(20,105,180,360);list.BackColor=BarcaUi.Surface;list.ForeColor=BarcaUi.Text;list.BorderStyle=BorderStyle.None;
+        list.SetBounds(20,105,180,460);list.BackColor=BarcaUi.Surface;list.ForeColor=BarcaUi.Text;list.BorderStyle=BorderStyle.None;
         void Label(string text,int y){Controls.Add(new Label{Text=text,Bounds=new(220,y,475,23),ForeColor=BarcaUi.Muted,Font=BarcaUi.Font(9)});}
         void Field(Control c,int y,int h=28){c.SetBounds(220,y,475,h);c.BackColor=BarcaUi.Raised;c.ForeColor=BarcaUi.Text;Controls.Add(c);}
         Label("显示名称",104);Field(name,130);name.MaxLength=24;
@@ -20,11 +20,15 @@ sealed class ApplicationOpenSettings:BarcaWindow
         folders.SetBounds(220,316,160,27);multiple.SetBounds(385,316,310,27);enabled.SetBounds(220,350,240,27);
         foreach(var check in new[]{folders,multiple,enabled}){check.ForeColor=BarcaUi.Text;Controls.Add(check);}
         var edit=new BarcaButton{Text="程序、图标与启动选项…",Bounds=new(220,389,475,32)};edit.Click+=(_,_)=>EditApplication();
-        detail.SetBounds(220,433,475,72);detail.ForeColor=BarcaUi.Muted;detail.Font=BarcaUi.Font(8.5f);
-        var add=new BarcaButton{Text="添加能力…",Bounds=new(20,480,180,30)};add.Click+=(_,_)=>{
+        Label("处理方式",433);Field(adapter,459);adapter.DropDownStyle=ComboBoxStyle.DropDownList;
+        adapter.Items.Add(new ComboChoice(UiLanguage.T("请求应用打开文件"),"app"));adapter.Items.Add(new ComboChoice(UiLanguage.T("文件导入交接（需工具支持回执协议）"),"handoff"));
+        Label("导入脚本绝对路径（仅文件交接需要）",497);Field(script,523);
+        adapter.SelectedIndexChanged+=(_,_)=>{if(!adapter.Enabled)return;bool handoff=(adapter.SelectedItem as ComboChoice)?.Value=="handoff";folders.Enabled=multiple.Enabled=!handoff;script.Enabled=handoff;if(handoff){folders.Checked=false;multiple.Checked=false;}};
+        detail.SetBounds(220,565,475,72);detail.ForeColor=BarcaUi.Muted;detail.Font=BarcaUi.Font(8.5f);
+        var add=new BarcaButton{Text="添加能力…",Bounds=new(20,610,180,30)};add.Click+=(_,_)=>{
             try{Flush();var r=new ApplicationOpenRule("custom-"+Guid.NewGuid().ToString("N")[..12],"新应用",[]);draft.ApplicationOpenRules.Add(r);Reload(r.Id);}catch(Exception e){detail.Text=UiLanguage.T(e.Message);}
         };
-        var save=new BarcaButton{Text="保存",Bounds=new(583,520,112,32)};save.Click+=(_,_)=>{try{Flush();ApplicationOpenCapabilities.Validate(draft.ApplicationOpenRules);Result=draft;DialogResult=DialogResult.OK;}catch(Exception e){detail.Text=UiLanguage.T(e.Message);}};
+        var save=new BarcaButton{Text="保存",Bounds=new(583,650,112,32)};save.Click+=(_,_)=>{try{Flush();ApplicationOpenCapabilities.Validate(draft.ApplicationOpenRules);Result=draft;DialogResult=DialogResult.OK;}catch(Exception e){detail.Text=UiLanguage.T(e.Message);}};
         list.SelectedIndexChanged+=(_,_)=>{if(loading||list.SelectedItem is not ComboChoice choice)return;try{Flush();LoadRule(choice.Value);}catch(Exception e){detail.Text=UiLanguage.T(e.Message);loading=true;list.SelectedItem=list.Items.Cast<ComboChoice>().FirstOrDefault(c=>c.Value==current);loading=false;}};
         Controls.AddRange([list,edit,detail,add,save]);Reload("code");MinimumSize=MaximumSize=Size;
     }
@@ -36,7 +40,8 @@ sealed class ApplicationOpenSettings:BarcaWindow
     void LoadRule(string id)
     {
         current=id;var r=ApplicationOpenCapabilities.Rules(draft).Single(r=>r.Id==id);name.Text=r.Name;types.Text=string.Join(" ",r.Extensions);folders.Checked=r.Folders;multiple.Checked=r.Multiple;enabled.Checked=r.Enabled;
-        folders.Enabled=multiple.Enabled=r.Adapter!="media";
+        folders.Enabled=multiple.Enabled=r.Adapter is not("media" or "handoff");
+        adapter.Enabled=r.Adapter is "app" or "handoff";adapter.SelectedItem=adapter.Items.Cast<ComboChoice>().FirstOrDefault(c=>c.Value==r.Adapter);script.Text=r.ImportScript;script.Enabled=r.Adapter is "app" or "handoff";
         application.Items.Clear();application.Items.Add(new ComboChoice(UiLanguage.T("自动检测 / 未指定"),""));foreach(var app in draft.ApplicationModules)application.Items.Add(new ComboChoice(app.Name+(app.Enabled?"":UiLanguage.T("（已停用）")),app.Id));
         if(r.ModuleId.Length>0&&!draft.ApplicationModules.Any(a=>a.Id==r.ModuleId))application.Items.Add(new ComboChoice(UiLanguage.T("应用模块已移除"),r.ModuleId));
         application.SelectedItem=application.Items.Cast<ComboChoice>().FirstOrDefault(c=>c.Value==r.ModuleId)??application.Items[0];
@@ -47,7 +52,8 @@ sealed class ApplicationOpenSettings:BarcaWindow
     void Flush()
     {
         if(current.Length==0)return;var old=ApplicationOpenCapabilities.Rules(draft).Single(r=>r.Id==current);
-        var rule=old with{Name=name.Text.Trim(),Extensions=ApplicationOpenCapabilities.Ext(types.Text),Folders=folders.Checked,Multiple=multiple.Checked,Enabled=enabled.Checked,ModuleId=(application.SelectedItem as ComboChoice)?.Value??""};
+        string mode=adapter.Enabled?(adapter.SelectedItem as ComboChoice)?.Value??old.Adapter:old.Adapter;
+        var rule=old with{Adapter=mode,ImportScript=script.Text.Trim(),Name=name.Text.Trim(),Extensions=ApplicationOpenCapabilities.Ext(types.Text),Folders=mode=="handoff"?false:folders.Checked,Multiple=mode=="handoff"?false:multiple.Checked,Enabled=enabled.Checked,ModuleId=(application.SelectedItem as ComboChoice)?.Value??""};
         ApplicationOpenCapabilities.Validate([rule]);draft.ApplicationOpenRules.RemoveAll(r=>r.Id==current);draft.ApplicationOpenRules.Add(rule);
         if(rule.ModuleId.Length>0&&draft.ApplicationModules.FirstOrDefault(a=>a.Id==rule.ModuleId) is {} app&&app.Enabled&&rule.Enabled){
             LocalApplications.Validate(app);string actual=ApplicationOpenCapabilities.Identity(app.Path);if(!File.Exists(actual))throw new IOException("应用已停用、移除或程序路径无效。");

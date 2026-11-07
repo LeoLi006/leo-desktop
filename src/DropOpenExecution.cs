@@ -24,6 +24,7 @@ static class DropOpenExecution
             string id=root.GetProperty("opener").GetString()??"";var resolved=ApplicationOpenCapabilities.Resolve(prefs,catalog).SingleOrDefault(a=>a.Rule.Id==id)??throw new ArgumentException("打开能力已移除，请重新选择。");
             if(!resolved.Available)throw new IOException("应用已停用、移除或程序路径无效。");
             if(root.TryGetProperty("expected",out var expected)&&expected.GetString()!=resolved.Stamp)throw new InvalidOperationException("打开能力配置已变化，请重新选择。");
+            if(resolved.Rule.Adapter=="handoff")return await FileImportHandoff.Execute(resolved,paths,token,start);
             var info=ApplicationOpenCapabilities.Start(resolved,paths);
             if(resolved.Rule.Adapter=="media"){
                 if(dispatch==null)throw new InvalidOperationException("媒体入口尚未就绪。");

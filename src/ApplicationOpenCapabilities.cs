@@ -7,7 +7,7 @@ namespace LeoLauncher;
 
 // Rules reference existing application modules; executable/flags/icon/UAC remain owned there.
 sealed record ApplicationOpenRule(string Id,string Name,string[] Extensions,bool Folders=false,bool Multiple=false,
-    string Adapter="app",string ModuleId="",bool Enabled=true,string[]? DetectExecutables=null);
+    string Adapter="app",string ModuleId="",bool Enabled=true,string[]? DetectExecutables=null,string ImportScript="");
 sealed record ResolvedOpenApplication(ApplicationOpenRule Rule,LocalApplication? Application,string State,string Source)
 {
     public bool Available=>State=="ready";
@@ -18,6 +18,8 @@ sealed record ResolvedOpenApplication(ApplicationOpenRule Rule,LocalApplication?
 static class ApplicationOpenCapabilities
 {
     public static ApplicationOpenRule[] Defaults()=>[
+        new("mojian","转为墨笺手写",Ext("md markdown"),Adapter:"handoff"),
+        new("sumatra","用 SumatraPDF 阅读",Ext("pdf"),DetectExecutables:["SumatraPDF.exe"]),
         new("code","VS Code",Ext("txt md markdown json jsonl xml yaml yml toml ini cfg conf log csv tsv html htm css scss less js jsx ts tsx py ipynb c h cpp hpp cs java go rs rb php sql sh ps1 bat cmd r tex bib gitignore dockerfile"),true,true,"code",DetectExecutables:["Code.exe"]),
         new("potplayer","PotPlayer",Ext("mp3 flac wav m4a aac ogg opus wma mp4 mkv avi mov webm wmv ts mpeg mpg m4v"),Adapter:"media",DetectExecutables:["PotPlayerMini64.exe","PotPlayerMini.exe","PotPlayer64.exe","PotPlayer.exe"]),
         new("annotate","手写 / 批注",[]),
@@ -31,7 +33,9 @@ static class ApplicationOpenCapabilities
     {
         if(rules==null)return;var all=rules.ToArray();
         if(all.Length>40||all.Any(r=>r==null)||all.Select(r=>r.Id).Distinct().Count()!=all.Length)throw new ArgumentException("打开能力配置重复或过多。");
-        foreach(var r in all){if(new[]{"default","choose_app","configure_open","copy_paths","copy_text","reveal","note","todo","add_module","copy_image_file","open_url","save_image","copy_image"}.Contains(r.Id)||!Regex.IsMatch(r.Id??"",@"^[a-z][a-z0-9-]{1,39}$")||string.IsNullOrWhiteSpace(r.Name)||r.Name.Length>24||r.Name.Any(char.IsControl)||r.Extensions==null||r.Extensions.Length>120||r.Extensions.Any(e=>!Regex.IsMatch(e??"",@"^\.[a-zA-Z0-9_-]{1,24}$"))||r.Adapter is not("app" or "code" or "media")||(r.ModuleId==null||r.ModuleId.Length>0&&!Guid.TryParseExact(r.ModuleId,"N",out _))||r.DetectExecutables?.Length>16||r.DetectExecutables?.Any(e=>!Regex.IsMatch(e??"",@"^[a-zA-Z0-9 _.-]+\.exe$",RegexOptions.IgnoreCase))==true)throw new ArgumentException("打开能力的名称、类型或应用配置无效。");
+        foreach(var r in all){if(new[]{"default","choose_app","configure_open","copy_paths","copy_text","reveal","note","todo","add_module","copy_image_file","open_url","save_image","copy_image"}.Contains(r.Id)||!Regex.IsMatch(r.Id??"",@"^[a-z][a-z0-9-]{1,39}$")||string.IsNullOrWhiteSpace(r.Name)||r.Name.Length>24||r.Name.Any(char.IsControl)||r.Extensions==null||r.Extensions.Length>120||r.Extensions.Any(e=>!Regex.IsMatch(e??"",@"^\.[a-zA-Z0-9_-]{1,24}$"))||r.Adapter is not("app" or "code" or "media" or "handoff")||(r.ModuleId==null||r.ModuleId.Length>0&&!Guid.TryParseExact(r.ModuleId,"N",out _))||r.DetectExecutables?.Length>16||r.DetectExecutables?.Any(e=>!Regex.IsMatch(e??"",@"^[a-zA-Z0-9 _.-]+\.exe$",RegexOptions.IgnoreCase))==true)throw new ArgumentException("打开能力的名称、类型或应用配置无效。");
+            if(r.ImportScript==null||r.ImportScript.Length>4096||r.ImportScript.Length>0&&(!System.IO.Path.IsPathFullyQualified(r.ImportScript)||r.ImportScript.Any(char.IsControl)))throw new ArgumentException("处理脚本必须是本机绝对路径。");
+            if(r.Adapter=="handoff"&&(r.Multiple||r.Folders))throw new ArgumentException("文件导入交接目前仅支持单个文件。");
             if(r.Adapter=="media"&&(r.Id!="potplayer"||r.Multiple||r.Folders))throw new ArgumentException("PotPlayer 媒体适配目前仅支持单个媒体文件。");
         }
     }
@@ -67,7 +71,7 @@ static class ApplicationOpenCapabilities
                     }
                 }
                 if(!rule.Enabled||rule.Adapter=="media"&&!p.MediaModule||app?.Enabled==false)state="disabled";
-                else if(app!=null){LocalApplications.Validate(app);if(!File.Exists(Identity(app.Path)))throw new IOException();if(rule.Adapter=="code"&&!System.IO.Path.GetFileName(Identity(app.Path)).Equals("Code.exe",StringComparison.OrdinalIgnoreCase))throw new IOException();if(rule.Adapter=="media")ModulePaths.Validate("media",Identity(app.Path));state="ready";}
+                else if(app!=null){LocalApplications.Validate(app);if(rule.Adapter=="handoff"&&!File.Exists(rule.ImportScript))throw new IOException();if(!File.Exists(Identity(app.Path)))throw new IOException();if(rule.Adapter=="code"&&!System.IO.Path.GetFileName(Identity(app.Path)).Equals("Code.exe",StringComparison.OrdinalIgnoreCase))throw new IOException();if(rule.Adapter=="media")ModulePaths.Validate("media",Identity(app.Path));state="ready";}
             }catch(Exception e)when(FeatureFaults.Recoverable(e)){state="invalid-path";}
             output.Add(new(rule,app,state,source));
         }
@@ -75,9 +79,9 @@ static class ApplicationOpenCapabilities
     }
     public static (ResolvedOpenApplication[] Apps,bool Default,string DefaultPath) Candidates(Preferences p,string[] paths,IEnumerable<AppEntry>? catalog=null,Func<string,string?>? registered=null,Func<string,string?>? association=null)
     {
-        association??=Association;var matches=Resolve(p,catalog,registered,association).Where(a=>Matches(a.Rule,paths)).GroupBy(a=>Identity(a.Path) is{Length:>0} identity?identity:"rule:"+a.Rule.Id,StringComparer.OrdinalIgnoreCase).Select(g=>g.FirstOrDefault(a=>a.Available&&(paths.Length==1||a.Rule.Multiple))??g.FirstOrDefault(a=>a.Available)??g.First()).ToArray();
+        association??=Association;var matches=Resolve(p,catalog,registered,association).Where(a=>Matches(a.Rule,paths)).GroupBy(a=>a.Rule.Adapter=="handoff"?"handler:"+a.Rule.Id:Identity(a.Path) is{Length:>0} identity?identity:"rule:"+a.Rule.Id,StringComparer.OrdinalIgnoreCase).Select(g=>g.FirstOrDefault(a=>a.Available&&(paths.Length==1||a.Rule.Multiple))??g.FirstOrDefault(a=>a.Available)??g.First()).ToArray();
         string defaultPath=paths.All(File.Exists)&&paths.Select(System.IO.Path.GetExtension).Distinct(StringComparer.OrdinalIgnoreCase).Count()==1?association(System.IO.Path.GetExtension(paths[0]))??"":"";
-        var same=matches.FirstOrDefault(a=>a.Available&&defaultPath.Length>0&&Identity(a.Path).Equals(Identity(defaultPath),StringComparison.OrdinalIgnoreCase));
+        var same=matches.FirstOrDefault(a=>a.Available&&a.Rule.Adapter!="handoff"&&defaultPath.Length>0&&Identity(a.Path).Equals(Identity(defaultPath),StringComparison.OrdinalIgnoreCase));
         bool replaceDefault=same!=null&&(paths.Length==1||same.Rule.Multiple);
         if(same!=null&&!replaceDefault)matches=matches.Where(a=>a!=same).ToArray();
         if(same!=null&&replaceDefault)matches=matches.Select(a=>a==same?a with{Source="系统默认 / 类型匹配"}:a).ToArray();
@@ -87,6 +91,7 @@ static class ApplicationOpenCapabilities
     public static ProcessStartInfo Start(ResolvedOpenApplication value,string[] paths)
     {
         if(!value.Available||value.Application==null)throw new IOException("应用已停用、移除或程序路径无效。");
+        if(value.Rule.Adapter=="handoff")throw new ArgumentException("文件交接必须使用导入回执入口。");
         var r=value.Rule;paths=FileDropActions.RequirePaths(paths);
         if(!Matches(r,paths))throw new ArgumentException("所选应用的文件类型配置不匹配。");
         if(paths.Length>1&&!r.Multiple)throw new ArgumentException("此应用打开能力仅支持单项，请分开拖入。");
